@@ -1,0 +1,62 @@
+# Local assistant instructions and working state
+AGENTS.md
+.codex/
+.claude/
+.local/
+Tenant_Trust_Master_Task_List.xlsx
+~$*
+
+# Local environment and credentials; keep safe example configurations
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Generated PKI / Fabric identities and network artifacts
+**/peerOrganizations/
+**/ordererOrganizations/
+**/crypto-config/
+**/channel-artifacts/
+**/fabric-wallet/
+
+# Runtime data, raw evidence, local volumes and generated outputs
+/runtime/
+/data/
+/logs/
+/outputs/
+/artifacts/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Dependencies, caches and build output
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.next/
+dist/
+build/
+coverage/
+.coverage
+htmlcov/
+*.tsbuildinfo
+
+# Local editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
