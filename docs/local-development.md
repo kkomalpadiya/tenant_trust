@@ -54,19 +54,24 @@ Create the ignored local environment file once, start both services and apply mi
 
 ```powershell
 npm run infra:init
+npm run pki:init
+npm run policy:test
 npm run infra:up
 npm run infra:migrate
 npm run infra:check
 npm run messaging:verify
+npm run security-services:verify
 ```
 
-PostgreSQL listens on `127.0.0.1:55432`, Redis on `127.0.0.1:56379` and NATS on `127.0.0.1:54222`. The non-default ports avoid other local projects, while loopback binding prevents LAN access. Application containers should use the Compose service names `postgres:5432`, `redis:6379` and `nats:4222` on the backend network.
+PostgreSQL listens on `127.0.0.1:55432`, Redis on `127.0.0.1:56379`, NATS on `127.0.0.1:54222`, step-ca on `https://127.0.0.1:59000` and OPA on `127.0.0.1:58181`. The non-default ports avoid other local projects, while loopback binding prevents LAN access. Application containers use the Compose names `postgres:5432`, `redis:6379`, `nats:4222`, `step-ca:9000` and `opa:8181` on the backend network.
 
-The generated `.env` contains local credentials and is ignored by Git. `.env.example` contains safe placeholders and the digest-pinned images. Rerunning `npm run infra:init` adds newly documented settings without replacing existing secrets. Running it with `--force` rotates credentials, so first stop the stack and remove its volumes only when deliberately resetting all local data.
+The generated `.env` contains local credentials and is ignored by Git. `.env.example` contains safe placeholders and the digest-pinned images. `npm run infra:init` also creates the ignored `runtime/secrets/step-ca-password.txt` file when it is absent. Rerunning the command adds newly documented settings without replacing existing secrets.
+
+`npm run pki:init` initializes step-ca only when its named volume has no CA configuration. Repeated runs preserve the same CA identity. The `--force` option for `infra:init` rotates environment credentials but deliberately preserves the step-ca password file. CA key-password rotation requires a separate rekey procedure; deleting or replacing the password file alone can make the encrypted intermediate key unusable.
 
 Migrations are ordered SQL files under `database/migrations`. `npm run infra:migrate` records each successful filename in `platform.schema_migrations` and skips it on later runs. Add a new numbered file for every schema change instead of editing an already-applied migration.
 
-PostgreSQL, Redis and NATS use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. See [Reliable event delivery](architecture/event-delivery.md) for subject, acknowledgement, retry, deduplication and replay rules. Stop containers while retaining data with:
+PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. See [Reliable event delivery](architecture/event-delivery.md) for subject, acknowledgement, retry, deduplication and replay rules, and [Tenant certificate-authority model](architecture/tenant-pki.md) for the issuer boundary. Stop containers while retaining data with:
 
 ```powershell
 npm run infra:down

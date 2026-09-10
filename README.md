@@ -6,7 +6,7 @@ A valid certificate establishes identity. Access also depends on tenant membersh
 
 ## Current status
 
-The repository contains the initial scope, repository design, selected technology stack, shared event contracts and a runnable PostgreSQL, Redis and NATS JetStream development foundation. Application services and evaluation tools have not been implemented yet.
+The repository contains the initial scope, repository design, selected technology stack, shared event contracts and a runnable PostgreSQL, Redis, NATS JetStream, step-ca and OPA development foundation. Application services and evaluation tools have not been implemented yet.
 
 ## Planned capabilities
 
@@ -25,8 +25,9 @@ The repository contains the initial scope, repository design, selected technolog
 - [Local development setup and environment checks](docs/local-development.md)
 - [Shared service contracts](packages/contracts/README.md)
 - [Reliable event delivery](docs/architecture/event-delivery.md)
+- [Tenant certificate-authority model](docs/architecture/tenant-pki.md)
 
-Bootstrap the core services with `npm run infra:init`, `npm run infra:up`, `npm run infra:migrate` and `npm run infra:check`. Run `npm run messaging:verify` to demonstrate validated publish, retry and replay. Full commands and local port assignments are in the development guide.
+Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run infra:check`. Run the messaging and security-service verifiers for live demonstrations. Full commands and local port assignments are in the development guide.
 
 ## Planned infrastructure
 

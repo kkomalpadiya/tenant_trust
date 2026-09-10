@@ -72,6 +72,79 @@ services:
     networks:
       - backend
 
+  step-ca:
+    image: ${STEP_CA_IMAGE}
+    entrypoint: ["step-ca"]
+    command:
+      - /home/step/config/ca.json
+      - --password-file
+      - /run/secrets/step_ca_password
+    ports:
+      - "127.0.0.1:${STEP_CA_HOST_PORT}:9000"
+    volumes:
+      - step-ca-data:/home/step
+      - ../pki/verify-issuance.sh:/scripts/verify-issuance.sh:ro
+    secrets:
+      - step_ca_password
+    healthcheck:
+      test: ["CMD", "step", "ca", "health", "--ca-url", "https://localhost:9000", "--root", "/home/step/certs/root_ca.crt"]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backend
+
+  opa:
+    image: ${OPA_IMAGE}
+    command:
+      - run
+      - --server
+      - --addr=0.0.0.0:8181
+      - --log-format=json
+      - /policies
+    ports:
+      - "127.0.0.1:${OPA_HOST_PORT}:8181"
+    volumes:
+      - ../../policies:/policies:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/bin/busybox netstat -lnt | grep -q ':8181 '"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - backend
+
+  step-ca-init:
+    image: ${STEP_CA_IMAGE}
+    profiles: ["tools"]
+    entrypoint: ["/bin/sh", "/scripts/init-step-ca.sh"]
+    environment:
+      STEP_CA_NAME: Tenant Trust Local Platform CA
+      STEP_CA_DNS_NAMES: localhost,step-ca
+      STEP_CA_ADDRESS: :9000
+      STEP_CA_PROVISIONER: platform-admin
+    volumes:
+      - step-ca-data:/home/step
+      - ../pki/init-step-ca.sh:/scripts/init-step-ca.sh:ro
+    secrets:
+      - step_ca_password
+    networks:
+      - backend
+
+  opa-test:
+    image: ${OPA_IMAGE}
+    profiles: ["tools"]
+    entrypoint: ["/opa"]
+    command: ["test", "/policies", "--verbose"]
+    volumes:
+      - ../../policies:/policies:ro
+    networks:
+      - backend
+
   migrate:
     image: ${POSTGRES_IMAGE}
     profiles: ["tools"]
@@ -98,7 +171,13 @@ volumes:
     name: tenant-trust-redis-data
   nats-data:
     name: tenant-trust-nats-data
+  step-ca-data:
+    name: tenant-trust-step-ca-data
 
 networks:
   backend:
     name: tenant-trust-backend
+
+secrets:
+  step_ca_password:
+    file: ../../runtime/secrets/step-ca-password.txt
