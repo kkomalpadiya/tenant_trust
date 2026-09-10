@@ -49,6 +49,29 @@ services:
     networks:
       - backend
 
+  nats:
+    image: ${NATS_IMAGE}
+    command:
+      - --jetstream
+      - --store_dir=/data/jetstream
+      - --http_port=8222
+      - --name=tenant-trust-local
+      - --user=${NATS_USER}
+      - --pass=${NATS_PASSWORD}
+    ports:
+      - "127.0.0.1:${NATS_HOST_PORT}:4222"
+    volumes:
+      - nats-data:/data/jetstream
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - 'http://127.0.0.1:8222/healthz?js-enabled-only=true' | grep -q '\"status\":\"ok\"'"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - backend
+
   migrate:
     image: ${POSTGRES_IMAGE}
     profiles: ["tools"]
@@ -73,6 +96,8 @@ volumes:
     name: tenant-trust-postgres-data
   redis-data:
     name: tenant-trust-redis-data
+  nats-data:
+    name: tenant-trust-nats-data
 
 networks:
   backend:

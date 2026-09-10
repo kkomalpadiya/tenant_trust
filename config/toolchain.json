@@ -11,6 +11,9 @@
   "fabricNodeChaincode": "2.5.8",
   "fabricChaincodeNodeMajor": 22,
   "postgresql": "17.11",
+  "natsServer": "2.14.6",
+  "natsJetStreamClient": "3.4.0",
+  "natsTransportNode": "3.4.0",
   "profiles": {
     "smoke": { "dockerMemoryGiB": 1.5, "freeDiskGiB": 2 },
     "core": { "dockerMemoryGiB": 3.5, "freeDiskGiB": 15 },

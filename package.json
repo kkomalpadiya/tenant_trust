@@ -12,12 +12,14 @@
   "scripts": {
     "check:environment": "node scripts/check-environment.mjs",
     "infra:init": "node scripts/init-local-env.mjs",
-    "infra:up": "docker compose --env-file .env -f infra/compose/compose.yaml up -d postgres redis",
+    "infra:up": "docker compose --env-file .env -f infra/compose/compose.yaml up -d postgres redis nats",
     "infra:migrate": "docker compose --env-file .env -f infra/compose/compose.yaml --profile tools run --rm migrate",
     "infra:check": "node scripts/check-core-services.mjs",
     "infra:down": "docker compose --env-file .env -f infra/compose/compose.yaml down",
+    "messaging:verify": "node scripts/verify-event-delivery.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",
-    "test": "npm run test:contracts"
+    "test:messaging": "npm test --workspace @tenant-trust/messaging",
+    "test": "npm run test:contracts && npm run test:messaging"
   },
   "engines": {
     "node": "24.20.0",

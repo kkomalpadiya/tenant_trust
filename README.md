@@ -6,7 +6,7 @@ A valid certificate establishes identity. Access also depends on tenant membersh
 
 ## Current status
 
-The repository contains the initial scope, repository design, selected technology stack, shared event contracts and a runnable PostgreSQL and Redis development foundation. Application services and evaluation tools have not been implemented yet.
+The repository contains the initial scope, repository design, selected technology stack, shared event contracts and a runnable PostgreSQL, Redis and NATS JetStream development foundation. Application services and evaluation tools have not been implemented yet.
 
 ## Planned capabilities
 
@@ -24,8 +24,9 @@ The repository contains the initial scope, repository design, selected technolog
 - [Technology stack and resource budget](docs/architecture/technology-stack.md)
 - [Local development setup and environment checks](docs/local-development.md)
 - [Shared service contracts](packages/contracts/README.md)
+- [Reliable event delivery](docs/architecture/event-delivery.md)
 
-Bootstrap the core data services with `npm run infra:init`, `npm run infra:up`, `npm run infra:migrate` and `npm run infra:check`. Full commands and local port assignments are in the development guide.
+Bootstrap the core services with `npm run infra:init`, `npm run infra:up`, `npm run infra:migrate` and `npm run infra:check`. Run `npm run messaging:verify` to demonstrate validated publish, retry and replay. Full commands and local port assignments are in the development guide.
 
 ## Planned infrastructure
 

@@ -48,7 +48,7 @@ This is a global WSL setting. Save work in every WSL session and stop running co
 
 Close unneeded applications if host free memory is low. Keep project database and ledger contents in Docker named volumes; retain source code in the chosen checkout. Do not delete or prune other projects' images, containers or volumes as part of setup.
 
-## PostgreSQL and Redis
+## PostgreSQL, Redis and NATS
 
 Create the ignored local environment file once, start both services and apply migrations:
 
@@ -57,15 +57,16 @@ npm run infra:init
 npm run infra:up
 npm run infra:migrate
 npm run infra:check
+npm run messaging:verify
 ```
 
-PostgreSQL listens on `127.0.0.1:55432` and Redis on `127.0.0.1:56379`. The non-default ports avoid other local database projects, while loopback binding prevents LAN access. Application containers should use the Compose service names `postgres:5432` and `redis:6379` on the backend network.
+PostgreSQL listens on `127.0.0.1:55432`, Redis on `127.0.0.1:56379` and NATS on `127.0.0.1:54222`. The non-default ports avoid other local projects, while loopback binding prevents LAN access. Application containers should use the Compose service names `postgres:5432`, `redis:6379` and `nats:4222` on the backend network.
 
-The generated `.env` contains local credentials and is ignored by Git. `.env.example` contains safe placeholders and the digest-pinned images. Running `npm run infra:init -- --force` rotates credentials, so first stop the stack and remove its volumes only when deliberately resetting all local data.
+The generated `.env` contains local credentials and is ignored by Git. `.env.example` contains safe placeholders and the digest-pinned images. Rerunning `npm run infra:init` adds newly documented settings without replacing existing secrets. Running it with `--force` rotates credentials, so first stop the stack and remove its volumes only when deliberately resetting all local data.
 
 Migrations are ordered SQL files under `database/migrations`. `npm run infra:migrate` records each successful filename in `platform.schema_migrations` and skips it on later runs. Add a new numbered file for every schema change instead of editing an already-applied migration.
 
-PostgreSQL and Redis use the named volumes `tenant-trust-postgres-data` and `tenant-trust-redis-data`. Redis enables append-only persistence and disables eviction. Stop containers while retaining data with:
+PostgreSQL, Redis and NATS use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. See [Reliable event delivery](architecture/event-delivery.md) for subject, acknowledgement, retry, deduplication and replay rules. Stop containers while retaining data with:
 
 ```powershell
 npm run infra:down

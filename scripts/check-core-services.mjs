@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { AuthorizationError, connect } from "@nats-io/transport-node";
 
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const composeArgs = ["compose", "--env-file", ".env", "-f", "infra/compose/compose.yaml"];
@@ -76,6 +77,39 @@ for (const check of checks) {
   } catch (error) {
     failures += 1;
     console.error(`FAIL ${error.message}`);
+  }
+}
+
+try {
+  const connection = await connect({
+    servers: `nats://127.0.0.1:${environment.NATS_HOST_PORT}`,
+    user: environment.NATS_USER,
+    pass: environment.NATS_PASSWORD,
+    name: "tenant-trust-core-check",
+    timeout: 3_000,
+  });
+  await connection.close();
+  console.log("PASS NATS accepts authenticated connections");
+} catch (error) {
+  failures += 1;
+  console.error(`FAIL NATS authenticated connection failed: ${error.message}`);
+}
+
+try {
+  const unauthenticated = await connect({
+    servers: `nats://127.0.0.1:${environment.NATS_HOST_PORT}`,
+    name: "tenant-trust-unauthenticated-check",
+    timeout: 3_000,
+  });
+  await unauthenticated.close();
+  failures += 1;
+  console.error("FAIL NATS accepted an unauthenticated connection");
+} catch (error) {
+  if (error instanceof AuthorizationError) {
+    console.log("PASS NATS rejects unauthenticated connections");
+  } else {
+    failures += 1;
+    console.error(`FAIL NATS unauthenticated check failed unexpectedly: ${error.message}`);
   }
 }
 
