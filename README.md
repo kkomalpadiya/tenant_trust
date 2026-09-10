@@ -26,6 +26,7 @@ The repository contains the initial scope, repository design, selected technolog
 - [Shared service contracts](packages/contracts/README.md)
 - [Reliable event delivery](docs/architecture/event-delivery.md)
 - [Tenant certificate-authority model](docs/architecture/tenant-pki.md)
+- [Threat model and failure policy](docs/security/threat-model.md)
 
 Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run infra:check`. Run the messaging and security-service verifiers for live demonstrations. Full commands and local port assignments are in the development guide.
 
