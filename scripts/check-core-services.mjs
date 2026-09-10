@@ -1,0 +1,83 @@
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const repositoryRoot = resolve(import.meta.dirname, "..");
+const composeArgs = ["compose", "--env-file", ".env", "-f", "infra/compose/compose.yaml"];
+const environment = Object.fromEntries(
+  readFileSync(resolve(repositoryRoot, ".env"), "utf8")
+    .split(/\r?\n/u)
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => {
+      const separator = line.indexOf("=");
+      return [line.slice(0, separator), line.slice(separator + 1)];
+    }),
+);
+const psql = ["exec", "-T", "postgres", "psql", "-U", environment.POSTGRES_USER, "-d", environment.POSTGRES_DB, "-Atqc"];
+
+function run(args, label) {
+  const result = spawnSync("docker", [...composeArgs, ...args], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    const detail = (result.stderr || result.stdout).trim();
+    throw new Error(`${label} failed${detail ? `: ${detail}` : ""}`);
+  }
+  return result.stdout.trim();
+}
+
+const checks = [
+  {
+    label: "PostgreSQL accepts authenticated queries",
+    args: [...psql, "SELECT 1"],
+    expected: "1",
+  },
+  {
+    label: "Foundation migration is recorded",
+    args: [...psql, "SELECT count(*) FROM platform.schema_migrations"],
+    expected: "1",
+  },
+  {
+    label: "Identity, trust and audit schemas exist",
+    args: [...psql, "SELECT count(*) FROM information_schema.schemata WHERE schema_name IN ('identity','trust','audit')"],
+    expected: "3",
+  },
+  {
+    label: "Redis accepts authenticated commands",
+    args: ["exec", "-T", "redis", "redis-cli", "--no-auth-warning", "ping"],
+    expected: "PONG",
+  },
+  {
+    label: "Redis rejects unauthenticated commands",
+    args: ["exec", "-T", "redis", "env", "-u", "REDISCLI_AUTH", "redis-cli", "ping"],
+    expected: "NOAUTH Authentication required.",
+  },
+  {
+    label: "Redis append-only persistence is enabled",
+    args: ["exec", "-T", "redis", "redis-cli", "--no-auth-warning", "CONFIG", "GET", "appendonly"],
+    expected: "appendonly\nyes",
+  },
+  {
+    label: "Redis eviction is disabled for durable state",
+    args: ["exec", "-T", "redis", "redis-cli", "--no-auth-warning", "CONFIG", "GET", "maxmemory-policy"],
+    expected: "maxmemory-policy\nnoeviction",
+  },
+];
+
+let failures = 0;
+for (const check of checks) {
+  try {
+    const actual = run(check.args, check.label).replaceAll("\r", "");
+    if (actual !== check.expected) {
+      throw new Error(`expected ${JSON.stringify(check.expected)}, received ${JSON.stringify(actual)}`);
+    }
+    console.log(`PASS ${check.label}`);
+  } catch (error) {
+    failures += 1;
+    console.error(`FAIL ${error.message}`);
+  }
+}
+
+if (failures > 0) process.exit(1);
+console.log("Core service checks passed.");

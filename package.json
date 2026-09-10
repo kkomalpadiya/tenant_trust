@@ -11,6 +11,11 @@
   ],
   "scripts": {
     "check:environment": "node scripts/check-environment.mjs",
+    "infra:init": "node scripts/init-local-env.mjs",
+    "infra:up": "docker compose --env-file .env -f infra/compose/compose.yaml up -d postgres redis",
+    "infra:migrate": "docker compose --env-file .env -f infra/compose/compose.yaml --profile tools run --rm migrate",
+    "infra:check": "node scripts/check-core-services.mjs",
+    "infra:down": "docker compose --env-file .env -f infra/compose/compose.yaml down",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",
     "test": "npm run test:contracts"
   },
