@@ -6,7 +6,7 @@ A valid certificate establishes identity. Access also depends on tenant membersh
 
 ## Current status
 
-The repository contains the initial scope and repository design. Application services, infrastructure configuration and evaluation tools have not been implemented yet. There is no runnable application at this stage.
+The repository contains the initial scope, repository design, selected technology stack and an environment checker. Application services, infrastructure configuration and evaluation tools have not been implemented yet. There is no runnable application at this stage.
 
 ## Planned capabilities
 
@@ -21,10 +21,12 @@ The repository contains the initial scope and repository design. Application ser
 
 - [Prototype scope and demonstration](docs/scope.md)
 - [Repository layout and component boundaries](docs/architecture/repository-layout.md)
+- [Technology stack and resource budget](docs/architecture/technology-stack.md)
+- [Local development setup and environment checks](docs/local-development.md)
 
 ## Planned infrastructure
 
-The initial design uses PostgreSQL for durable application state, Redis for short-lived runtime state, NATS for event delivery, step-ca for certificate services, OPA for policy decisions and Hyperledger Fabric for audit commitments. Application languages, runtime versions and local deployment configuration will be selected before implementation.
+The application uses TypeScript on Node.js 24 LTS, Fastify for the API and React with Vite for the dashboard. PostgreSQL holds durable application state, Redis holds short-lived runtime state, NATS delivers events, step-ca provides certificate services, OPA makes policy decisions and Hyperledger Fabric records audit commitments. Docker Desktop with WSL2 runs Linux services locally. See the technology stack document for version targets and component bootstrap boundaries.
 
 ## Configuration and generated files
 

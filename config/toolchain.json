@@ -1,0 +1,19 @@
+{
+  "node": "24.20.0",
+  "nodeImage": "node:24.20.0-bookworm-slim",
+  "packageManager": "npm",
+  "typescript": "5.9.3",
+  "fastify": "5.12.3",
+  "react": "19.2.8",
+  "vite": "8.2.2",
+  "fabricGateway": "1.12.1",
+  "fabric": "2.5.16",
+  "fabricNodeChaincode": "2.5.8",
+  "fabricChaincodeNodeMajor": 22,
+  "postgresql": "17.11",
+  "profiles": {
+    "smoke": { "dockerMemoryGiB": 1.5, "freeDiskGiB": 2 },
+    "core": { "dockerMemoryGiB": 3.5, "freeDiskGiB": 15 },
+    "fabric": { "dockerMemoryGiB": 5.5, "freeDiskGiB": 25 }
+  }
+}

@@ -79,4 +79,4 @@ Production high availability, billing/subscriptions, external customer onboardin
 
 ## Remaining implementation decisions
 
-Select application languages, frontend framework, supported versions, local container runtime and resource limits next. The second factor, certificate status mechanism, Fabric topology, detailed thresholds and reporting deadline remain decisions for their respective tasks. This document does not claim those components are already implemented or experimentally validated.
+Application languages, frontend framework, runtime targets and initial resource budgets are defined in [the technology stack](architecture/technology-stack.md). The second factor, certificate status mechanism, Fabric topology, detailed thresholds and reporting deadline remain decisions for their respective tasks. This document does not claim those components are already implemented or experimentally validated.
