@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/common.schema.json",
+  "title": "Tenant Trust common contract definitions",
+  "$defs": {
+    "tenantId": { "type": "string", "pattern": "^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "subjectId": { "type": "string", "pattern": "^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "certificateId": { "type": "string", "pattern": "^crt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "issuerId": { "type": "string", "pattern": "^iss_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "sourceId": { "type": "string", "pattern": "^src_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "evidenceId": { "type": "string", "pattern": "^evd_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "trustTransitionId": { "type": "string", "pattern": "^trn_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "policyVersionId": { "type": "string", "pattern": "^pol_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "decisionId": { "type": "string", "pattern": "^dec_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "actionId": { "type": "string", "pattern": "^act_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "requestId": { "type": "string", "pattern": "^req_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "eventId": { "type": "string", "pattern": "^evt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "correlationId": { "type": "string", "pattern": "^cor_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "rfc3339Utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "reasonCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$" },
+    "producer": {
+      "type": "object",
+      "properties": {
+        "service": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$" },
+        "instanceId": { "type": "string", "minLength": 1, "maxLength": 128 }
+      },
+      "required": ["service", "instanceId"],
+      "additionalProperties": false
+    },
+    "aggregateId": {
+      "oneOf": [
+        { "$ref": "#/$defs/tenantId" },
+        { "$ref": "#/$defs/subjectId" },
+        { "$ref": "#/$defs/certificateId" },
+        { "$ref": "#/$defs/evidenceId" },
+        { "$ref": "#/$defs/trustTransitionId" },
+        { "$ref": "#/$defs/policyVersionId" },
+        { "$ref": "#/$defs/decisionId" },
+        { "$ref": "#/$defs/actionId" }
+      ]
+    },
+    "eventEnvelope": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "eventId": { "$ref": "#/$defs/eventId" },
+        "eventType": { "type": "string" },
+        "tenantId": { "$ref": "#/$defs/tenantId" },
+        "subjectId": { "oneOf": [{ "$ref": "#/$defs/subjectId" }, { "type": "null" }] },
+        "aggregateId": { "$ref": "#/$defs/aggregateId" },
+        "correlationId": { "$ref": "#/$defs/correlationId" },
+        "causationId": { "oneOf": [{ "$ref": "#/$defs/eventId" }, { "type": "null" }] },
+        "idempotencyKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:/-]{7,159}$" },
+        "occurredAt": { "$ref": "#/$defs/rfc3339Utc" },
+        "recordedAt": { "$ref": "#/$defs/rfc3339Utc" },
+        "producer": { "$ref": "#/$defs/producer" },
+        "payload": { "type": "object" }
+      },
+      "required": ["schemaVersion", "eventId", "eventType", "tenantId", "subjectId", "aggregateId", "correlationId", "causationId", "idempotencyKey", "occurredAt", "recordedAt", "producer", "payload"],
+      "additionalProperties": false
+    }
+  }
+}

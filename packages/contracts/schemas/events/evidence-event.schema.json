@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/events/evidence-event.schema.json",
+  "title": "Evidence ingestion event",
+  "type": "object",
+  "allOf": [
+    { "$ref": "../common.schema.json#/$defs/eventEnvelope" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "enum": ["evidence.accepted.v1", "evidence.rejected.v1"] },
+        "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "aggregateId": { "$ref": "../common.schema.json#/$defs/evidenceId" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "evidenceId": { "$ref": "../common.schema.json#/$defs/evidenceId" },
+            "sourceId": { "$ref": "../common.schema.json#/$defs/sourceId" },
+            "evidenceType": { "enum": ["identity", "device", "behaviour", "certificate", "compliance"] },
+            "observedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            "expiresAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            "sourceSequence": { "type": "integer", "minimum": 0 },
+            "contentHashSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
+            "synthetic": { "type": "boolean" },
+            "rejectionCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }
+          },
+          "required": ["evidenceId", "sourceId", "evidenceType", "observedAt", "expiresAt", "sourceSequence", "contentHashSha256", "synthetic"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["payload"]
+    }
+  ],
+  "if": { "type": "object", "properties": { "eventType": { "const": "evidence.rejected.v1" } } },
+  "then": { "type": "object", "properties": { "payload": { "type": "object", "properties": { "rejectionCode": { "$ref": "../common.schema.json#/$defs/reasonCode" } }, "required": ["rejectionCode"] } } }
+}

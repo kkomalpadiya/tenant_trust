@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/events/decision-event.schema.json",
+  "title": "Authorization decision event",
+  "type": "object",
+  "allOf": [
+    { "$ref": "../common.schema.json#/$defs/eventEnvelope" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "access.decided.v1" },
+        "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "aggregateId": { "$ref": "../common.schema.json#/$defs/decisionId" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "decisionId": { "$ref": "../common.schema.json#/$defs/decisionId" },
+            "requestId": { "$ref": "../common.schema.json#/$defs/requestId" },
+            "certificateId": { "$ref": "../common.schema.json#/$defs/certificateId" },
+            "trustTransitionId": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/trustTransitionId" }, { "type": "null" }] },
+            "trustScore": { "$ref": "../common.schema.json#/$defs/score" },
+            "policyVersionId": { "$ref": "../common.schema.json#/$defs/policyVersionId" },
+            "operation": { "enum": ["profile:read", "record:read", "record:write", "record:export", "member:manage", "certificate:manage", "admin-key:rotate"] },
+            "resourceType": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$" },
+            "resourceIdHashSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
+            "outcome": { "enum": ["ALLOW", "STEP_UP", "DENY", "QUARANTINE"] },
+            "reasonCodes": { "type": "array", "items": { "$ref": "../common.schema.json#/$defs/reasonCode" }, "minItems": 1, "uniqueItems": true },
+            "stepUpProofIdHashSha256": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/sha256" }, { "type": "null" }] }
+          },
+          "required": ["decisionId", "requestId", "certificateId", "trustTransitionId", "trustScore", "policyVersionId", "operation", "resourceType", "resourceIdHashSha256", "outcome", "reasonCodes", "stepUpProofIdHashSha256"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["payload"]
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/events/certificate-event.schema.json",
+  "title": "Certificate lifecycle event",
+  "type": "object",
+  "allOf": [
+    { "$ref": "../common.schema.json#/$defs/eventEnvelope" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "enum": ["certificate.requested.v1", "certificate.issued.v1", "certificate.renewed.v1", "certificate.revoked.v1", "certificate.expired.v1"] },
+        "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "aggregateId": { "$ref": "../common.schema.json#/$defs/certificateId" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "certificateId": { "$ref": "../common.schema.json#/$defs/certificateId" },
+            "issuerId": { "$ref": "../common.schema.json#/$defs/issuerId" },
+            "serialNumber": { "type": "string", "pattern": "^[0-9A-F]{2,64}$" },
+            "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
+            "state": { "enum": ["requested", "active", "revoked", "expired"] },
+            "notBefore": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            "notAfter": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            "supersedesCertificateId": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/certificateId" }, { "type": "null" }] },
+            "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }
+          },
+          "required": ["certificateId", "issuerId", "state"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["payload"]
+    }
+  ],
+  "if": { "type": "object", "properties": { "eventType": { "const": "certificate.revoked.v1" } } },
+  "then": { "type": "object", "properties": { "payload": { "type": "object", "properties": { "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "serialNumber": { "type": "string", "pattern": "^[0-9A-F]{2,64}$" } }, "required": ["reasonCode", "fingerprintSha256", "serialNumber"] } } }
+}

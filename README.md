@@ -23,6 +23,7 @@ The repository contains the initial scope, repository design, selected technolog
 - [Repository layout and component boundaries](docs/architecture/repository-layout.md)
 - [Technology stack and resource budget](docs/architecture/technology-stack.md)
 - [Local development setup and environment checks](docs/local-development.md)
+- [Shared service contracts](packages/contracts/README.md)
 
 ## Planned infrastructure
 

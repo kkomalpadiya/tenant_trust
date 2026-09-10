@@ -1,0 +1,13 @@
+{
+  "name": "@tenant-trust/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "schemas",
+    "README.md"
+  ],
+  "exports": {
+    "./schemas/*": "./schemas/*"
+  }
+}

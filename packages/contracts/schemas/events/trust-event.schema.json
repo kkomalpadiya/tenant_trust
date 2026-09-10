@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/events/trust-event.schema.json",
+  "title": "Trust transition event",
+  "type": "object",
+  "allOf": [
+    { "$ref": "../common.schema.json#/$defs/eventEnvelope" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "const": "trust.updated.v1" },
+        "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "aggregateId": { "$ref": "../common.schema.json#/$defs/trustTransitionId" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "transitionId": { "$ref": "../common.schema.json#/$defs/trustTransitionId" },
+            "previousScore": { "$ref": "../common.schema.json#/$defs/score" },
+            "newScore": { "$ref": "../common.schema.json#/$defs/score" },
+            "previousBand": { "enum": ["trusted", "conditional", "restricted", "quarantine", "uninitialized"] },
+            "newBand": { "enum": ["trusted", "conditional", "restricted", "quarantine"] },
+            "modelVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+            "configurationVersion": { "type": "integer", "minimum": 1 },
+            "evidenceIds": { "type": "array", "items": { "$ref": "../common.schema.json#/$defs/evidenceId" }, "minItems": 1, "uniqueItems": true },
+            "explanationHashSha256": { "$ref": "../common.schema.json#/$defs/sha256" }
+          },
+          "required": ["transitionId", "previousScore", "newScore", "previousBand", "newBand", "modelVersion", "configurationVersion", "evidenceIds", "explanationHashSha256"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["payload"]
+    }
+  ]
+}

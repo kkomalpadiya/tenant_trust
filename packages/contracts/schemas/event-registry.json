@@ -1,0 +1,27 @@
+{
+  "registryVersion": "1.0.0",
+  "events": {
+    "tenant.created.v1": "events/tenant-event.schema.json",
+    "tenant.suspended.v1": "events/tenant-event.schema.json",
+    "tenant.reactivated.v1": "events/tenant-event.schema.json",
+    "subject.provisioned.v1": "events/subject-event.schema.json",
+    "subject.role-changed.v1": "events/subject-event.schema.json",
+    "subject.suspended.v1": "events/subject-event.schema.json",
+    "subject.reactivated.v1": "events/subject-event.schema.json",
+    "certificate.requested.v1": "events/certificate-event.schema.json",
+    "certificate.issued.v1": "events/certificate-event.schema.json",
+    "certificate.renewed.v1": "events/certificate-event.schema.json",
+    "certificate.revoked.v1": "events/certificate-event.schema.json",
+    "certificate.expired.v1": "events/certificate-event.schema.json",
+    "evidence.accepted.v1": "events/evidence-event.schema.json",
+    "evidence.rejected.v1": "events/evidence-event.schema.json",
+    "trust.updated.v1": "events/trust-event.schema.json",
+    "policy.published.v1": "events/policy-event.schema.json",
+    "policy.activated.v1": "events/policy-event.schema.json",
+    "policy.rolled-back.v1": "events/policy-event.schema.json",
+    "access.decided.v1": "events/decision-event.schema.json",
+    "security-action.requested.v1": "events/action-event.schema.json",
+    "security-action.succeeded.v1": "events/action-event.schema.json",
+    "security-action.failed.v1": "events/action-event.schema.json"
+  }
+}

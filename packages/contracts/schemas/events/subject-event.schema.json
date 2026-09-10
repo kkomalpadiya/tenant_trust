@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/events/subject-event.schema.json",
+  "title": "Subject lifecycle event",
+  "type": "object",
+  "allOf": [
+    { "$ref": "../common.schema.json#/$defs/eventEnvelope" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "enum": ["subject.provisioned.v1", "subject.role-changed.v1", "subject.suspended.v1", "subject.reactivated.v1"] },
+        "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "aggregateId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "state": { "enum": ["active", "suspended"] },
+            "roles": { "type": "array", "items": { "enum": ["tenant-admin", "tenant-member"] }, "minItems": 1, "uniqueItems": true },
+            "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }
+          },
+          "required": ["state", "roles"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["payload"]
+    }
+  ]
+}

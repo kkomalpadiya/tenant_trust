@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/events/policy-event.schema.json",
+  "title": "Policy lifecycle event",
+  "type": "object",
+  "allOf": [
+    { "$ref": "../common.schema.json#/$defs/eventEnvelope" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "enum": ["policy.published.v1", "policy.activated.v1", "policy.rolled-back.v1"] },
+        "aggregateId": { "$ref": "../common.schema.json#/$defs/policyVersionId" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "policyVersionId": { "$ref": "../common.schema.json#/$defs/policyVersionId" },
+            "bundleVersion": { "type": "integer", "minimum": 1 },
+            "bundleHashSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
+            "state": { "enum": ["published", "active", "superseded"] },
+            "replacesPolicyVersionId": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/policyVersionId" }, { "type": "null" }] }
+          },
+          "required": ["policyVersionId", "bundleVersion", "bundleHashSha256", "state", "replacesPolicyVersionId"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["payload"]
+    }
+  ]
+}

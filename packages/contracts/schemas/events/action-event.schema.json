@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/events/action-event.schema.json",
+  "title": "Security action event",
+  "type": "object",
+  "allOf": [
+    { "$ref": "../common.schema.json#/$defs/eventEnvelope" },
+    {
+      "type": "object",
+      "properties": {
+        "eventType": { "enum": ["security-action.requested.v1", "security-action.succeeded.v1", "security-action.failed.v1"] },
+        "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "aggregateId": { "$ref": "../common.schema.json#/$defs/actionId" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "actionId": { "$ref": "../common.schema.json#/$defs/actionId" },
+            "decisionId": { "$ref": "../common.schema.json#/$defs/decisionId" },
+            "actionType": { "enum": ["restrict-access", "suspend-subject", "block-renewal", "revoke-certificate", "restore-access", "issue-replacement-certificate"] },
+            "status": { "enum": ["requested", "succeeded", "failed"] },
+            "targetCertificateId": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/certificateId" }, { "type": "null" }] },
+            "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" },
+            "failureCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }
+          },
+          "required": ["actionId", "decisionId", "actionType", "status", "targetCertificateId", "reasonCode"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["payload"]
+    }
+  ],
+  "if": { "type": "object", "properties": { "eventType": { "const": "security-action.failed.v1" } } },
+  "then": { "type": "object", "properties": { "payload": { "type": "object", "properties": { "failureCode": { "$ref": "../common.schema.json#/$defs/reasonCode" } }, "required": ["failureCode"] } } }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "tenant-trust",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*",
+    "chaincode/*"
+  ],
+  "scripts": {
+    "check:environment": "node scripts/check-environment.mjs",
+    "test:contracts": "node --test packages/contracts/test/*.test.mjs",
+    "test": "npm run test:contracts"
+  },
+  "engines": {
+    "node": "24.20.0",
+    "npm": ">=10.8.3"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  }
+}
