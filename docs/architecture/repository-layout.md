@@ -11,6 +11,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `services/orchestrator/` | Security action state machine, certificate actions and governed recovery |
 | `services/audit/` | Durable audit delivery, Fabric integration, reconciliation and verification |
 | `packages/contracts/` | Versioned request, event and decision schemas shared by producers and consumers |
+| `packages/tenant-context/` | Trusted authenticated tenant-context resolution and anti-switch checks shared by enforcement points |
 | `policies/` | OPA policy source and policy test cases |
 | `database/migrations/` | Ordered application schema changes, including tenant isolation controls |
 | `database/seeds/` | Idempotent synthetic development data with deterministic identifiers and no credentials |
@@ -26,7 +27,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 
 ## Boundary rules
 
-- The API derives tenant identity from authenticated context. Every store, cache key, event and policy lookup preserves tenant scope.
+- The API derives tenant identity from authenticated context through `packages/tenant-context/`. Client headers and resource IDs can confirm that context but cannot select or replace it. Every store, cache key, event and policy lookup preserves tenant scope.
 - Shared contracts describe interfaces without exposing component internals. Schema changes must account for both producers and consumers.
 - Component paths define responsibilities, not a requirement to run every component in a separate process. Deployment granularity will follow the local resource budget.
 - Certificate validation and policy enforcement gate protected operations. Trust computation supplies versioned input to policy decisions.

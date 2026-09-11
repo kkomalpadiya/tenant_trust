@@ -61,6 +61,7 @@ npm run infra:migrate
 npm run demo:provision
 npm run infra:check
 npm run demo:verify
+npm run test:tenant-context
 npm run messaging:verify
 npm run security-services:verify
 npm run foundation:check
@@ -80,7 +81,7 @@ PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables ap
 
 ## Foundation verification
 
-Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests, the tenant identity model and deterministic demo records, OPA policy, authenticated core services, NATS delivery and replay, step-ca issuance, and the dependency audit.
+Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests including trusted tenant-context resolution, the tenant identity model and deterministic demo records, OPA policy, authenticated core services, NATS delivery and replay, step-ca issuance, and the dependency audit.
 
 Run `npm run foundation:clean` to prove a first start from empty service state. The command generates temporary credentials and free loopback ports, creates uniquely named containers, volumes and a network, initializes the CA, applies migrations, runs the complete foundation verification, and then removes those disposable resources. It does not reuse or delete the normal `tenant-trust-*` volumes or `runtime/secrets` files.
 

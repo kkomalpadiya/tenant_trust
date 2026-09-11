@@ -27,7 +27,8 @@
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",
     "test:messaging": "npm test --workspace @tenant-trust/messaging",
-    "test": "npm run test:contracts && npm run test:messaging"
+    "test:tenant-context": "npm test --workspace @tenant-trust/tenant-context",
+    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context"
   },
   "engines": {
     "node": "24.20.0",
