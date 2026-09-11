@@ -166,18 +166,18 @@ services:
 
 volumes:
   postgres-data:
-    name: tenant-trust-postgres-data
+    name: ${POSTGRES_VOLUME_NAME}
   redis-data:
-    name: tenant-trust-redis-data
+    name: ${REDIS_VOLUME_NAME}
   nats-data:
-    name: tenant-trust-nats-data
+    name: ${NATS_VOLUME_NAME}
   step-ca-data:
-    name: tenant-trust-step-ca-data
+    name: ${STEP_CA_VOLUME_NAME}
 
 networks:
   backend:
-    name: tenant-trust-backend
+    name: ${BACKEND_NETWORK_NAME}
 
 secrets:
   step_ca_password:
-    file: ../../runtime/secrets/step-ca-password.txt
+    file: ${STEP_CA_PASSWORD_FILE}

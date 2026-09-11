@@ -1,20 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { X509Certificate } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-const repositoryRoot = resolve(import.meta.dirname, "..");
-const environment = Object.fromEntries(
-  readFileSync(resolve(repositoryRoot, ".env"), "utf8")
-    .split(/\r?\n/u)
-    .filter((line) => line && !line.startsWith("#") && line.includes("="))
-    .map((line) => {
-      const separator = line.indexOf("=");
-      return [line.slice(0, separator), line.slice(separator + 1)];
-    }),
-);
-const composeArgs = ["compose", "--env-file", ".env", "-f", "infra/compose/compose.yaml"];
+import { composeArgs, environment, repositoryRoot } from "./lib/foundation-context.mjs";
 
 function compose(args, label) {
   const result = spawnSync("docker", [...composeArgs, ...args], {

@@ -18,4 +18,4 @@ step ca init \
 test -f /home/step/certs/root_ca.crt
 test -f /home/step/certs/intermediate_ca.crt
 test -f /home/step/secrets/intermediate_ca_key
-echo "Initialized the local platform CA in the tenant-trust-step-ca-data volume."
+echo "Initialized the local platform CA in /home/step."

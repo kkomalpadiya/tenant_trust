@@ -1,19 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { AuthorizationError, connect } from "@nats-io/transport-node";
+import { composeArgs, environment, repositoryRoot } from "./lib/foundation-context.mjs";
 
-const repositoryRoot = resolve(import.meta.dirname, "..");
-const composeArgs = ["compose", "--env-file", ".env", "-f", "infra/compose/compose.yaml"];
-const environment = Object.fromEntries(
-  readFileSync(resolve(repositoryRoot, ".env"), "utf8")
-    .split(/\r?\n/u)
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => {
-      const separator = line.indexOf("=");
-      return [line.slice(0, separator), line.slice(separator + 1)];
-    }),
-);
 const psql = ["exec", "-T", "postgres", "psql", "-U", environment.POSTGRES_USER, "-d", environment.POSTGRES_DB, "-Atqc"];
 
 function run(args, label) {

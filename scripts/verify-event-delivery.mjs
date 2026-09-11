@@ -12,18 +12,7 @@ import {
   eventStreamConfig,
   subjectForEvent,
 } from "@tenant-trust/messaging";
-
-const repositoryRoot = resolve(import.meta.dirname, "..");
-const parseEnvironment = (path) => Object.fromEntries(
-  readFileSync(path, "utf8")
-    .split(/\r?\n/u)
-    .filter((line) => line && !line.startsWith("#") && line.includes("="))
-    .map((line) => {
-      const separator = line.indexOf("=");
-      return [line.slice(0, separator), line.slice(separator + 1)];
-    }),
-);
-const environment = parseEnvironment(resolve(repositoryRoot, ".env"));
+import { environment, repositoryRoot } from "./lib/foundation-context.mjs";
 
 for (const key of ["NATS_HOST_PORT", "NATS_USER", "NATS_PASSWORD"]) {
   if (!environment[key]) throw new Error(`Missing ${key}; run npm run infra:init.`);

@@ -61,6 +61,7 @@ npm run infra:migrate
 npm run infra:check
 npm run messaging:verify
 npm run security-services:verify
+npm run foundation:check
 ```
 
 PostgreSQL listens on `127.0.0.1:55432`, Redis on `127.0.0.1:56379`, NATS on `127.0.0.1:54222`, step-ca on `https://127.0.0.1:59000` and OPA on `127.0.0.1:58181`. The non-default ports avoid other local projects, while loopback binding prevents LAN access. Application containers use the Compose names `postgres:5432`, `redis:6379`, `nats:4222`, `step-ca:9000` and `opa:8181` on the backend network.
@@ -71,10 +72,38 @@ The generated `.env` contains local credentials and is ignored by Git. `.env.exa
 
 Migrations are ordered SQL files under `database/migrations`. `npm run infra:migrate` records each successful filename in `platform.schema_migrations` and skips it on later runs. Add a new numbered file for every schema change instead of editing an already-applied migration.
 
-PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. See [Reliable event delivery](architecture/event-delivery.md) for subject, acknowledgement, retry, deduplication and replay rules, and [Tenant certificate-authority model](architecture/tenant-pki.md) for the issuer boundary. Stop containers while retaining data with:
+PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. See [Reliable event delivery](architecture/event-delivery.md) for subject, acknowledgement, retry, deduplication and replay rules, and [Tenant certificate-authority model](architecture/tenant-pki.md) for the issuer boundary.
+
+## Foundation verification
+
+Run `npm run foundation:check` when the normal development stack is running and migrated. It validates the host resource budget, Compose configuration, container health, repository tests, OPA policy, authenticated core services, NATS delivery and replay, step-ca issuance, and the dependency audit.
+
+Run `npm run foundation:clean` to prove a first start from empty service state. The command generates temporary credentials and free loopback ports, creates uniquely named containers, volumes and a network, initializes the CA, applies migrations, runs the complete foundation verification, and then removes those disposable resources. It does not reuse or delete the normal `tenant-trust-*` volumes or `runtime/secrets` files.
+
+The GitHub Actions workflow at `.github/workflows/foundation.yml` runs the isolated clean check after `npm ci`. A local pass verifies the workflow commands and application behavior; the first GitHub run remains the authoritative check of runner permissions, image access and hosted-runner resources.
+
+## Safe shutdown and restart
+
+Stop containers while retaining the database, event stream, CA and cache data with:
 
 ```powershell
 npm run infra:down
 ```
 
-Do not add `-v` unless the intent is to delete the local database and cache contents.
+Restart the preserved environment with `npm run infra:up`. Reapplying `npm run infra:migrate` is safe because recorded migrations are skipped.
+
+## Deliberate local reset
+
+The following procedure permanently deletes this project's local PostgreSQL, Redis, NATS and step-ca volumes and rotates all generated development credentials. It does not prune Docker or touch another project's resources. Run it only when a complete Tenant Trust reset is intended:
+
+```powershell
+docker compose --env-file .env -f infra/compose/compose.yaml down --volumes --remove-orphans
+Remove-Item -LiteralPath .\runtime\secrets\step-ca-password.txt -Force
+npm run infra:init -- --force
+npm run pki:init
+npm run infra:up
+npm run infra:migrate
+npm run foundation:check
+```
+
+Delete the step-ca password only in the same reset that deletes `tenant-trust-step-ca-data`; otherwise the remaining encrypted CA key can become unusable. Do not use global Docker prune commands for this project.
