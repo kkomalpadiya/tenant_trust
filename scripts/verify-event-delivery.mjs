@@ -12,6 +12,7 @@ import {
   eventStreamConfig,
   subjectForEvent,
 } from "@tenant-trust/messaging";
+import { resolveTenantContext } from "@tenant-trust/tenant-context";
 import { environment, repositoryRoot } from "./lib/foundation-context.mjs";
 
 for (const key of ["NATS_HOST_PORT", "NATS_USER", "NATS_PASSWORD"]) {
@@ -27,6 +28,7 @@ ajv.addSchema(commonSchema);
 const validateTenantEvent = ajv.compile(tenantSchema);
 
 const tenantUuid = randomUUID();
+const subjectUuid = randomUUID();
 const eventUuid = randomUUID();
 const correlationUuid = randomUUID();
 const now = new Date().toISOString();
@@ -46,6 +48,26 @@ const event = {
   payload: { state: "active", displayName: "Synthetic Delivery Demo Tenant" },
 };
 assert.equal(validateTenantEvent(event), true, ajv.errorsText(validateTenantEvent.errors));
+
+const context = resolveTenantContext({
+  authentication: {
+    source: "trusted-session",
+    authenticationId: `delivery-verifier:${eventUuid}`,
+    tenantId: event.tenantId,
+    subjectId: `sub_${subjectUuid}`,
+  },
+  authority: {
+    tenant: { tenantId: event.tenantId, state: "active", version: 1 },
+    subject: { subjectId: `sub_${subjectUuid}`, state: "active", version: 1 },
+    membership: {
+      tenantId: event.tenantId,
+      subjectId: `sub_${subjectUuid}`,
+      state: "active",
+      version: 1,
+    },
+    roles: ["tenant-member"],
+  },
+});
 
 const connection = await connect({
   servers: `nats://127.0.0.1:${environment.NATS_HOST_PORT}`,
@@ -73,7 +95,7 @@ try {
     await manager.streams.add(eventStreamConfig());
   }
 
-  const subject = subjectForEvent(event);
+  const subject = subjectForEvent(context, event);
   const payload = new TextEncoder().encode(JSON.stringify(event));
   const publishAck = await client.publish(subject, payload, { msgID: event.eventId });
   assert.equal(publishAck.stream, EVENT_STREAM);
@@ -84,9 +106,9 @@ try {
   assert.equal(duplicateAck.duplicate, true);
 
   const shortBackoff = [250_000_000, 500_000_000, 1_000_000_000];
-  await resetConsumer(manager, "delivery_demo_v1", durableConsumerConfig({
+  await resetConsumer(manager, "delivery_demo_v1", durableConsumerConfig(context, {
     durableName: "delivery_demo_v1",
-    filterSubject: subject,
+    eventFilter: event.eventType,
     startSequence: publishAck.seq,
     backoff: shortBackoff,
   }));
@@ -105,9 +127,9 @@ try {
   assert.equal(retryDelivery.info.deliveryCount, 2);
   assert.equal(await retryDelivery.ackAck({ timeout: 3_000 }), true);
 
-  await resetConsumer(manager, "replay_demo_v1", durableConsumerConfig({
+  await resetConsumer(manager, "replay_demo_v1", durableConsumerConfig(context, {
     durableName: "replay_demo_v1",
-    filterSubject: subject,
+    eventFilter: event.eventType,
     startSequence: publishAck.seq,
   }));
   const replayConsumer = await client.consumers.get(EVENT_STREAM, "replay_demo_v1");

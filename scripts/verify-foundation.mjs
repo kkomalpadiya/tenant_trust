@@ -75,6 +75,7 @@ run(process.execPath, ["scripts/verify-database-isolation.mjs"], "database isola
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
 run(process.execPath, ["scripts/verify-event-delivery.mjs"], "event delivery verification");
+run(process.execPath, ["scripts/verify-runtime-isolation.mjs"], "runtime tenant isolation verification");
 run(process.execPath, ["scripts/verify-security-services.mjs"], "security service verification");
 runNpm(["audit", "--audit-level=high"], "dependency audit");
 

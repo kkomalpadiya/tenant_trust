@@ -4,7 +4,9 @@ Tenant Trust uses NATS JetStream for asynchronous security domain events. JetStr
 
 ## Subjects and tenant scope
 
-Publish a contract-valid event to `tenant.<tenantId>.events.<eventType>`. For example, a trust transition uses `tenant.tnt_...events.trust.updated.v1`. Producers derive this subject from the validated envelope. Consumers subscribe to the narrowest tenant and event filter their responsibility allows and verify the envelope tenant against trusted aggregate state before applying an effect.
+Publish a contract-valid event to `tenant.<tenantId>.events.<eventType>`. For example, a trust transition uses `tenant.tnt_...events.trust.updated.v1`. Producers call `subjectForEvent` with a resolved tenant context; the helper rejects an envelope tenant mismatch and derives the subject from trusted context. Consumers call `durableConsumerConfig` with that context so a caller cannot select a different tenant or a cross-tenant wildcard. They still verify the envelope tenant against trusted aggregate state before applying an effect.
+
+The local broker grants Tenant Alpha and Tenant Beta credentials only their exact event prefixes. The broad platform account is reserved for trusted stream administration and service verification. See [Redis and NATS tenant isolation](runtime-tenant-isolation.md) for the permission boundary and production limitations.
 
 The local stream retains up to 512 MiB for seven days and discards the oldest messages when a limit is reached. It uses file storage in the `tenant-trust-nats-data` Docker volume. These limits support development and evaluation and must be reviewed before any non-local deployment.
 
@@ -31,4 +33,4 @@ Each default consumer allows one unacknowledged message at a time. This preserve
 
 Create a separate durable consumer with an explicit start sequence or start time. Replay uses the same validation, tenant and idempotency checks as live delivery. An acknowledged message remains replayable because the stream uses limits retention rather than work-queue retention.
 
-Run `npm run messaging:verify` against the local stack. The verifier validates a synthetic event, publishes it with a message ID, proves duplicate suppression, negatively acknowledges the first delivery, confirms redelivery, acknowledges it and replays the same stored sequence through a second durable consumer.
+Run `npm run messaging:verify` against the local stack. The verifier validates a synthetic event, publishes it with a message ID, proves duplicate suppression, negatively acknowledges the first delivery, confirms redelivery, acknowledges it and replays the same stored sequence through a second durable consumer. Run `npm run runtime-isolation:verify` to prove tenant-specific broker delivery and rejection of cross-tenant subscriptions.

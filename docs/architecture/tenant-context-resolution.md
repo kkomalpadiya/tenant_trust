@@ -56,8 +56,8 @@ Foreign and missing resources use one tenant-safe external denial. `tenantSafeDe
 All consumers receive context explicitly. Global mutable tenant state, ambient request headers and unqualified repository methods are forbidden.
 
 - PostgreSQL: begin a transaction, call `identity.set_tenant_context` with the trusted tenant, use tenant-qualified statements and finish with commit or rollback. Forced row-level security uses that transaction-local binding and fails closed when it is absent. See [Database tenant isolation](database-isolation.md).
-- Redis: build keys from the trusted tenant and deny operations without context. Key and permission enforcement belongs to T2.5.
-- NATS: derive subjects from the trusted tenant context and restrict consumer filters. Broker isolation belongs to T2.5.
+- Redis: use `tenantCacheKey` and `tenantLockKey` from `@tenant-trust/tenant-context/redis`; both reject unbranded contexts and encode dynamic key segments.
+- NATS: pass the context to messaging subject and durable-consumer helpers. The local broker separately restricts the two demonstration tenant credentials to exact tenant prefixes. See [Redis and NATS tenant isolation](runtime-tenant-isolation.md).
 - OPA: include the exact context and current versioned state in complete decision input. Policy enforcement belongs to Phase 7.
 - PKI and audit: resolve issuers and records from the same trusted tenant, never from caller-selected identifiers.
 
@@ -71,4 +71,4 @@ Internal reason codes distinguish these cases for testing and tenant-safe audit.
 
 The `@tenant-trust/tenant-context` tests prove the contract accepts a valid mTLS or tenant-bound session, returns an immutable context, rejects inactive and mismatched authoritative state, excludes platform-only authority, rejects tenant switches from every supported request/resource claim source and maps all failures to one external denial.
 
-These tests do not prove that a future API validates certificates correctly, issues secure sessions, isolates Redis/NATS or supplies complete OPA input. Database scoping is verified separately against the running PostgreSQL instance; the remaining controls are separate implementation gates.
+These tests do not prove that a future API validates certificates correctly, issues secure sessions or supplies complete OPA input. Database scoping and Redis/NATS runtime scoping are verified separately against the running services; future adapters must use those established boundaries consistently.
