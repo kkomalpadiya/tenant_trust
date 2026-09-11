@@ -119,7 +119,7 @@ BEGIN
       'tenant-member'
     );
     RAISE EXCEPTION 'tenant role without matching membership was accepted';
-  EXCEPTION WHEN foreign_key_violation THEN
+  EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
 

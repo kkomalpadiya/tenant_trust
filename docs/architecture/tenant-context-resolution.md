@@ -55,7 +55,7 @@ Foreign and missing resources use one tenant-safe external denial. `tenantSafeDe
 
 All consumers receive context explicitly. Global mutable tenant state, ambient request headers and unqualified repository methods are forbidden.
 
-- PostgreSQL: begin a transaction, call `identity.set_tenant_context` with the trusted tenant, use tenant-qualified statements and finish with commit or rollback. Forced row-level security uses that transaction-local binding and fails closed when it is absent. See [Database tenant isolation](database-isolation.md).
+- PostgreSQL: begin a transaction, call `identity.set_tenant_actor_context` with the trusted tenant and subject, use tenant-qualified statements and finish with commit or rollback. Forced row-level security rechecks active membership and roles and fails closed when either binding is absent. See [Database tenant isolation](database-isolation.md) and [Tenant resource and membership authorization](resource-membership-authorization.md).
 - Redis: use `tenantCacheKey` and `tenantLockKey` from `@tenant-trust/tenant-context/redis`; both reject unbranded contexts and encode dynamic key segments.
 - NATS: pass the context to messaging subject and durable-consumer helpers. The local broker separately restricts the two demonstration tenant credentials to exact tenant prefixes. See [Redis and NATS tenant isolation](runtime-tenant-isolation.md).
 - OPA: include the exact context and current versioned state in complete decision input. Policy enforcement belongs to Phase 7.

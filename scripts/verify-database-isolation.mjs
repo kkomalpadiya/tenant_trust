@@ -39,4 +39,4 @@ if (result.status !== 0) {
 
 if (result.stdout.trim()) console.log(result.stdout.trim());
 if (result.stderr.trim()) console.error(result.stderr.trim());
-console.log("Database isolation verification passed on one reused PostgreSQL session.");
+console.log("Database isolation verification passed on one reused actor-bound PostgreSQL session.");

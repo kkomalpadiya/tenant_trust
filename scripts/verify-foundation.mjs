@@ -72,6 +72,7 @@ runNpm(["test"], "repository tests");
 run(process.execPath, ["scripts/verify-identity-model.mjs"], "identity model verification");
 run(process.execPath, ["scripts/verify-demo-provisioning.mjs"], "demo identity verification");
 run(process.execPath, ["scripts/verify-database-isolation.mjs"], "database isolation verification");
+run(process.execPath, ["scripts/verify-resource-membership-isolation.mjs"], "resource and membership isolation verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
 run(process.execPath, ["scripts/verify-event-delivery.mjs"], "event delivery verification");

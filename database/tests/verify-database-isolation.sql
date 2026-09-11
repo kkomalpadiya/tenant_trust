@@ -59,7 +59,10 @@ CREATE TEMP TABLE isolation_connection_probe (
 INSERT INTO isolation_connection_probe VALUES (pg_backend_pid());
 
 BEGIN;
-SELECT identity.set_tenant_context('tnt_018f1234-5678-7abc-8def-0123456789ab');
+SELECT identity.set_tenant_actor_context(
+  'tnt_018f1234-5678-7abc-8def-0123456789ab',
+  'sub_018f1234-5678-7abc-8def-0123456789ac'
+);
 
 DO $verify_alpha_scope$
 DECLARE
@@ -67,6 +70,9 @@ DECLARE
 BEGIN
   IF identity.current_tenant_id() <> 'tnt_018f1234-5678-7abc-8def-0123456789ab' THEN
     RAISE EXCEPTION 'Tenant Alpha context was not installed';
+  END IF;
+  IF identity.current_subject_id() <> 'sub_018f1234-5678-7abc-8def-0123456789ac' THEN
+    RAISE EXCEPTION 'Tenant Alpha administrator context was not installed';
   END IF;
   IF (SELECT count(*) FROM identity.tenants) <> 1
      OR (SELECT count(*) FROM identity.tenant_memberships) <> 2
@@ -116,6 +122,9 @@ BEGIN
   IF identity.current_tenant_id() IS NOT NULL THEN
     RAISE EXCEPTION 'transaction-local tenant context leaked into a reused transaction';
   END IF;
+  IF identity.current_subject_id() IS NOT NULL THEN
+    RAISE EXCEPTION 'transaction-local subject context leaked into a reused transaction';
+  END IF;
   IF (SELECT count(*) FROM identity.tenants) <> 0
      OR (SELECT count(*) FROM identity.tenant_memberships) <> 0
      OR (SELECT count(*) FROM identity.tenant_role_assignments) <> 0
@@ -127,12 +136,18 @@ $verify_reused_connection_is_empty$;
 ROLLBACK;
 
 BEGIN;
-SELECT identity.set_tenant_context('tnt_018f1234-5678-7abc-8def-0123456789ac');
+SELECT identity.set_tenant_actor_context(
+  'tnt_018f1234-5678-7abc-8def-0123456789ac',
+  'sub_018f1234-5678-7abc-8def-0123456789ae'
+);
 
 DO $verify_beta_scope$
 BEGIN
   IF identity.current_tenant_id() <> 'tnt_018f1234-5678-7abc-8def-0123456789ac' THEN
     RAISE EXCEPTION 'Tenant Beta context was not installed';
+  END IF;
+  IF identity.current_subject_id() <> 'sub_018f1234-5678-7abc-8def-0123456789ae' THEN
+    RAISE EXCEPTION 'Tenant Beta administrator context was not installed';
   END IF;
   IF (SELECT count(*) FROM identity.tenants) <> 1
      OR (SELECT count(*) FROM identity.tenant_memberships) <> 2

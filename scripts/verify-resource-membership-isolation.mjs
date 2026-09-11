@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { composeArgs, environment, repositoryRoot } from "./lib/foundation-context.mjs";
 
 const verificationSql = readFileSync(
-  resolve(repositoryRoot, "database/tests/verify-demo-provisioning.sql"),
+  resolve(repositoryRoot, "database/tests/verify-resource-membership-isolation.sql"),
   "utf8",
 );
 
@@ -34,9 +34,9 @@ const result = spawnSync(
 
 if (result.status !== 0) {
   const detail = (result.stderr || result.stdout || result.error?.message || "").trim();
-  throw new Error(`Demo identity verification failed${detail ? `:\n${detail}` : ""}`);
+  throw new Error(`Resource and membership isolation verification failed${detail ? `:\n${detail}` : ""}`);
 }
 
 if (result.stdout.trim()) console.log(result.stdout.trim());
 if (result.stderr.trim()) console.error(result.stderr.trim());
-console.log("Demo identity and resource verification passed and lifecycle probes were rolled back.");
+console.log("Resource and membership isolation verification passed without retaining test changes.");

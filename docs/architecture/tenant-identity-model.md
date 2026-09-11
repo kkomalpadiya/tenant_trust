@@ -43,6 +43,8 @@ Role assignment alone is never enough to authorize a request. Effective tenant a
 4. The required role is assigned on that membership.
 5. Credential, resource, policy, request-context and trust checks pass.
 
+Tenant runtime writes to memberships and tenant roles require an active `tenant-admin` actor context. New roles require an active membership, ordinary members cannot promote themselves, and a trigger prevents the final active tenant administrator from being removed or suspended. Suspended memberships retain their role rows for recovery and audit, but the roles grant no access.
+
 The separate PostgreSQL enum types make `platform-admin` invalid in a tenant-role row and make tenant roles invalid in a platform-role row. Tenant-scoped subject events likewise carry only tenant roles; platform-role changes require a separate future platform administration contract rather than being smuggled into a tenant event.
 
 ## Uniqueness and lifecycle rules
@@ -68,8 +70,8 @@ Run `npm run infra:migrate` and then `npm run identity-model:verify`. The verifi
 | Tenant Beta | Bob | `tenant-member` |
 | Tenant Beta | Tenant Beta Admin | `tenant-admin` |
 
-The separate Platform Operator subject receives `platform-admin` and no tenant membership. All seed records begin in the `active` state. The seed contains no passwords, certificate material or production identity data.
+The resource seed also creates one member-owned and one administrator-owned synthetic resource in each tenant. The separate Platform Operator subject receives `platform-admin` and no tenant membership. All seed identity records begin in the `active` state. The seeds contain no passwords, certificate material or production identity data.
 
-Run `npm run demo:verify` to check the exact deterministic mapping and role split. The verifier also changes one tenant, subject and membership to `suspended`, checks their incremented versions, and rolls the transaction back so the baseline remains active.
+Run `npm run demo:verify` to check the exact deterministic identity, role and resource mapping. The verifier also changes one tenant, subject and membership to `suspended`, checks their incremented versions, and rolls the transaction back so the baseline remains active.
 
-The durable model and local provisioning workflow do not authenticate requests or enforce suspension. [Trusted tenant-context resolution](tenant-context-resolution.md) defines how verified identity and this authoritative state produce one immutable tenant context while rejecting client-selected tenant switches. [Database tenant isolation](database-isolation.md) applies forced row-level security to the current tenant-owned identity tables and verifies connection reuse. Suspension enforcement remains a later Phase 2 task.
+[Trusted tenant-context resolution](tenant-context-resolution.md) defines how verified identity and this authoritative state produce one immutable tenant context while rejecting client-selected tenant switches. [Database tenant isolation](database-isolation.md) applies forced row-level security and verifies connection reuse. [Tenant resource and membership authorization](resource-membership-authorization.md) defines owner, administrator, role-change and membership-state enforcement. Full tenant suspension and teardown orchestration remain a later Phase 2 task.

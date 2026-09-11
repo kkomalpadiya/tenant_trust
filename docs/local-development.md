@@ -62,6 +62,7 @@ npm run demo:provision
 npm run infra:check
 npm run demo:verify
 npm run database-isolation:verify
+npm run resource-membership:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -77,15 +78,15 @@ The generated `.env` contains local credentials and is ignored by Git. `.env.exa
 
 Migrations are ordered SQL files under `database/migrations`. `npm run infra:migrate` records each successful filename in `platform.schema_migrations` and skips it on later runs. Add a new numbered file for every schema change instead of editing an already-applied migration.
 
-Tenant-scoped database code must start a transaction and call `identity.set_tenant_context` before querying. Forced row-level security then limits tenant, membership, tenant-role and visible-subject rows to that binding. `npm run database-isolation:verify` proves read/write isolation and reuses one PostgreSQL session across Alpha, unbound and Beta transactions to confirm the binding cannot leak.
+Tenant-scoped database code must start a transaction and call `identity.set_tenant_actor_context` with tenant and subject IDs from the resolved trusted context before querying. Forced row-level security then rechecks active membership and roles while limiting identity and resource rows to that actor. `npm run database-isolation:verify` proves tenant isolation and connection reuse. `npm run resource-membership:verify` proves owner-only member access, tenant-wide administrator access, role-change behavior, suspended-membership denial and last-administrator protection.
 
-`npm run demo:provision` creates the deterministic Tenant Alpha and Tenant Beta subjects, memberships and role assignments used by the prototype scenarios. It is safe to rerun and does not reactivate suspended rows or overwrite changed lifecycle versions. It fails if a deterministic ID, tenant slug or provider identity belongs to different data. `npm run demo:verify` checks the mapping and exercises lifecycle persistence in a transaction that is rolled back.
+`npm run demo:provision` applies every ordered SQL seed under `database/seeds`. It creates the deterministic Tenant Alpha and Tenant Beta subjects, memberships, role assignments and synthetic resources used by the prototype scenarios. It is safe to rerun and does not reactivate suspended rows or overwrite changed lifecycle versions. It fails when a deterministic identity, ownership or resource ID conflicts with different data. `npm run demo:verify` checks the mapping and exercises lifecycle persistence in a transaction that is rolled back.
 
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 
 ## Foundation verification
 
-Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests including trusted tenant-context resolution, the tenant identity model, deterministic demo records, database row-level isolation and connection reuse, Redis key isolation, tenant-specific NATS permissions, OPA policy, NATS delivery and replay, step-ca issuance, and the dependency audit.
+Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests including trusted tenant-context resolution, the tenant identity model, deterministic demo records and resources, actor-aware resource and membership rules, database row-level isolation and connection reuse, Redis key isolation, tenant-specific NATS permissions, OPA policy, NATS delivery and replay, step-ca issuance, and the dependency audit.
 
 Run `npm run foundation:clean` to prove a first start from empty service state. The command generates temporary credentials and free loopback ports, creates uniquely named containers, volumes and a network, initializes the CA, applies migrations, runs the complete foundation verification, and then removes those disposable resources. It does not reuse or delete the normal `tenant-trust-*` volumes or `runtime/secrets` files.
 

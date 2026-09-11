@@ -8,6 +8,7 @@ DECLARE
   subject_count integer;
   membership_count integer;
   tenant_role_count integer;
+  resource_count integer;
 BEGIN
   SELECT count(*) INTO tenant_count
   FROM identity.tenants
@@ -62,6 +63,19 @@ BEGIN
 
   IF tenant_role_count <> 4 THEN
     RAISE EXCEPTION 'expected four tenant role assignments, found %', tenant_role_count;
+  END IF;
+
+  SELECT count(*) INTO resource_count
+  FROM app.resources
+  WHERE (tenant_id, resource_id, owner_subject_id) IN (
+    ('tnt_018f1234-5678-7abc-8def-0123456789ab', 'res_018f1234-5678-7abc-8def-0123456789b0', 'sub_018f1234-5678-7abc-8def-0123456789ab'),
+    ('tnt_018f1234-5678-7abc-8def-0123456789ab', 'res_018f1234-5678-7abc-8def-0123456789b1', 'sub_018f1234-5678-7abc-8def-0123456789ac'),
+    ('tnt_018f1234-5678-7abc-8def-0123456789ac', 'res_018f1234-5678-7abc-8def-0123456789b2', 'sub_018f1234-5678-7abc-8def-0123456789ad'),
+    ('tnt_018f1234-5678-7abc-8def-0123456789ac', 'res_018f1234-5678-7abc-8def-0123456789b3', 'sub_018f1234-5678-7abc-8def-0123456789ae')
+  );
+
+  IF resource_count <> 4 THEN
+    RAISE EXCEPTION 'expected four tenant-owned demonstration resources, found %', resource_count;
   END IF;
 
   IF EXISTS (
@@ -156,4 +170,4 @@ $verify_lifecycle_persistence$;
 
 ROLLBACK;
 
-\echo 'PASS deterministic tenants, subjects, memberships, roles and lifecycle persistence'
+\echo 'PASS deterministic tenants, subjects, memberships, roles, resources and lifecycle persistence'

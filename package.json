@@ -25,6 +25,7 @@
     "demo:provision": "node scripts/provision-demo-identities.mjs",
     "demo:verify": "node scripts/verify-demo-provisioning.mjs",
     "database-isolation:verify": "node scripts/verify-database-isolation.mjs",
+    "resource-membership:verify": "node scripts/verify-resource-membership-isolation.mjs",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",
