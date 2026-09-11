@@ -55,7 +55,7 @@ Foreign and missing resources use one tenant-safe external denial. `tenantSafeDe
 
 All consumers receive context explicitly. Global mutable tenant state, ambient request headers and unqualified repository methods are forbidden.
 
-- PostgreSQL: begin a transaction, bind the trusted tenant locally, use tenant-qualified statements and clear the binding on completion. Connection-reuse enforcement belongs to T2.4.
+- PostgreSQL: begin a transaction, call `identity.set_tenant_context` with the trusted tenant, use tenant-qualified statements and finish with commit or rollback. Forced row-level security uses that transaction-local binding and fails closed when it is absent. See [Database tenant isolation](database-isolation.md).
 - Redis: build keys from the trusted tenant and deny operations without context. Key and permission enforcement belongs to T2.5.
 - NATS: derive subjects from the trusted tenant context and restrict consumer filters. Broker isolation belongs to T2.5.
 - OPA: include the exact context and current versioned state in complete decision input. Policy enforcement belongs to Phase 7.
@@ -71,4 +71,4 @@ Internal reason codes distinguish these cases for testing and tenant-safe audit.
 
 The `@tenant-trust/tenant-context` tests prove the contract accepts a valid mTLS or tenant-bound session, returns an immutable context, rejects inactive and mismatched authoritative state, excludes platform-only authority, rejects tenant switches from every supported request/resource claim source and maps all failures to one external denial.
 
-These tests do not prove that a future API validates certificates correctly, issues secure sessions, scopes database connections, isolates Redis/NATS or supplies complete OPA input. Those are separate implementation gates.
+These tests do not prove that a future API validates certificates correctly, issues secure sessions, isolates Redis/NATS or supplies complete OPA input. Database scoping is verified separately against the running PostgreSQL instance; the remaining controls are separate implementation gates.

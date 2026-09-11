@@ -61,6 +61,7 @@ npm run infra:migrate
 npm run demo:provision
 npm run infra:check
 npm run demo:verify
+npm run database-isolation:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run security-services:verify
@@ -75,13 +76,15 @@ The generated `.env` contains local credentials and is ignored by Git. `.env.exa
 
 Migrations are ordered SQL files under `database/migrations`. `npm run infra:migrate` records each successful filename in `platform.schema_migrations` and skips it on later runs. Add a new numbered file for every schema change instead of editing an already-applied migration.
 
+Tenant-scoped database code must start a transaction and call `identity.set_tenant_context` before querying. Forced row-level security then limits tenant, membership, tenant-role and visible-subject rows to that binding. `npm run database-isolation:verify` proves read/write isolation and reuses one PostgreSQL session across Alpha, unbound and Beta transactions to confirm the binding cannot leak.
+
 `npm run demo:provision` creates the deterministic Tenant Alpha and Tenant Beta subjects, memberships and role assignments used by the prototype scenarios. It is safe to rerun and does not reactivate suspended rows or overwrite changed lifecycle versions. It fails if a deterministic ID, tenant slug or provider identity belongs to different data. `npm run demo:verify` checks the mapping and exercises lifecycle persistence in a transaction that is rolled back.
 
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. See [Reliable event delivery](architecture/event-delivery.md) for subject, acknowledgement, retry, deduplication and replay rules, and [Tenant certificate-authority model](architecture/tenant-pki.md) for the issuer boundary.
 
 ## Foundation verification
 
-Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests including trusted tenant-context resolution, the tenant identity model and deterministic demo records, OPA policy, authenticated core services, NATS delivery and replay, step-ca issuance, and the dependency audit.
+Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests including trusted tenant-context resolution, the tenant identity model, deterministic demo records, database row-level isolation and connection reuse, OPA policy, authenticated core services, NATS delivery and replay, step-ca issuance, and the dependency audit.
 
 Run `npm run foundation:clean` to prove a first start from empty service state. The command generates temporary credentials and free loopback ports, creates uniquely named containers, volumes and a network, initializes the CA, applies migrations, runs the complete foundation verification, and then removes those disposable resources. It does not reuse or delete the normal `tenant-trust-*` volumes or `runtime/secrets` files.
 

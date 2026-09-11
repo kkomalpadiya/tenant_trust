@@ -23,9 +23,9 @@ const checks = [
     expected: "1",
   },
   {
-    label: "Required foundation and identity migrations are recorded",
-    args: [...psql, "SELECT count(*) FROM platform.schema_migrations WHERE migration_name IN ('001_foundation.sql', '002_tenant_subject_roles.sql')"],
-    expected: "2",
+    label: "Required foundation, identity and isolation migrations are recorded",
+    args: [...psql, "SELECT count(*) FROM platform.schema_migrations WHERE migration_name IN ('001_foundation.sql', '002_tenant_subject_roles.sql', '003_tenant_row_level_security.sql')"],
+    expected: "3",
   },
   {
     label: "Identity, trust and audit schemas exist",

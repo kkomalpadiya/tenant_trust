@@ -6,7 +6,7 @@ A valid certificate establishes identity. Access also depends on tenant membersh
 
 ## Current status
 
-The repository contains the initial scope, repository design, selected technology stack, shared event contracts, the tenant/subject/role data model, deterministic two-tenant development provisioning, a tested trusted tenant-context contract and a runnable PostgreSQL, Redis, NATS JetStream, step-ca and OPA foundation. Application services and evaluation tools have not been implemented yet.
+The repository contains the initial scope, repository design, selected technology stack, shared event contracts, the tenant/subject/role data model, deterministic two-tenant development provisioning, tested tenant-context and PostgreSQL row-isolation controls, and a runnable PostgreSQL, Redis, NATS JetStream, step-ca and OPA foundation. Application services and evaluation tools have not been implemented yet.
 
 ## Planned capabilities
 
@@ -27,6 +27,7 @@ The repository contains the initial scope, repository design, selected technolog
 - [Reliable event delivery](docs/architecture/event-delivery.md)
 - [Tenant, subject and role data model](docs/architecture/tenant-identity-model.md)
 - [Trusted tenant-context resolution](docs/architecture/tenant-context-resolution.md)
+- [Database tenant isolation](docs/architecture/database-isolation.md)
 - [Tenant certificate-authority model](docs/architecture/tenant-pki.md)
 - [Threat model and failure policy](docs/security/threat-model.md)
 

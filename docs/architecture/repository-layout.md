@@ -28,6 +28,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 ## Boundary rules
 
 - The API derives tenant identity from authenticated context through `packages/tenant-context/`. Client headers and resource IDs can confirm that context but cannot select or replace it. Every store, cache key, event and policy lookup preserves tenant scope.
+- Tenant database work runs inside a transaction with `identity.set_tenant_context`; forced row-level security denies unbound and cross-tenant access even when application SQL omits a tenant predicate.
 - Shared contracts describe interfaces without exposing component internals. Schema changes must account for both producers and consumers.
 - Component paths define responsibilities, not a requirement to run every component in a separate process. Deployment granularity will follow the local resource budget.
 - Certificate validation and policy enforcement gate protected operations. Trust computation supplies versioned input to policy decisions.
