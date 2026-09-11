@@ -15,8 +15,8 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `packages/messaging/` | Context-bound NATS subject construction, JetStream stream defaults and tenant-filtered durable consumer defaults |
 | `infra/nats/` | NATS server configuration and tenant-specific demonstration permissions |
 | `policies/` | OPA policy source and policy test cases |
-| `database/migrations/` | Ordered application schema changes, including tenant, actor, membership and resource isolation controls |
-| `database/seeds/` | Idempotent synthetic development identities and tenant-owned resources with deterministic identifiers and no credentials |
+| `database/migrations/` | Ordered application schema changes, including tenant, actor, membership, resource and security-configuration isolation controls |
+| `database/seeds/` | Idempotent synthetic development identities, resources and tenant-owned security configuration with deterministic identifiers and no credentials |
 | `infra/compose/` | Local container service definitions and safe configuration templates |
 | `infra/pki/` | Tenant issuer provisioning scripts and certificate profile templates |
 | `infra/fabric/` | Fabric network definitions and lifecycle scripts, excluding generated identities and channel artifacts |
@@ -31,6 +31,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 
 - The API derives tenant identity from authenticated context through `packages/tenant-context/`. Client headers and resource IDs can confirm that context but cannot select or replace it. Every store, cache key, event and policy lookup preserves tenant scope.
 - Tenant database work runs inside a transaction with `identity.set_tenant_actor_context`; forced row-level security denies unbound, inactive, unauthorized and cross-tenant access even when application SQL omits a tenant predicate.
+- Tenant issuer mappings, evidence sources, trust settings and policy versions use tenant-qualified keys. Active members can read only their tenant's rows, and only its active administrators can change them.
 - Tenant Redis keys and NATS subjects are constructed only from a resolved tenant context. Tenant NATS credentials are limited to exact subject prefixes; privileged service credentials remain an explicit trusted boundary.
 - Shared contracts describe interfaces without exposing component internals. Schema changes must account for both producers and consumers.
 - Component paths define responsibilities, not a requirement to run every component in a separate process. Deployment granularity will follow the local resource budget.

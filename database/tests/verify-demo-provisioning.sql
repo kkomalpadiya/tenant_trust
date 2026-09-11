@@ -9,6 +9,10 @@ DECLARE
   membership_count integer;
   tenant_role_count integer;
   resource_count integer;
+  issuer_mapping_count integer;
+  evidence_source_count integer;
+  trust_configuration_count integer;
+  policy_version_count integer;
 BEGIN
   SELECT count(*) INTO tenant_count
   FROM identity.tenants
@@ -76,6 +80,59 @@ BEGIN
 
   IF resource_count <> 4 THEN
     RAISE EXCEPTION 'expected four tenant-owned demonstration resources, found %', resource_count;
+  END IF;
+
+  SELECT count(*) INTO issuer_mapping_count
+  FROM identity.tenant_issuer_mappings
+  WHERE issuer_id IN (
+    'iss_018f1234-5678-7abc-8def-0123456789b4',
+    'iss_018f1234-5678-7abc-8def-0123456789b5'
+  );
+
+  IF issuer_mapping_count <> 2 THEN
+    RAISE EXCEPTION 'expected two tenant issuer mappings, found %', issuer_mapping_count;
+  END IF;
+
+  SELECT count(*) INTO evidence_source_count
+  FROM trust.evidence_sources
+  WHERE source_id IN (
+    'src_018f1234-5678-7abc-8def-0123456789b6',
+    'src_018f1234-5678-7abc-8def-0123456789b7',
+    'src_018f1234-5678-7abc-8def-0123456789b8',
+    'src_018f1234-5678-7abc-8def-0123456789b9',
+    'src_018f1234-5678-7abc-8def-0123456789ba',
+    'src_018f1234-5678-7abc-8def-0123456789bb',
+    'src_018f1234-5678-7abc-8def-0123456789bc',
+    'src_018f1234-5678-7abc-8def-0123456789bd',
+    'src_018f1234-5678-7abc-8def-0123456789be',
+    'src_018f1234-5678-7abc-8def-0123456789bf'
+  );
+
+  IF evidence_source_count <> 10 THEN
+    RAISE EXCEPTION 'expected ten tenant evidence sources, found %', evidence_source_count;
+  END IF;
+
+  SELECT count(*) INTO trust_configuration_count
+  FROM trust.trust_configurations
+  WHERE tenant_id IN (
+    'tnt_018f1234-5678-7abc-8def-0123456789ab',
+    'tnt_018f1234-5678-7abc-8def-0123456789ac'
+  )
+    AND configuration_version = 1;
+
+  IF trust_configuration_count <> 2 THEN
+    RAISE EXCEPTION 'expected two tenant trust configurations, found %', trust_configuration_count;
+  END IF;
+
+  SELECT count(*) INTO policy_version_count
+  FROM trust.policy_versions
+  WHERE policy_version_id IN (
+    'pol_018f1234-5678-7abc-8def-0123456789c0',
+    'pol_018f1234-5678-7abc-8def-0123456789c1'
+  );
+
+  IF policy_version_count <> 2 THEN
+    RAISE EXCEPTION 'expected two tenant policy versions, found %', policy_version_count;
   END IF;
 
   IF EXISTS (
@@ -170,4 +227,4 @@ $verify_lifecycle_persistence$;
 
 ROLLBACK;
 
-\echo 'PASS deterministic tenants, subjects, memberships, roles, resources and lifecycle persistence'
+\echo 'PASS deterministic tenants, identities, resources, security configuration and lifecycle persistence'

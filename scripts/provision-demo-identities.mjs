@@ -43,4 +43,4 @@ for (const seedFile of seedFiles) {
   if (result.stderr.trim()) console.error(result.stderr.trim());
 }
 
-console.log("Demo identity and resource provisioning completed without changing existing lifecycle states.");
+console.log("Demo identity, resource and security configuration provisioning completed without changing existing lifecycle states.");
