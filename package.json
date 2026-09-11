@@ -20,6 +20,7 @@
     "policy:test": "docker compose --env-file .env -f infra/compose/compose.yaml --profile tools run --rm opa-test",
     "security-services:verify": "node scripts/verify-security-services.mjs",
     "messaging:verify": "node scripts/verify-event-delivery.mjs",
+    "identity-model:verify": "node scripts/verify-identity-model.mjs",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",

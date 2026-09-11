@@ -1,0 +1,60 @@
+# Tenant, subject and role data model
+
+## Model boundary
+
+PostgreSQL is the authoritative store for tenants, subjects, memberships and role assignments. A subject is a platform identity, not a tenant authorization. A subject gains tenant context only through an explicit membership identified by the composite key `(tenant_id, subject_id)`.
+
+```text
+subjects                         tenants
+    |                               |
+    |                               |
+    +------ tenant_memberships -----+
+                 |
+                 +------ tenant_role_assignments
+
+subjects ------ platform_role_assignments
+```
+
+Migration `002_tenant_subject_roles.sql` creates the following relations in the `identity` schema:
+
+| Relation | Key and purpose |
+| --- | --- |
+| `tenants` | `tenant_id` primary key and a unique lowercase `tenant_slug`; owns tenant lifecycle state |
+| `subjects` | `subject_id` primary key and unique `(identity_provider, provider_subject)`; identifies one human or service identity |
+| `tenant_memberships` | Composite primary key `(tenant_id, subject_id)`; records whether a subject belongs to a tenant |
+| `tenant_role_assignments` | Composite key `(tenant_id, subject_id, role_name)` and a composite foreign key to the matching membership |
+| `platform_role_assignments` | Composite key `(subject_id, role_name)`; records platform operations authority separately from tenant roles |
+
+The `tenant_id` and `subject_id` domains enforce the same prefixed UUID formats as the shared event contracts. Tenant-owned role rows cannot exist without the exact tenant-qualified membership. Foreign keys use restrictive deletion so a tenant, subject or membership cannot be silently removed while dependent authority remains.
+
+## Role boundaries
+
+`platform-admin` is a platform-scoped role. It may provision or suspend tenants and operate platform infrastructure through a dedicated platform administration path. It does not create a tenant membership and does not automatically grant access to tenant records, member profiles, tenant policy, evidence, trust state or certificate operations.
+
+`tenant-admin` is a tenant-scoped role attached to one `(tenant_id, subject_id)` membership. It may manage membership and permitted certificate operations only inside that tenant. The same subject needs a separate membership and role assignment for every other tenant. A tenant administrator cannot grant platform roles, administer another tenant or select a different tenant through a request field.
+
+`tenant-member` is also tenant-scoped. It represents ordinary membership and grants only the operations allowed by the tenant policy for that subject, resource and current security context.
+
+Role assignment alone is never enough to authorize a request. Effective tenant access requires all of the following to be current and mutually consistent:
+
+1. The platform subject is active.
+2. The target tenant is active.
+3. The exact tenant membership is active.
+4. The required role is assigned on that membership.
+5. Credential, resource, policy, request-context and trust checks pass.
+
+The separate PostgreSQL enum types make `platform-admin` invalid in a tenant-role row and make tenant roles invalid in a platform-role row. Tenant-scoped subject events likewise carry only tenant roles; platform-role changes require a separate future platform administration contract rather than being smuggled into a tenant event.
+
+## Uniqueness and lifecycle rules
+
+- Tenant slugs are lowercase, bounded and globally unique for deterministic local routing and provisioning.
+- External identities are unique by `(identity_provider, provider_subject)`; display names are not identifiers.
+- A subject may have memberships in multiple tenants, but each membership and each assigned tenant role is unique within its tenant-qualified key.
+- Each mutable lifecycle row has a positive version and ordered timestamps for later optimistic concurrency checks.
+- Lifecycle states are `active` or `suspended`. Suspension preserves identifiers and relationships for later recovery and audit work.
+
+## Verification and later enforcement
+
+Run `npm run infra:migrate` and then `npm run identity-model:verify`. The verifier inserts disposable records in a transaction, proves the tenant and external-identity uniqueness constraints, proves role assignments require the matching membership, proves platform and tenant roles cannot be mixed, proves dependent roles prevent membership deletion, and rolls the fixtures back.
+
+This task defines the durable model and its structural constraints. It does not create demonstration tenants, trust client-supplied tenant context or enable row-level security. Those controls belong to provisioning, trusted tenant-context resolution and database-isolation tasks T2.2 through T2.4.
