@@ -99,6 +99,7 @@ try {
   compose(["--profile", "tools", "run", "--rm", "step-ca-init"], "isolated CA initialization");
   compose(["up", "-d", "postgres", "redis", "nats", "step-ca", "opa"], "isolated foundation startup");
   compose(["--profile", "tools", "run", "--rm", "migrate"], "isolated database migration");
+  run(process.execPath, ["scripts/provision-demo-identities.mjs"], "isolated demo identity provisioning");
   run(process.execPath, ["scripts/verify-foundation.mjs"], "isolated foundation verification");
 } catch (error) {
   primaryFailure = error;

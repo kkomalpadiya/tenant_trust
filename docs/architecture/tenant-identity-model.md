@@ -57,4 +57,19 @@ The separate PostgreSQL enum types make `platform-admin` invalid in a tenant-rol
 
 Run `npm run infra:migrate` and then `npm run identity-model:verify`. The verifier inserts disposable records in a transaction, proves the tenant and external-identity uniqueness constraints, proves role assignments require the matching membership, proves platform and tenant roles cannot be mixed, proves dependent roles prevent membership deletion, and rolls the fixtures back.
 
-This task defines the durable model and its structural constraints. It does not create demonstration tenants, trust client-supplied tenant context or enable row-level security. Those controls belong to provisioning, trusted tenant-context resolution and database-isolation tasks T2.2 through T2.4.
+## Deterministic development identities
+
+`npm run demo:provision` creates the fixed local demonstration identities below. The seed is idempotent: rerunning it preserves existing lifecycle states and validates that its deterministic identifiers do not conflict with different records.
+
+| Tenant | Subject | Tenant role |
+| --- | --- | --- |
+| Tenant Alpha | Alice | `tenant-member` |
+| Tenant Alpha | Tenant Alpha Admin | `tenant-admin` |
+| Tenant Beta | Bob | `tenant-member` |
+| Tenant Beta | Tenant Beta Admin | `tenant-admin` |
+
+The separate Platform Operator subject receives `platform-admin` and no tenant membership. All seed records begin in the `active` state. The seed contains no passwords, certificate material or production identity data.
+
+Run `npm run demo:verify` to check the exact deterministic mapping and role split. The verifier also changes one tenant, subject and membership to `suspended`, checks their incremented versions, and rolls the transaction back so the baseline remains active.
+
+The durable model and local provisioning workflow do not authenticate requests, trust client-supplied tenant context, enforce suspension or enable row-level security. Those controls belong to trusted tenant-context resolution, database isolation and suspension tasks later in Phase 2.

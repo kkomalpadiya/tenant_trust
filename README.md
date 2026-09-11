@@ -6,7 +6,7 @@ A valid certificate establishes identity. Access also depends on tenant membersh
 
 ## Current status
 
-The repository contains the initial scope, repository design, selected technology stack, shared event contracts, the tenant/subject/role data model and a runnable PostgreSQL, Redis, NATS JetStream, step-ca and OPA development foundation. Application services and evaluation tools have not been implemented yet.
+The repository contains the initial scope, repository design, selected technology stack, shared event contracts, the tenant/subject/role data model, deterministic two-tenant development provisioning and a runnable PostgreSQL, Redis, NATS JetStream, step-ca and OPA foundation. Application services and evaluation tools have not been implemented yet.
 
 ## Planned capabilities
 
@@ -29,7 +29,7 @@ The repository contains the initial scope, repository design, selected technolog
 - [Tenant certificate-authority model](docs/architecture/tenant-pki.md)
 - [Threat model and failure policy](docs/security/threat-model.md)
 
-Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up` and `npm run infra:migrate`, then run `npm run foundation:check`. Use `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
+Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run foundation:check`. Use `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
 
 ## Planned infrastructure
 

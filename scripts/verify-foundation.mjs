@@ -70,6 +70,7 @@ for (const service of services) await waitForHealthy(service);
 
 runNpm(["test"], "repository tests");
 run(process.execPath, ["scripts/verify-identity-model.mjs"], "identity model verification");
+run(process.execPath, ["scripts/verify-demo-provisioning.mjs"], "demo identity verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
 run(process.execPath, ["scripts/verify-event-delivery.mjs"], "event delivery verification");

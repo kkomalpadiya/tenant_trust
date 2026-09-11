@@ -13,6 +13,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `packages/contracts/` | Versioned request, event and decision schemas shared by producers and consumers |
 | `policies/` | OPA policy source and policy test cases |
 | `database/migrations/` | Ordered application schema changes, including tenant isolation controls |
+| `database/seeds/` | Idempotent synthetic development data with deterministic identifiers and no credentials |
 | `infra/compose/` | Local container service definitions and safe configuration templates |
 | `infra/pki/` | Tenant issuer provisioning scripts and certificate profile templates |
 | `infra/fabric/` | Fabric network definitions and lifecycle scripts, excluding generated identities and channel artifacts |
