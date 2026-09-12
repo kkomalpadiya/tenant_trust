@@ -109,6 +109,21 @@ export function assertNoTenantSwitch(context, claims = []) {
   return trustedContext;
 }
 
+export function revalidateTenantContext(context, authority) {
+  const trustedContext = requireRecord(context, "TENANT_CONTEXT_REQUIRED");
+  if (!RESOLVED_CONTEXTS.has(trustedContext)) deny("TENANT_CONTEXT_INVALID");
+
+  return resolveTenantContext({
+    authentication: {
+      source: trustedContext.authentication.source,
+      authenticationId: trustedContext.authentication.authenticationId,
+      tenantId: trustedContext.tenantId,
+      subjectId: trustedContext.subjectId,
+    },
+    authority,
+  });
+}
+
 export function tenantSafeDenial(error) {
   if (!(error instanceof TenantContextError)) throw error;
   return TENANT_CONTEXT_DENIAL;

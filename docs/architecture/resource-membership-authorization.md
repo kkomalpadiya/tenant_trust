@@ -40,7 +40,7 @@ The database owner remains a privileged migration and provisioning boundary. App
 - Each tenant must retain at least one active tenant administrator. Add a replacement administrator before removing or suspending the current final administrator.
 - Platform-role assignments remain inaccessible to the tenant runtime role.
 
-Tenant suspension and final teardown orchestration remain part of T2.9. This migration establishes the row and authority invariants those workflows must preserve.
+Tenant suspension and final teardown use the separate platform lifecycle boundary described in [Tenant suspension and teardown controls](tenant-lifecycle-controls.md). A suspended tenant no longer needs an active administrator, which allows teardown to remove every tenant role while retaining memberships and their referenced history.
 
 ## Verification
 

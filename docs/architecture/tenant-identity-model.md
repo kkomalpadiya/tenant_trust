@@ -53,7 +53,7 @@ The separate PostgreSQL enum types make `platform-admin` invalid in a tenant-rol
 - External identities are unique by `(identity_provider, provider_subject)`; display names are not identifiers.
 - A subject may have memberships in multiple tenants, but each membership and each assigned tenant role is unique within its tenant-qualified key.
 - Each mutable lifecycle row has a positive version and ordered timestamps for later optimistic concurrency checks.
-- Lifecycle states are `active` or `suspended`. Suspension preserves identifiers and relationships for later recovery and audit work.
+- Lifecycle states are `active` or `suspended`. Suspension preserves identifiers and relationships for later recovery and audit work. Irreversible teardown keeps the tenant suspended and adds `retired_at` rather than introducing a state that could accidentally pass an active-state check.
 
 ## Verification and later enforcement
 
@@ -74,4 +74,4 @@ The resource seed also creates one member-owned and one administrator-owned synt
 
 Run `npm run demo:verify` to check the exact deterministic identity, role and resource mapping. The verifier also changes one tenant, subject and membership to `suspended`, checks their incremented versions, and rolls the transaction back so the baseline remains active.
 
-[Trusted tenant-context resolution](tenant-context-resolution.md) defines how verified identity and this authoritative state produce one immutable tenant context while rejecting client-selected tenant switches. [Database tenant isolation](database-isolation.md) applies forced row-level security and verifies connection reuse. [Tenant resource and membership authorization](resource-membership-authorization.md) defines owner, administrator, role-change and membership-state enforcement. Full tenant suspension and teardown orchestration remain a later Phase 2 task.
+[Trusted tenant-context resolution](tenant-context-resolution.md) defines how verified identity and this authoritative state produce one immutable tenant context while rejecting client-selected tenant switches. [Database tenant isolation](database-isolation.md) applies forced row-level security and verifies connection reuse. [Tenant resource and membership authorization](resource-membership-authorization.md) defines owner, administrator, role-change and membership-state enforcement. [Tenant suspension and teardown controls](tenant-lifecycle-controls.md) define the separate platform actor, immediate suspension, governed recovery and irreversible retained teardown boundary.

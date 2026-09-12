@@ -4,6 +4,7 @@ import {
   TENANT_CONTEXT_DENIAL,
   TenantContextError,
   assertNoTenantSwitch,
+  revalidateTenantContext,
   resolveTenantContext,
   tenantSafeDenial,
 } from "../src/index.mjs";
@@ -124,4 +125,19 @@ test("maps every context failure to one non-enumerating external denial", () => 
     assert.equal(tenantSafeDenial(new TenantContextError(reasonCode)), TENANT_CONTEXT_DENIAL);
   }
   assert.deepEqual(TENANT_CONTEXT_DENIAL, { statusCode: 403, code: "ACCESS_DENIED" });
+});
+
+test("revalidates active context versions and denies suspended tenants", () => {
+  const context = resolveTenantContext(validInput());
+  const refreshedAuthority = validInput().authority;
+  refreshedAuthority.tenant.version = 4;
+  refreshedAuthority.subject.version = 6;
+  refreshedAuthority.membership.version = 8;
+
+  const refreshed = revalidateTenantContext(context, refreshedAuthority);
+  assert.deepEqual(refreshed.versions, { tenant: 4, subject: 6, membership: 8 });
+
+  refreshedAuthority.tenant.state = "suspended";
+  expectDenial("TENANT_INACTIVE", () => revalidateTenantContext(context, refreshedAuthority));
+  expectDenial("TENANT_CONTEXT_INVALID", () => revalidateTenantContext({ ...context }, refreshedAuthority));
 });

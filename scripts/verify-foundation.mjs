@@ -75,6 +75,7 @@ run(process.execPath, ["scripts/verify-database-isolation.mjs"], "database isola
 run(process.execPath, ["scripts/verify-resource-membership-isolation.mjs"], "resource and membership isolation verification");
 run(process.execPath, ["scripts/verify-security-configuration.mjs"], "tenant security configuration verification");
 run(process.execPath, ["scripts/verify-cross-tenant-tampering.mjs"], "cross-tenant tampering verification");
+run(process.execPath, ["scripts/verify-tenant-lifecycle.mjs"], "tenant lifecycle verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
 run(process.execPath, ["scripts/verify-event-delivery.mjs"], "event delivery verification");

@@ -38,7 +38,7 @@ PostgreSQL remains authoritative for lifecycle and roles. Resolution requires al
 
 The result contains only `tenantId`, `subjectId`, sorted tenant roles, authentication provenance and the three authority versions. It is frozen before it crosses into downstream code. Platform roles are excluded. A `platform-admin` uses a separate platform administration route and gains no tenant data context without an ordinary active tenant membership and role.
 
-The recorded versions let later middleware detect stale derived context after suspension or role changes. They do not replace a required fresh database read, session invalidation or certificate-status check.
+The recorded versions let middleware detect stale derived context after suspension or role changes. `revalidateTenantContext` rebuilds a resolver-branded context from fresh authoritative tenant, subject, membership and role state while preserving the authenticated identity binding. It rejects a suspended tenant even when the caller still holds an older context object. It does not replace session invalidation or certificate-status checks.
 
 ## Request and resource checks
 

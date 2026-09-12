@@ -34,6 +34,8 @@ The deterministic seed creates separate planned issuer mappings and five planned
 
 These rows define ownership, integrity and lifecycle metadata only. A planned issuer is not an operational tenant CA, a planned source has no enrolled verification key, and a published policy is not active in OPA. Later PKI, evidence, trust and policy tasks must activate those components only after their own verification requirements pass.
 
+Irreversible tenant teardown retires issuer mappings and evidence sources, supersedes active trust and policy versions, and retains every configuration row under its tenant-qualified key. Published or draft immutable versions remain historical metadata, but the retired tenant stays suspended and cannot use them. See [Tenant suspension and teardown controls](tenant-lifecycle-controls.md).
+
 ## Verification
 
 Run `npm run security-configuration:verify` after applying migrations and provisioning demo data. The verifier proves forced RLS and actor-aware policies, member read-only access, tenant-admin writes, cross-tenant identifier denial, tenant-qualified issuer references, immutable version content, one-active-version rules and empty access when the same connection is reused without context. All test writes roll back.

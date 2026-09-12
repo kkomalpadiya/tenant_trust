@@ -23,9 +23,9 @@ const checks = [
     expected: "1",
   },
   {
-    label: "Required foundation, isolation and tenant security configuration migrations are recorded",
-    args: [...psql, "SELECT count(*) FROM platform.schema_migrations WHERE migration_name IN ('001_foundation.sql', '002_tenant_subject_roles.sql', '003_tenant_row_level_security.sql', '004_tenant_resources_and_membership_rules.sql', '005_tenant_security_configuration.sql')"],
-    expected: "5",
+    label: "Required foundation, isolation, security configuration and lifecycle migrations are recorded",
+    args: [...psql, "SELECT count(*) FROM platform.schema_migrations WHERE migration_name IN ('001_foundation.sql', '002_tenant_subject_roles.sql', '003_tenant_row_level_security.sql', '004_tenant_resources_and_membership_rules.sql', '005_tenant_security_configuration.sql', '006_tenant_lifecycle_controls.sql')"],
+    expected: "6",
   },
   {
     label: "Identity, trust and audit schemas exist",
