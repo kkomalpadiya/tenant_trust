@@ -69,17 +69,10 @@ console.log("PASS Compose configuration is valid");
 for (const service of services) await waitForHealthy(service);
 
 runNpm(["test"], "repository tests");
-run(process.execPath, ["scripts/verify-identity-model.mjs"], "identity model verification");
-run(process.execPath, ["scripts/verify-demo-provisioning.mjs"], "demo identity verification");
-run(process.execPath, ["scripts/verify-database-isolation.mjs"], "database isolation verification");
-run(process.execPath, ["scripts/verify-resource-membership-isolation.mjs"], "resource and membership isolation verification");
-run(process.execPath, ["scripts/verify-security-configuration.mjs"], "tenant security configuration verification");
-run(process.execPath, ["scripts/verify-cross-tenant-tampering.mjs"], "cross-tenant tampering verification");
-run(process.execPath, ["scripts/verify-tenant-lifecycle.mjs"], "tenant lifecycle verification");
+run(process.execPath, ["scripts/verify-tenant-isolation-phase.mjs"], "tenant isolation phase verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
 run(process.execPath, ["scripts/verify-event-delivery.mjs"], "event delivery verification");
-run(process.execPath, ["scripts/verify-runtime-isolation.mjs"], "runtime tenant isolation verification");
 run(process.execPath, ["scripts/verify-security-services.mjs"], "security service verification");
 runNpm(["audit", "--audit-level=high"], "dependency audit");
 

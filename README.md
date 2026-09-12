@@ -31,12 +31,13 @@ The repository contains the initial scope, repository design, selected technolog
 - [Tenant resource and membership authorization](docs/architecture/resource-membership-authorization.md)
 - [Tenant-owned security configuration](docs/architecture/tenant-security-configuration.md)
 - [Tenant suspension and teardown controls](docs/architecture/tenant-lifecycle-controls.md)
+- [Tenant isolation phase verification](docs/architecture/tenant-isolation-verification.md)
 - [Redis and NATS tenant isolation](docs/architecture/runtime-tenant-isolation.md)
 - [Tenant certificate-authority model](docs/architecture/tenant-pki.md)
 - [Threat model and failure policy](docs/security/threat-model.md)
 - [Cross-tenant negative testing](docs/security/cross-tenant-negative-testing.md)
 
-Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run foundation:check`. Use `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
+Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run tenant-isolation:verify` for the Phase 2 gate or `npm run foundation:check` for the complete foundation. Use `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
 
 ## Planned infrastructure
 

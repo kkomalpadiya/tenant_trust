@@ -34,6 +34,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 - Platform tenant lifecycle work uses a separate transaction-local platform actor and execute-only role. Suspension denies live tenant activity; teardown removes tenant roles and retains referenced records plus append-only lifecycle history.
 - Tenant issuer mappings, evidence sources, trust settings and policy versions use tenant-qualified keys. Active members can read only their tenant's rows, and only its active administrators can change them.
 - Tenant Redis keys and NATS subjects are constructed only from a resolved tenant context. Tenant NATS credentials are limited to exact subject prefixes; privileged service credentials remain an explicit trusted boundary.
+- The Phase 2 gate reprovisions the deterministic Alpha/Beta fixtures and verifies database, cache, event and suspension boundaries in one fail-fast scenario before tenant isolation is considered complete.
 - Shared contracts describe interfaces without exposing component internals. Schema changes must account for both producers and consumers.
 - Component paths define responsibilities, not a requirement to run every component in a separate process. Deployment granularity will follow the local resource budget.
 - Certificate validation and policy enforcement gate protected operations. Trust computation supplies versioned input to policy decisions.

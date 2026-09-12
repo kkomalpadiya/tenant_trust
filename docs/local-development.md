@@ -66,6 +66,7 @@ npm run resource-membership:verify
 npm run security-configuration:verify
 npm run cross-tenant:verify
 npm run tenant-lifecycle:verify
+npm run tenant-isolation:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -89,11 +90,13 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 
 `npm run demo:provision` applies every ordered SQL seed under `database/seeds`. It creates the deterministic Tenant Alpha and Tenant Beta subjects, memberships, role assignments, synthetic resources, planned issuer mappings, planned synthetic evidence sources, active trust settings and published policy metadata used by the prototype scenarios. It is safe to rerun and does not reactivate suspended rows or overwrite changed lifecycle versions. It fails when a deterministic identity, ownership or configuration identifier conflicts with different data. `npm run demo:verify` checks the mapping and exercises lifecycle persistence in a transaction that is rolled back.
 
+`npm run tenant-isolation:verify` is the Phase 2 completion gate. It reprovisions the deterministic Alpha/Beta scenario, then runs the identity, database-query, resource, membership, security-configuration, cross-tenant tampering, Redis cache, NATS event and tenant-suspension checks in a fixed fail-fast order. Run the individual commands while diagnosing a boundary, then rerun this complete gate before treating tenant isolation as verified. See [Tenant isolation phase verification](architecture/tenant-isolation-verification.md).
+
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 
 ## Foundation verification
 
-Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests including trusted tenant-context resolution and lifecycle revalidation, the tenant identity model, deterministic demo records and security configuration, actor-aware resource, membership and configuration rules, cross-tenant tampering denial, audited tenant suspension and teardown, database row-level isolation and connection reuse, Redis key isolation, tenant-specific NATS permissions, OPA policy, NATS delivery and replay, step-ca issuance, and the dependency audit.
+Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests including trusted tenant-context resolution and lifecycle revalidation, the complete Tenant Alpha/Tenant Beta isolation phase gate, OPA policy, NATS delivery and replay, step-ca issuance, and the dependency audit.
 
 Run `npm run foundation:clean` to prove a first start from empty service state. The command generates temporary credentials and free loopback ports, creates uniquely named containers, volumes and a network, initializes the CA, applies migrations, runs the complete foundation verification, and then removes those disposable resources. It does not reuse or delete the normal `tenant-trust-*` volumes or `runtime/secrets` files.
 

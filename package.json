@@ -29,6 +29,7 @@
     "security-configuration:verify": "node scripts/verify-security-configuration.mjs",
     "cross-tenant:verify": "node scripts/verify-cross-tenant-tampering.mjs",
     "tenant-lifecycle:verify": "node scripts/verify-tenant-lifecycle.mjs",
+    "tenant-isolation:verify": "node scripts/verify-tenant-isolation-phase.mjs",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",
