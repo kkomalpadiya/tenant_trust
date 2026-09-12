@@ -67,6 +67,7 @@ npm run security-configuration:verify
 npm run cross-tenant:verify
 npm run tenant-lifecycle:verify
 npm run tenant-isolation:verify
+npm run pki-definition:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -91,6 +92,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run demo:provision` applies every ordered SQL seed under `database/seeds`. It creates the deterministic Tenant Alpha and Tenant Beta subjects, memberships, role assignments, synthetic resources, planned issuer mappings, planned synthetic evidence sources, active trust settings and published policy metadata used by the prototype scenarios. It is safe to rerun and does not reactivate suspended rows or overwrite changed lifecycle versions. It fails when a deterministic identity, ownership or configuration identifier conflicts with different data. `npm run demo:verify` checks the mapping and exercises lifecycle persistence in a transaction that is rolled back.
 
 `npm run tenant-isolation:verify` is the Phase 2 completion gate. It reprovisions the deterministic Alpha/Beta scenario, then runs the identity, database-query, resource, membership, security-configuration, cross-tenant tampering, Redis cache, NATS event and tenant-suspension checks in a fixed fail-fast order. Run the individual commands while diagnosing a boundary, then rerun this complete gate before treating tenant isolation as verified. See [Tenant isolation phase verification](architecture/tenant-isolation-verification.md).
+
+`npm run pki-definition:verify` is the T3.1 design gate. It validates the committed offline-root and per-tenant intermediate hierarchy, checks that Alpha and Beta do not share CA state, keys, provisioners, credentials or service principals, confirms issuer selection is derived from validated tenant context, and matches the planned manifest entries to the database seed mappings. This is a static boundary check; it does not start the two tenant authorities or claim live certificate issuance isolation. See [Tenant certificate-authority hierarchy](architecture/tenant-pki.md).
 
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 

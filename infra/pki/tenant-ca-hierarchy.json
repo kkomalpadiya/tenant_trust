@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1.0.0",
+  "trustDomain": "tenant-trust.local",
+  "platformRoot": {
+    "rootId": "tenant-trust-platform-root",
+    "version": 1,
+    "availability": "offline",
+    "certificateBundleReference": "runtime/pki/trust/platform-root-v1.pem",
+    "permittedSigningPurposes": ["tenant-intermediate"],
+    "privateKeyCustody": {
+      "backend": "offline-encrypted",
+      "keyReference": "platform-root/v1",
+      "online": false,
+      "exportable": false
+    }
+  },
+  "issuerSelection": {
+    "source": "validated-tenant-context",
+    "clientSuppliedIssuerAccepted": false,
+    "mappingAuthority": "identity.tenant_issuer_mappings"
+  },
+  "issuers": [
+    {
+      "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+      "issuerId": "iss_018f1234-5678-7abc-8def-0123456789b4",
+      "issuerName": "tenant-alpha-intermediate",
+      "state": "planned",
+      "parentRootId": "tenant-trust-platform-root",
+      "parentRootVersion": 1,
+      "authorityUrl": "https://issuer.tenant-alpha.invalid",
+      "dnsNames": ["issuer.tenant-alpha.invalid"],
+      "stateBoundary": "tenant-alpha-step-ca-data",
+      "configurationBoundary": "tenant-alpha-step-ca-config",
+      "intermediateCertificateReference": "runtime/pki/tenant-alpha/intermediate-v1.pem",
+      "intermediateKeyCustody": {
+        "backend": "local-encrypted-file",
+        "keyReference": "tenant-alpha/intermediate-v1",
+        "exportable": false
+      },
+      "provisioner": {
+        "name": "tenant-alpha-certificate-lifecycle",
+        "credentialReference": "tenant-alpha/provisioner-v1",
+        "credentialStoredInGit": false
+      },
+      "authorization": {
+        "lifecycleOperator": "platform-pki-operator",
+        "certificateServicePrincipal": "svc-tenant-alpha-certificate-lifecycle",
+        "allowedCertificateOperations": ["issue", "renew", "revoke"],
+        "tenantAdminDirectCaAccess": false
+      }
+    },
+    {
+      "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ac",
+      "issuerId": "iss_018f1234-5678-7abc-8def-0123456789b5",
+      "issuerName": "tenant-beta-intermediate",
+      "state": "planned",
+      "parentRootId": "tenant-trust-platform-root",
+      "parentRootVersion": 1,
+      "authorityUrl": "https://issuer.tenant-beta.invalid",
+      "dnsNames": ["issuer.tenant-beta.invalid"],
+      "stateBoundary": "tenant-beta-step-ca-data",
+      "configurationBoundary": "tenant-beta-step-ca-config",
+      "intermediateCertificateReference": "runtime/pki/tenant-beta/intermediate-v1.pem",
+      "intermediateKeyCustody": {
+        "backend": "local-encrypted-file",
+        "keyReference": "tenant-beta/intermediate-v1",
+        "exportable": false
+      },
+      "provisioner": {
+        "name": "tenant-beta-certificate-lifecycle",
+        "credentialReference": "tenant-beta/provisioner-v1",
+        "credentialStoredInGit": false
+      },
+      "authorization": {
+        "lifecycleOperator": "platform-pki-operator",
+        "certificateServicePrincipal": "svc-tenant-beta-certificate-lifecycle",
+        "allowedCertificateOperations": ["issue", "renew", "revoke"],
+        "tenantAdminDirectCaAccess": false
+      }
+    }
+  ]
+}

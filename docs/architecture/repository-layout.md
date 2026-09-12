@@ -18,7 +18,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `database/migrations/` | Ordered application schema changes, including tenant, actor, membership, resource, security-configuration and lifecycle controls |
 | `database/seeds/` | Idempotent synthetic development identities, resources and tenant-owned security configuration with deterministic identifiers and no credentials |
 | `infra/compose/` | Local container service definitions and safe configuration templates |
-| `infra/pki/` | Tenant issuer provisioning scripts and certificate profile templates |
+| `infra/pki/` | Machine-checked tenant CA hierarchy, issuer-boundary definitions, provisioning scripts and certificate profile templates |
 | `infra/fabric/` | Fabric network definitions and lifecycle scripts, excluding generated identities and channel artifacts |
 | `chaincode/audit/` | Audit commitment contract source and contract tests |
 | `tests/` | Integration and end-to-end tests, synthetic fixtures and isolation checks |
@@ -33,6 +33,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 - Tenant database work runs inside a transaction with `identity.set_tenant_actor_context`; forced row-level security denies unbound, inactive, unauthorized and cross-tenant access even when application SQL omits a tenant predicate.
 - Platform tenant lifecycle work uses a separate transaction-local platform actor and execute-only role. Suspension denies live tenant activity; teardown removes tenant roles and retains referenced records plus append-only lifecycle history.
 - Tenant issuer mappings, evidence sources, trust settings and policy versions use tenant-qualified keys. Active members can read only their tenant's rows, and only its active administrators can change them.
+- The tenant CA manifest defines one offline platform root and distinct Alpha/Beta state, key, provisioner and service-principal boundaries. Runtime certificate code must resolve the issuer from validated tenant context and must never accept caller-selected issuer routing.
 - Tenant Redis keys and NATS subjects are constructed only from a resolved tenant context. Tenant NATS credentials are limited to exact subject prefixes; privileged service credentials remain an explicit trusted boundary.
 - The Phase 2 gate reprovisions the deterministic Alpha/Beta fixtures and verifies database, cache, event and suspension boundaries in one fail-fast scenario before tenant isolation is considered complete.
 - Shared contracts describe interfaces without exposing component internals. Schema changes must account for both producers and consumers.
