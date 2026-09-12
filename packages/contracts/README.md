@@ -1,8 +1,10 @@
 # Shared service contracts
 
-This package owns versioned JSON Schema contracts for security-relevant events. Services validate an event before publishing it and again before applying its effect. The schemas describe data shape; the invariants below define processing behavior that JSON Schema alone cannot express.
+This package owns versioned JSON Schema contracts for security-relevant events and internal security commands. Services validate an event before publishing it and again before applying its effect. Command handlers validate normalized requests after trusted identity context has been attached. The schemas describe data shape; the invariants below define processing behavior that JSON Schema alone cannot express.
 
 `schemas/event-registry.json` maps every supported event name to its validator schema. Producers and consumers use this registry rather than inferring a schema from string parsing.
+
+`schemas/pki/certificate-request.schema.json` defines the normalized certificate issue/renew request, and `schemas/pki/certificate-identity-profile.json` defines the X.509 fields the PKI service derives from trusted tenant and subject identity. The raw caller cannot choose the issuer, SAN, subject, key usage, serial or validity timestamps. See [Certificate identity profile and request contract](../../docs/architecture/certificate-identity-profile.md).
 
 ## Identifier rules
 

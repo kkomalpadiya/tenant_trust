@@ -51,7 +51,7 @@ function envelope(number, eventType, aggregateId, payload, overrides = {}) {
 const events = {
   'tenant-event.schema.json': envelope(1, 'tenant.created.v1', ids.tenant, { state: 'active', displayName: 'Tenant Alpha' }, { subjectId: null }),
   'subject-event.schema.json': envelope(2, 'subject.provisioned.v1', ids.subject, { state: 'active', roles: ['tenant-member'] }),
-  'certificate-event.schema.json': envelope(3, 'certificate.issued.v1', ids.certificate, { certificateId: ids.certificate, issuerId: ids.issuer, serialNumber: '01AF', fingerprintSha256: hash, state: 'active', notBefore: '2026-09-10T10:03:00.000Z', notAfter: '2026-10-10T10:03:00.000Z', supersedesCertificateId: null }),
+  'certificate-event.schema.json': envelope(3, 'certificate.issued.v1', ids.certificate, { certificateId: ids.certificate, issuerId: ids.issuer, serialNumber: '01AF'.padEnd(32, '0'), fingerprintSha256: hash, state: 'active', notBefore: '2026-09-10T10:03:00.000Z', notAfter: '2026-10-10T10:03:00.000Z', supersedesCertificateId: null }),
   'evidence-event.schema.json': envelope(4, 'evidence.accepted.v1', ids.evidence, { evidenceId: ids.evidence, sourceId: ids.source, evidenceType: 'device', observedAt: '2026-09-10T10:03:30.000Z', expiresAt: '2026-09-10T10:20:00.000Z', sourceSequence: 7, contentHashSha256: hash, synthetic: true }),
   'trust-event.schema.json': envelope(5, 'trust.updated.v1', ids.transition, { transitionId: ids.transition, previousScore: 86, newScore: 62, previousBand: 'trusted', newBand: 'restricted', modelVersion: '1.0.0', configurationVersion: 1, evidenceIds: [ids.evidence], explanationHashSha256: hash }),
   'policy-event.schema.json': envelope(6, 'policy.activated.v1', ids.policy, { policyVersionId: ids.policy, bundleVersion: 1, bundleHashSha256: hash, state: 'active', replacesPolicyVersionId: null }),
@@ -100,7 +100,7 @@ test('malformed tenant IDs, local timestamps, scores and unknown fields are reje
 });
 
 test('rejection, revocation and failure events require their reason fields', () => {
-  const revoked = envelope(9, 'certificate.revoked.v1', ids.certificate, { certificateId: ids.certificate, issuerId: ids.issuer, serialNumber: '01AF', fingerprintSha256: hash, state: 'revoked', reasonCode: 'KEY_COMPROMISE' });
+  const revoked = envelope(9, 'certificate.revoked.v1', ids.certificate, { certificateId: ids.certificate, issuerId: ids.issuer, serialNumber: '01AF'.padEnd(32, '0'), fingerprintSha256: hash, state: 'revoked', reasonCode: 'KEY_COMPROMISE' });
   assert.equal(validators['certificate-event.schema.json'](revoked), true);
   delete revoked.payload.reasonCode;
   assert.equal(validators['certificate-event.schema.json'](revoked), false);
@@ -114,4 +114,17 @@ test('rejection, revocation and failure events require their reason fields', () 
   assert.equal(validators['action-event.schema.json'](failed), false);
   failed.payload.failureCode = 'CA_UNAVAILABLE';
   assert.equal(validators['action-event.schema.json'](failed), true);
+});
+
+test('certificate events use a non-zero 128-bit uppercase serial representation', () => {
+  const issued = events['certificate-event.schema.json'];
+  for (const serialNumber of ['01AF', '0'.repeat(32), 'ab'.repeat(16), '01'.repeat(17)]) {
+    const candidate = structuredClone(issued);
+    candidate.payload.serialNumber = serialNumber;
+    assert.equal(
+      validators['certificate-event.schema.json'](candidate),
+      false,
+      `${serialNumber} was unexpectedly accepted as a canonical certificate serial`,
+    );
+  }
 });

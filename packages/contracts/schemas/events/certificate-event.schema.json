@@ -16,7 +16,7 @@
           "properties": {
             "certificateId": { "$ref": "../common.schema.json#/$defs/certificateId" },
             "issuerId": { "$ref": "../common.schema.json#/$defs/issuerId" },
-            "serialNumber": { "type": "string", "pattern": "^[0-9A-F]{2,64}$" },
+            "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" },
             "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
             "state": { "enum": ["requested", "active", "revoked", "expired"] },
             "notBefore": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
@@ -32,5 +32,5 @@
     }
   ],
   "if": { "type": "object", "properties": { "eventType": { "const": "certificate.revoked.v1" } } },
-  "then": { "type": "object", "properties": { "payload": { "type": "object", "properties": { "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "serialNumber": { "type": "string", "pattern": "^[0-9A-F]{2,64}$" } }, "required": ["reasonCode", "fingerprintSha256", "serialNumber"] } } }
+  "then": { "type": "object", "properties": { "payload": { "type": "object", "properties": { "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" } }, "required": ["reasonCode", "fingerprintSha256", "serialNumber"] } } }
 }

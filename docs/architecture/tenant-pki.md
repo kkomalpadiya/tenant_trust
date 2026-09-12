@@ -4,7 +4,7 @@
 
 The committed definition in `infra/pki/tenant-ca-hierarchy.json` is the source of truth for the planned Tenant Alpha and Tenant Beta issuer boundaries. It defines public trust references, opaque key and credential references, authorization identities and isolation boundaries. It contains no private keys, passwords or provisioner credentials.
 
-The local Compose stack still runs one development step-ca instance. That instance proves CA initialization, TLS health and temporary certificate issuance for the foundation only. It is not either tenant issuer and does not prove operational tenant isolation. Creating the two authorities and issuing tenant-bound leaf certificates belong to T3.3.
+The local Compose stack still runs one development step-ca instance. That instance proves CA initialization, TLS health and temporary certificate issuance for the foundation only. It is not either tenant issuer and does not prove operational tenant isolation. The leaf identity and request contract are defined in [Certificate identity profile and request contract](certificate-identity-profile.md). Creating the two authorities and issuing tenant-bound leaf certificates belong to T3.3.
 
 ## Hierarchy and trust
 

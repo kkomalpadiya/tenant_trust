@@ -1,0 +1,104 @@
+{
+  "profileId": "tenant-client-auth-v1",
+  "profileVersion": "1.0.0",
+  "certificateType": "end-entity",
+  "identity": {
+    "subject": {
+      "relativeDistinguishedNames": [
+        {
+          "attribute": "commonName",
+          "source": "subjectId"
+        },
+        {
+          "attribute": "organizationName",
+          "source": "tenantId"
+        }
+      ],
+      "humanReadableIdentityAllowed": false
+    },
+    "subjectAlternativeNames": {
+      "required": [
+        {
+          "type": "uniformResourceIdentifier",
+          "template": "urn:tenant-trust:identity:v1:tenant:{tenantId}:subject:{subjectId}"
+        }
+      ],
+      "forbiddenTypes": [
+        "dNSName",
+        "iPAddress",
+        "rfc822Name"
+      ],
+      "callerSuppliedValuesAccepted": false
+    }
+  },
+  "extensions": {
+    "basicConstraints": {
+      "critical": true,
+      "ca": false
+    },
+    "keyUsage": {
+      "critical": true,
+      "values": [
+        "digitalSignature"
+      ]
+    },
+    "extendedKeyUsage": {
+      "critical": false,
+      "values": [
+        "clientAuth"
+      ]
+    },
+    "subjectKeyIdentifierRequired": true,
+    "authorityKeyIdentifierRequired": true
+  },
+  "publicKey": {
+    "allowedAlgorithms": [
+      "ecdsa-p256",
+      "ed25519"
+    ],
+    "minimumSecurityBits": 128,
+    "proofOfPossession": "pkcs10-signature"
+  },
+  "serialNumber": {
+    "source": "issuing-ca",
+    "callerSupplied": false,
+    "randomBits": 128,
+    "encoding": "uppercase-hex",
+    "encodedLength": 32,
+    "nonZero": true,
+    "uniquenessScope": "issuer"
+  },
+  "validity": {
+    "requestedValiditySecondsMinimum": 300,
+    "requestedValiditySecondsDefault": 3600,
+    "requestedValiditySecondsMaximum": 86400,
+    "backdateSeconds": 60,
+    "notBeforeRule": "issued-at-minus-backdate",
+    "notAfterRule": "not-before-plus-requested-validity",
+    "renewalMayExceedMaximum": false
+  },
+  "requestBoundary": {
+    "normalizedAfterAuthentication": true,
+    "issuerSelection": "validated-tenant-context",
+    "callerControlledFields": [
+      "subjectId",
+      "requestedValiditySeconds",
+      "proofOfPossession.csrPem",
+      "proofOfPossession.csrSha256",
+      "proofOfPossession.publicKeyAlgorithm",
+      "idempotencyKey"
+    ],
+    "forbiddenCallerFields": [
+      "issuerId",
+      "authorityUrl",
+      "subject",
+      "subjectAlternativeNames",
+      "keyUsage",
+      "extendedKeyUsage",
+      "serialNumber",
+      "notBefore",
+      "notAfter",
+      "privateKey"
+    ]
+  }
+}
