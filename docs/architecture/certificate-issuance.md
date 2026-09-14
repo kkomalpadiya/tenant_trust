@@ -4,6 +4,8 @@
 
 `@tenant-trust/certificate-issuance` implements the application boundary for the initial `tenant-client-auth-v1` enrollment flow. It receives an immutable context created by `@tenant-trust/tenant-context` and a narrow caller request containing a target subject, CSR, CSR digest, requested validity and idempotency key.
 
+The boundary requires a `recordIssuedCertificate` dependency. After it verifies the returned leaf, it delegates to the tenant-bound inventory service and does not return success until durable certificate and initial lifecycle-event identities are confirmed.
+
 The package derives the normalized contract fields that carry authority: `tenantId`, `requestedBySubjectId`, `operation` and `requestedAt`. Unknown request fields are rejected, so a caller cannot select an issuer or authority URL, replace the requester, supply certificate subject/SAN/extensions/timestamps, or submit private-key material.
 
 ## Request flow

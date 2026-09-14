@@ -265,8 +265,17 @@ export function verifyIssuedCertificate({ certificatePem, prepared } = {}) {
 }
 
 export function createCertificateIssuanceService(dependencies = {}) {
-  const { loadTargetMembership, resolveIssuer, signCertificate, clock = () => new Date() } = dependencies;
+  const {
+    loadTargetMembership,
+    resolveIssuer,
+    signCertificate,
+    recordIssuedCertificate,
+    clock = () => new Date(),
+  } = dependencies;
   if (typeof signCertificate !== "function") throw new TypeError("A certificate signer is required.");
+  if (typeof recordIssuedCertificate !== "function") {
+    throw new TypeError("A certificate inventory writer is required.");
+  }
 
   return Object.freeze({
     async issue({ context, request } = {}) {
@@ -278,7 +287,12 @@ export function createCertificateIssuanceService(dependencies = {}) {
         clock,
       });
       const result = await signCertificate(prepared.signingInstruction);
-      return verifyIssuedCertificate({ certificatePem: result?.certificatePem, prepared });
+      const verifiedCertificate = verifyIssuedCertificate({ certificatePem: result?.certificatePem, prepared });
+      return recordIssuedCertificate({
+        context,
+        normalizedRequest: prepared.normalizedRequest,
+        verifiedCertificate,
+      });
     },
   });
 }

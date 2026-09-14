@@ -6,7 +6,7 @@ A valid certificate establishes identity. Access also depends on tenant membersh
 
 ## Current status
 
-The repository contains the initial scope, repository design, selected technology stack, shared event contracts, the tenant/subject/role data model, deterministic two-tenant identities, resources and security configuration, tested tenant-context, actor-aware PostgreSQL resource, membership, configuration and lifecycle authorization, audited tenant suspension and teardown, Redis key-scoping and NATS subject/consumer controls, a machine-checked tenant CA hierarchy, a versioned client-certificate identity profile, and a certificate issuance boundary with real two-issuer cryptographic verification. Certificate inventory and later lifecycle operations, application services and evaluation tools have not been implemented yet.
+The repository contains the initial scope, repository design, selected technology stack, shared event contracts, the tenant/subject/role data model, deterministic two-tenant identities, resources and security configuration, tested tenant-context, actor-aware PostgreSQL resource, membership, configuration and lifecycle authorization, audited tenant suspension and teardown, Redis key-scoping and NATS subject/consumer controls, a machine-checked tenant CA hierarchy, a versioned client-certificate identity profile, a certificate issuance boundary with real two-issuer cryptographic verification, and a tenant-scoped certificate inventory with append-only lifecycle records. Renewal, revocation, application services and evaluation tools have not been implemented yet.
 
 ## Planned capabilities
 
@@ -36,10 +36,11 @@ The repository contains the initial scope, repository design, selected technolog
 - [Tenant certificate-authority model](docs/architecture/tenant-pki.md)
 - [Certificate identity profile and request contract](docs/architecture/certificate-identity-profile.md)
 - [Certificate request and issuance](docs/architecture/certificate-issuance.md)
+- [Certificate inventory and lifecycle records](docs/architecture/certificate-inventory.md)
 - [Threat model and failure policy](docs/security/threat-model.md)
 - [Cross-tenant negative testing](docs/security/cross-tenant-negative-testing.md)
 
-Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run tenant-isolation:verify` for the Phase 2 gate, `npm run pki-definition:verify` for the tenant issuer design gate, `npm run certificate-profile:verify` for the certificate-contract gate, `npm run certificate-issuance:verify` for the enrollment gate or `npm run foundation:check` for the complete foundation. Use `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
+Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run tenant-isolation:verify` for the Phase 2 gate, `npm run pki-definition:verify` for the tenant issuer design gate, `npm run certificate-profile:verify` for the certificate-contract gate, `npm run certificate-issuance:verify` for the enrollment gate, `npm run certificate-inventory:verify` for the durable inventory gate or `npm run foundation:check` for the complete foundation. Use `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
 
 ## Planned infrastructure
 

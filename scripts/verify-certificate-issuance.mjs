@@ -9,6 +9,7 @@ import {
   certificateIssuanceSafeDenial,
   createCertificateIssuanceService,
 } from "@tenant-trust/certificate-issuance";
+import { createCertificateInventoryService } from "@tenant-trust/certificate-inventory";
 import { environment, repositoryRoot } from "./lib/foundation-context.mjs";
 
 const ids = {
@@ -191,7 +192,20 @@ try {
 
   const loadTargetMembership = async ({ tenantId, subjectId }) => memberships.get(`${tenantId}:${subjectId}`) ?? null;
   const resolveIssuer = async ({ tenantId }) => issuers.get(tenantId) ?? null;
-  const service = createCertificateIssuanceService({ loadTargetMembership, resolveIssuer, signCertificate: signWithIssuer });
+  const inventoryRecords = new Map();
+  const inventoryService = createCertificateInventoryService({
+    insertIssuedCertificate: async (record) => {
+      inventoryRecords.set(record.certificateId, record);
+      return { certificateId: record.certificateId, eventId: record.issuedEventId, state: record.state };
+    },
+  });
+  const recordIssuedCertificate = inventoryService.recordIssuedCertificate;
+  const service = createCertificateIssuanceService({
+    loadTargetMembership,
+    resolveIssuer,
+    signCertificate: signWithIssuer,
+    recordIssuedCertificate,
+  });
 
   const alphaCsr = await createCsr(ids.alice, "alpha-subject");
   const betaCsr = await createCsr(ids.bob, "beta-subject");
@@ -208,6 +222,9 @@ try {
   });
   assert.equal(alphaCertificate.issuerId, ids.alphaIssuer);
   assert.equal(betaCertificate.issuerId, ids.betaIssuer);
+  assert.match(alphaCertificate.certificateId, /^crt_/u);
+  assert.match(alphaCertificate.issuedEventId, /^evt_/u);
+  assert.equal(inventoryRecords.size, 2);
   assert.notEqual(alphaCertificate.fingerprintSha256, betaCertificate.fingerprintSha256);
   assert.equal(signerCalls.some((call) => JSON.stringify(call).includes("PRIVATE KEY")), false);
   console.log("PASS authorized Alpha and Beta subjects generated keys and received tenant-bound client certificates");
@@ -237,6 +254,7 @@ try {
     loadTargetMembership,
     resolveIssuer: async () => issuers.get(ids.beta),
     signCertificate: signWithIssuer,
+    recordIssuedCertificate,
   });
   await assert.rejects(
     foreignMappingService.issue({
@@ -251,6 +269,7 @@ try {
     loadTargetMembership,
     resolveIssuer,
     signCertificate: (instruction) => signWithIssuer(instruction, "beta-issuer"),
+    recordIssuedCertificate,
   });
   await assert.rejects(
     wrongSignerService.issue({

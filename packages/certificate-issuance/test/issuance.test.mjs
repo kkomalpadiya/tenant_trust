@@ -6,6 +6,7 @@ import {
   CERTIFICATE_ISSUANCE_DENIAL,
   CertificateIssuanceError,
   certificateIssuanceSafeDenial,
+  createCertificateIssuanceService,
   normalizeCertificateIssueRequest,
   prepareCertificateIssuance,
 } from "../src/index.mjs";
@@ -179,4 +180,11 @@ test("issuer resolution fails closed on a foreign tenant or inactive mapping", a
 
 test("internal denial reasons map to one non-enumerating response", () => {
   assert.deepEqual(certificateIssuanceSafeDenial(new CertificateIssuanceError("ISSUER_TENANT_MISMATCH")), CERTIFICATE_ISSUANCE_DENIAL);
+});
+
+test("the issuance service requires an inventory writer before it can return success", () => {
+  assert.throws(
+    () => createCertificateIssuanceService({ signCertificate: async () => null }),
+    /certificate inventory writer/iu,
+  );
 });
