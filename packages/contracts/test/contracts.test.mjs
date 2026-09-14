@@ -116,6 +116,35 @@ test('rejection, revocation and failure events require their reason fields', () 
   assert.equal(validators['action-event.schema.json'](failed), true);
 });
 
+test('renewal and supersession events require linked certificate lifecycle evidence', () => {
+  const successor = 'crt_018f1234-5678-7abc-8def-0123456789ac';
+  const renewed = envelope(10, 'certificate.renewed.v1', successor, {
+    certificateId: successor,
+    issuerId: ids.issuer,
+    serialNumber: '02AF'.padEnd(32, '0'),
+    fingerprintSha256: hash,
+    state: 'active',
+    notBefore: '2026-10-10T10:02:00.000Z',
+    notAfter: '2026-11-10T10:03:00.000Z',
+    supersedesCertificateId: ids.certificate,
+  });
+  assert.equal(validators['certificate-event.schema.json'](renewed), true);
+  delete renewed.payload.supersedesCertificateId;
+  assert.equal(validators['certificate-event.schema.json'](renewed), false);
+
+  const superseded = envelope(11, 'certificate.superseded.v1', ids.certificate, {
+    certificateId: ids.certificate,
+    issuerId: ids.issuer,
+    serialNumber: '01AF'.padEnd(32, '0'),
+    fingerprintSha256: hash,
+    state: 'superseded',
+    reasonCode: 'CERTIFICATE_RENEWED',
+  });
+  assert.equal(validators['certificate-event.schema.json'](superseded), true);
+  delete superseded.payload.reasonCode;
+  assert.equal(validators['certificate-event.schema.json'](superseded), false);
+});
+
 test('certificate events use a non-zero 128-bit uppercase serial representation', () => {
   const issued = events['certificate-event.schema.json'];
   for (const serialNumber of ['01AF', '0'.repeat(32), 'ab'.repeat(16), '01'.repeat(17)]) {

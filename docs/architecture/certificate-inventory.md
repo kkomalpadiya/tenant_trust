@@ -4,11 +4,11 @@ PostgreSQL is the authoritative off-chain store for certificate identity and cur
 
 ## Inventory model
 
-Every certificate row has a tenant-qualified primary key and records the opaque certificate ID, target subject, tenant issuer, certificate profile, issuer-scoped serial number, SHA-256 fingerprint, public-key algorithm, validity window, current state, requester, request/idempotency identities, correlation ID and the first/latest lifecycle event IDs. The allowed states are `active`, `revoked`, `expired` and `superseded`; T3.4 creates only `active` records. Later tasks own the guarded transition functions.
+Every certificate row has a tenant-qualified primary key and records the opaque certificate ID, target subject, tenant issuer, certificate profile, issuer-scoped serial number, SHA-256 fingerprint, canonical public-key SPKI digest, public-key algorithm, validity window, current state, requester, request/idempotency identities, correlation ID and the first/latest lifecycle event IDs. The allowed states are `active`, `revoked`, `expired` and `superseded`. Initial issuance creates an `active` row; renewal creates a new active row and permanently supersedes its predecessor.
 
 The database enforces globally unique certificate and event IDs, globally unique fingerprints, issuer-scoped serial uniqueness and tenant-scoped request/idempotency uniqueness. Immutable X.509 identity and issuance fields cannot be rewritten. Expiry and subject indexes support later authentication and lifecycle scans without dropping tenant scope.
 
-`identity.certificate_lifecycle_events` is append-only. Each event repeats the minimum certificate identity needed for a stable lifecycle audit projection and links to the inventory row. The initial event is `issued`, has state `active`, has no reason or causation event and uses the issuance request's idempotency identity. Revocation, expiry, renewal and supersession event shapes are reserved for their later transition implementations.
+`identity.certificate_lifecycle_events` is append-only. Each event repeats the minimum certificate identity needed for a stable lifecycle audit projection and links to the inventory row. The initial event is `issued`, has state `active`, has no reason or causation event and uses the issuance request's idempotency identity. Renewal appends linked `renewed` and `superseded` events in the same transaction; revocation and expiry remain later guarded transitions.
 
 ## Write and read boundaries
 

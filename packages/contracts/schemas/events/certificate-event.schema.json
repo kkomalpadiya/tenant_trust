@@ -8,7 +8,7 @@
     {
       "type": "object",
       "properties": {
-        "eventType": { "enum": ["certificate.requested.v1", "certificate.issued.v1", "certificate.renewed.v1", "certificate.revoked.v1", "certificate.expired.v1"] },
+        "eventType": { "enum": ["certificate.requested.v1", "certificate.issued.v1", "certificate.renewed.v1", "certificate.superseded.v1", "certificate.revoked.v1", "certificate.expired.v1"] },
         "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
         "aggregateId": { "$ref": "../common.schema.json#/$defs/certificateId" },
         "payload": {
@@ -18,7 +18,7 @@
             "issuerId": { "$ref": "../common.schema.json#/$defs/issuerId" },
             "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" },
             "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
-            "state": { "enum": ["requested", "active", "revoked", "expired"] },
+            "state": { "enum": ["requested", "active", "superseded", "revoked", "expired"] },
             "notBefore": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
             "notAfter": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
             "supersedesCertificateId": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/certificateId" }, { "type": "null" }] },
@@ -29,6 +29,14 @@
         }
       },
       "required": ["payload"]
+    },
+    {
+      "if": { "properties": { "eventType": { "const": "certificate.renewed.v1" } }, "required": ["eventType"] },
+      "then": { "properties": { "payload": { "type": "object", "properties": { "state": { "const": "active" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "notBefore": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, "notAfter": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, "supersedesCertificateId": { "$ref": "../common.schema.json#/$defs/certificateId" } }, "required": ["serialNumber", "fingerprintSha256", "notBefore", "notAfter", "supersedesCertificateId"] } } }
+    },
+    {
+      "if": { "properties": { "eventType": { "const": "certificate.superseded.v1" } }, "required": ["eventType"] },
+      "then": { "properties": { "payload": { "type": "object", "properties": { "state": { "const": "superseded" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" } }, "required": ["serialNumber", "fingerprintSha256", "reasonCode"] } } }
     }
   ],
   "if": { "type": "object", "properties": { "eventType": { "const": "certificate.revoked.v1" } } },

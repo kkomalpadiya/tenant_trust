@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { resolveTenantContext } from "@tenant-trust/tenant-context";
@@ -83,6 +83,14 @@ function clientRequest({ requestId, subjectId, csrPem, validity = 3600, key = "0
   };
 }
 
+function renewalRequest({ requestId, subjectId, csrPem, renewalOfCertificateId, key }) {
+  return {
+    ...clientRequest({ requestId, subjectId, csrPem, validity: 300, key }),
+    renewalOfCertificateId,
+    idempotencyKey: `certificate:renew:verification:${key}`,
+  };
+}
+
 async function createIssuer(name, directory) {
   await mkdir(resolve(workingDirectory, directory), { recursive: true });
   runStep([
@@ -100,6 +108,8 @@ async function createIssuer(name, directory) {
   return readFile(resolve(workingDirectory, directory, "intermediate.crt"), "utf8");
 }
 
+const inspectedCsrs = new Map();
+
 async function createCsr(name, directory) {
   await mkdir(resolve(workingDirectory, directory), { recursive: true });
   runStep([
@@ -111,7 +121,13 @@ async function createCsr(name, directory) {
     "--no-password",
     "--insecure",
   ], `${name} key and CSR creation`);
-  return readFile(resolve(workingDirectory, directory, "request.csr"), "utf8");
+  const csrPem = await readFile(resolve(workingDirectory, directory, "request.csr"), "utf8");
+  const privateKeyPem = await readFile(resolve(workingDirectory, directory, "private.key"), "utf8");
+  const publicKeySha256 = createHash("sha256")
+    .update(createPublicKey(createPrivateKey(privateKeyPem)).export({ type: "spki", format: "der" }))
+    .digest("hex");
+  inspectedCsrs.set(csrPem, { publicKeyAlgorithm: "ecdsa-p256", publicKeySha256 });
+  return csrPem;
 }
 
 const memberships = new Map([
@@ -198,13 +214,39 @@ try {
       inventoryRecords.set(record.certificateId, record);
       return { certificateId: record.certificateId, eventId: record.issuedEventId, state: record.state };
     },
+    insertRenewedCertificate: async (record) => {
+      const predecessor = inventoryRecords.get(record.supersedesCertificateId);
+      assert.equal(predecessor?.state, "active");
+      inventoryRecords.set(predecessor.certificateId, {
+        ...predecessor,
+        state: "superseded",
+        lastEventId: record.supersededEventId,
+      });
+      inventoryRecords.set(record.certificateId, record);
+      return {
+        certificateId: record.certificateId,
+        renewedEventId: record.renewedEventId,
+        supersededEventId: record.supersededEventId,
+        state: "active",
+        predecessorState: "superseded",
+      };
+    },
   });
   const recordIssuedCertificate = inventoryService.recordIssuedCertificate;
+  const recordRenewedCertificate = inventoryService.recordRenewedCertificate;
+  let verificationTime = new Date(Date.now() - 170_000);
   const service = createCertificateIssuanceService({
     loadTargetMembership,
+    loadRenewalCertificate: async ({ tenantId, certificateId, subjectId }) => {
+      const certificate = inventoryRecords.get(certificateId);
+      return certificate?.tenantId === tenantId && certificate?.subjectId === subjectId ? certificate : null;
+    },
+    inspectCertificateRequest: async (csr) => inspectedCsrs.get(csr) ?? null,
     resolveIssuer,
     signCertificate: signWithIssuer,
     recordIssuedCertificate,
+    recordRenewedCertificate,
+    clock: () => verificationTime,
   });
 
   const alphaCsr = await createCsr(ids.alice, "alpha-subject");
@@ -214,7 +256,7 @@ try {
 
   const alphaCertificate = await service.issue({
     context: alphaContext,
-    request: clientRequest({ requestId: "req_018f1234-5678-7abc-8def-0123456789c2", subjectId: ids.alice, csrPem: alphaCsr, key: "alpha" }),
+    request: clientRequest({ requestId: "req_018f1234-5678-7abc-8def-0123456789c2", subjectId: ids.alice, csrPem: alphaCsr, validity: 300, key: "alpha" }),
   });
   const betaCertificate = await service.issue({
     context: betaContext,
@@ -228,6 +270,63 @@ try {
   assert.notEqual(alphaCertificate.fingerprintSha256, betaCertificate.fingerprintSha256);
   assert.equal(signerCalls.some((call) => JSON.stringify(call).includes("PRIVATE KEY")), false);
   console.log("PASS authorized Alpha and Beta subjects generated keys and received tenant-bound client certificates");
+
+  verificationTime = new Date();
+  const renewalCallsBeforeDenial = signerCalls.length;
+  await assert.rejects(
+    service.renew({
+      context: alphaContext,
+      request: renewalRequest({
+        requestId: "req_018f1234-5678-7abc-8def-0123456789c8",
+        subjectId: ids.alice,
+        csrPem: alphaCsr,
+        renewalOfCertificateId: alphaCertificate.certificateId,
+        key: "same-key",
+      }),
+    }),
+    (error) => error instanceof CertificateIssuanceError && error.reasonCode === "KEY_ROTATION_REQUIRED",
+  );
+  assert.equal(signerCalls.length, renewalCallsBeforeDenial);
+
+  memberships.set(`${ids.alpha}:${ids.alice}`, {
+    ...memberships.get(`${ids.alpha}:${ids.alice}`),
+    membershipState: "suspended",
+  });
+  const rotatedCsr = await createCsr(ids.alice, "alpha-subject-rotated");
+  await assert.rejects(
+    service.renew({
+      context: alphaContext,
+      request: renewalRequest({
+        requestId: "req_018f1234-5678-7abc-8def-0123456789c9",
+        subjectId: ids.alice,
+        csrPem: rotatedCsr,
+        renewalOfCertificateId: alphaCertificate.certificateId,
+        key: "suspended",
+      }),
+    }),
+    (error) => error instanceof CertificateIssuanceError && error.reasonCode === "TARGET_MEMBERSHIP_INACTIVE",
+  );
+  memberships.set(`${ids.alpha}:${ids.alice}`, {
+    ...memberships.get(`${ids.alpha}:${ids.alice}`),
+    membershipState: "active",
+  });
+
+  const renewedCertificate = await service.renew({
+    context: alphaContext,
+    request: renewalRequest({
+      requestId: "req_018f1234-5678-7abc-8def-0123456789ca",
+      subjectId: ids.alice,
+      csrPem: rotatedCsr,
+      renewalOfCertificateId: alphaCertificate.certificateId,
+      key: "rotated",
+    }),
+  });
+  assert.equal(renewedCertificate.supersedesCertificateId, alphaCertificate.certificateId);
+  assert.equal(inventoryRecords.get(alphaCertificate.certificateId).state, "superseded");
+  assert.notEqual(renewedCertificate.publicKeySha256, alphaCertificate.publicKeySha256);
+  assert.notEqual(renewedCertificate.fingerprintSha256, alphaCertificate.fingerprintSha256);
+  assert.notEqual(renewedCertificate.renewedEventId, renewedCertificate.supersededEventId);
+  console.log("PASS eligible renewal used a fresh key and atomically recorded successor and supersession identities");
 
   const callsBeforeDenial = signerCalls.length;
   await assert.rejects(

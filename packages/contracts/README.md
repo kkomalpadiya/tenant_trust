@@ -6,7 +6,7 @@ This package owns versioned JSON Schema contracts for security-relevant events a
 
 `schemas/pki/certificate-request.schema.json` defines the normalized certificate issue/renew request, and `schemas/pki/certificate-identity-profile.json` defines the X.509 fields the PKI service derives from trusted tenant and subject identity. The raw caller cannot choose the issuer, SAN, subject, key usage, serial or validity timestamps. See [Certificate identity profile and request contract](../../docs/architecture/certificate-identity-profile.md).
 
-`@tenant-trust/certificate-issuance` implements the initial issue path against these contracts. It derives trusted fields, authorizes the target subject, resolves the tenant issuer and verifies the signed leaf before `@tenant-trust/certificate-inventory` assigns the durable certificate, event and correlation identities.
+`@tenant-trust/certificate-issuance` implements issue and renewal against these contracts. It derives trusted fields, authorizes the target subject, resolves the tenant issuer, verifies the signed leaf and enforces fresh-key renewal before `@tenant-trust/certificate-inventory` assigns durable certificate, correlation, renewal and supersession event identities.
 
 ## Identifier rules
 

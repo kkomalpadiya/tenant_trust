@@ -73,6 +73,7 @@ SELECT * FROM identity.record_certificate_issuance(
   'tenant-client-auth-v1',
   '00000000000000000000000000000001',
   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
   'ecdsa-p256',
   TIMESTAMPTZ '2026-09-14 09:59:00+00',
   TIMESTAMPTZ '2026-09-14 10:59:00+00',
@@ -90,6 +91,7 @@ SELECT * FROM identity.record_certificate_issuance(
   'tenant-client-auth-v1',
   '00000000000000000000000000000002',
   'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
   'ed25519',
   TIMESTAMPTZ '2026-09-14 10:00:00+00',
   TIMESTAMPTZ '2026-09-14 11:00:00+00',
@@ -116,6 +118,7 @@ BEGIN
       AND certificate.subject_id = 'sub_018f1234-5678-7abc-8def-0123456789ab'
       AND certificate.serial_number = '00000000000000000000000000000001'
       AND certificate.fingerprint_sha256 = repeat('a', 64)
+      AND certificate.public_key_sha256 = repeat('e', 64)
       AND certificate.not_after = TIMESTAMPTZ '2026-09-14 10:59:00+00'
       AND certificate.state = 'active'
       AND event.event_type = 'issued'
@@ -141,7 +144,7 @@ BEGIN
       'iss_018f1234-5678-7abc-8def-0123456789b5',
       'tenant-client-auth-v1',
       '00000000000000000000000000000003',
-      repeat('c', 64), 'ecdsa-p256',
+      repeat('c', 64), repeat('1', 64), 'ecdsa-p256',
       TIMESTAMPTZ '2026-09-14 10:00:00+00',
       TIMESTAMPTZ '2026-09-14 11:00:00+00',
       TIMESTAMPTZ '2026-09-14 10:01:00+00',
@@ -162,7 +165,7 @@ BEGIN
       'iss_018f1234-5678-7abc-8def-0123456789b4',
       'tenant-client-auth-v1',
       '00000000000000000000000000000001',
-      repeat('c', 64), 'ecdsa-p256',
+      repeat('c', 64), repeat('1', 64), 'ecdsa-p256',
       TIMESTAMPTZ '2026-09-14 10:00:00+00',
       TIMESTAMPTZ '2026-09-14 11:00:00+00',
       TIMESTAMPTZ '2026-09-14 10:01:00+00',
@@ -183,7 +186,7 @@ BEGIN
       'iss_018f1234-5678-7abc-8def-0123456789b4',
       'tenant-client-auth-v1',
       '00000000000000000000000000000003',
-      repeat('c', 64), 'ecdsa-p256',
+      repeat('c', 64), repeat('1', 64), 'ecdsa-p256',
       TIMESTAMPTZ '2026-09-14 10:00:00+00',
       TIMESTAMPTZ '2026-09-14 11:00:00+00',
       TIMESTAMPTZ '2026-09-14 10:01:00+00',
@@ -209,7 +212,7 @@ BEGIN
     'iss_018f1234-5678-7abc-8def-0123456789b4',
     'tenant-client-auth-v1',
     '00000000000000000000000000000001',
-    repeat('a', 64), 'ecdsa-p256',
+    repeat('a', 64), repeat('e', 64), 'ecdsa-p256',
     TIMESTAMPTZ '2026-09-14 09:59:00+00',
     TIMESTAMPTZ '2026-09-14 10:59:00+00',
     TIMESTAMPTZ '2026-09-14 10:00:00+00',
@@ -250,7 +253,7 @@ BEGIN
       'iss_018f1234-5678-7abc-8def-0123456789b4',
       'tenant-client-auth-v1',
       '00000000000000000000000000000004',
-      repeat('d', 64), 'ecdsa-p256',
+      repeat('d', 64), repeat('2', 64), 'ecdsa-p256',
       TIMESTAMPTZ '2026-09-14 10:00:00+00',
       TIMESTAMPTZ '2026-09-14 11:00:00+00',
       TIMESTAMPTZ '2026-09-14 10:01:00+00',

@@ -2,7 +2,7 @@
 
 ## Security boundary
 
-`@tenant-trust/certificate-issuance` implements the application boundary for the initial `tenant-client-auth-v1` enrollment flow. It receives an immutable context created by `@tenant-trust/tenant-context` and a narrow caller request containing a target subject, CSR, CSR digest, requested validity and idempotency key.
+`@tenant-trust/certificate-issuance` implements the application boundary for initial enrollment and fresh-key renewal of `tenant-client-auth-v1` certificates. It receives an immutable context created by `@tenant-trust/tenant-context` and a narrow caller request containing a target subject, CSR, CSR digest, requested validity and idempotency key.
 
 The boundary requires a `recordIssuedCertificate` dependency. After it verifies the returned leaf, it delegates to the tenant-bound inventory service and does not return success until durable certificate and initial lifecycle-event identities are confirmed.
 
@@ -30,7 +30,7 @@ The resolved issuer record supplies public metadata and the tenant intermediate 
 - a non-zero serial represented as 32 uppercase hexadecimal characters;
 - a validity window within the requested 5-minute to 24-hour bound and the profile backdate policy.
 
-Certificate metadata returned by this task is not yet a durable inventory record. T3.4 owns certificate IDs, persistence, lifecycle state and event IDs.
+Verified certificate metadata includes the canonical public-key SPKI digest. Initial issuance is persisted through the inventory writer; renewal additionally verifies eligibility and fresh-key possession before signing, then persists successor activation and predecessor supersession atomically. See [Certificate renewal and key rotation](certificate-renewal.md).
 
 ## Verification scenario
 

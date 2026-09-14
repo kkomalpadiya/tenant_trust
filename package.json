@@ -34,6 +34,7 @@
     "certificate-profile:verify": "node --test packages/contracts/test/certificate-profile.test.mjs",
     "certificate-issuance:verify": "npm run test:certificate-issuance && node scripts/verify-certificate-issuance.mjs",
     "certificate-inventory:verify": "npm run test:certificate-inventory && node scripts/verify-certificate-inventory.mjs",
+    "certificate-renewal:verify": "npm run test:certificate-issuance && npm run test:certificate-inventory && node scripts/verify-certificate-issuance.mjs && node scripts/verify-certificate-renewal.mjs",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",

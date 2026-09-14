@@ -11,6 +11,7 @@
     "certificate.requested.v1": "events/certificate-event.schema.json",
     "certificate.issued.v1": "events/certificate-event.schema.json",
     "certificate.renewed.v1": "events/certificate-event.schema.json",
+    "certificate.superseded.v1": "events/certificate-event.schema.json",
     "certificate.revoked.v1": "events/certificate-event.schema.json",
     "certificate.expired.v1": "events/certificate-event.schema.json",
     "evidence.accepted.v1": "events/evidence-event.schema.json",

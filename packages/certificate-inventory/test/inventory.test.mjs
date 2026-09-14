@@ -58,6 +58,7 @@ function certificate(overrides = {}) {
     issuerId: ids.alphaIssuer,
     serialNumber: "00000000000000000000000000000001",
     fingerprintSha256: "a".repeat(64),
+    publicKeySha256: "b".repeat(64),
     notBefore: "2026-09-14T09:59:00.000Z",
     notAfter: "2026-09-14T10:59:00.000Z",
     ...overrides,
