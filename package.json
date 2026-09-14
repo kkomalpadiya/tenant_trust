@@ -32,12 +32,14 @@
     "tenant-isolation:verify": "node scripts/verify-tenant-isolation-phase.mjs",
     "pki-definition:verify": "node scripts/verify-tenant-ca-definition.mjs",
     "certificate-profile:verify": "node --test packages/contracts/test/certificate-profile.test.mjs",
+    "certificate-issuance:verify": "npm run test:certificate-issuance && node scripts/verify-certificate-issuance.mjs",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",
     "test:messaging": "npm test --workspace @tenant-trust/messaging",
     "test:tenant-context": "npm test --workspace @tenant-trust/tenant-context",
-    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context"
+    "test:certificate-issuance": "npm test --workspace @tenant-trust/certificate-issuance",
+    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:certificate-issuance"
   },
   "engines": {
     "node": "24.20.0",

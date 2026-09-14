@@ -4,7 +4,7 @@
 
 The committed definition in `infra/pki/tenant-ca-hierarchy.json` is the source of truth for the planned Tenant Alpha and Tenant Beta issuer boundaries. It defines public trust references, opaque key and credential references, authorization identities and isolation boundaries. It contains no private keys, passwords or provisioner credentials.
 
-The local Compose stack still runs one development step-ca instance. That instance proves CA initialization, TLS health and temporary certificate issuance for the foundation only. It is not either tenant issuer and does not prove operational tenant isolation. The leaf identity and request contract are defined in [Certificate identity profile and request contract](certificate-identity-profile.md). Creating the two authorities and issuing tenant-bound leaf certificates belong to T3.3.
+The local Compose stack still runs one development step-ca instance for foundation health. The T3.3 verification gate separately creates an ephemeral platform root and distinct Alpha and Beta intermediates, issues real tenant-bound leaves, and removes all generated key material. The reusable application authorization and verification boundary is defined in [Certificate request and issuance](certificate-issuance.md). Long-running tenant-authority deployment remains separate from the foundation CA.
 
 ## Hierarchy and trust
 
@@ -33,7 +33,7 @@ Each manifest entry must match one row in `identity.tenant_issuer_mappings` by b
 
 Certificate lifecycle code starts with validated tenant context, then resolves the mapping. An issuer ID, authority URL, tenant header, path value, query value, request-body field or resource identifier supplied by a caller is only a consistency claim. It cannot select or replace the trusted mapping. A mismatch receives the same non-enumerating denial as any other cross-tenant request.
 
-The two planned mappings intentionally use different non-routable `.invalid` authority URLs. T3.3 will replace those planned endpoints with deployed internal authority names as part of one verified activation step; an endpoint must never be made active before its isolated authority exists.
+The two planned database mappings intentionally use different non-routable `.invalid` authority URLs. The T3.3 integration scenario supplies active in-memory mappings only after its isolated authorities exist; it does not falsely activate the planned database rows. A later long-running deployment must replace each placeholder with its deployed internal authority name and verified certificate fingerprint as one activation step.
 
 ## Isolation boundaries
 
@@ -82,4 +82,4 @@ Tenant suspension prevents new certificate operations even if its CA is healthy.
 
 Run `npm run pki-definition:verify`. The verifier checks that the platform root is offline and limited to signing tenant intermediates; Alpha and Beta have unique tenant, issuer, endpoint, state, configuration, key, provisioner, credential and service-principal boundaries; issuer selection comes only from validated tenant context; the manifest matches the planned database seed mappings; and no private key, password, token or secret field is committed.
 
-The static verifier is part of `npm run foundation:check` and the disposable `npm run foundation:clean` path. Passing it proves the hierarchy and isolation contract are internally consistent. It does not claim that the two tenant authorities or their runtime access controls have been deployed; T3.3 must add live cross-tenant issuance denial tests.
+The static verifier is part of `npm run foundation:check` and the disposable `npm run foundation:clean` path. `npm run certificate-issuance:verify` adds real ephemeral Alpha/Beta issuers and live cross-tenant denial tests while keeping all generated keys outside Git. Passing these gates does not claim that long-running tenant authorities or production HSM/KMS controls have been deployed.

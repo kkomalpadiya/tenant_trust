@@ -72,4 +72,4 @@ JSON Schema validates shape and conditional lineage. The service must additional
 
 Run `npm run certificate-profile:verify`. Tests compile the request schema, accept issue and renewal examples, reject invalid lineage, validity, timestamps, algorithms and proof-of-possession values, and prove that caller-supplied issuer, identity, privilege, serial, timestamp and private-key fields are not accepted. They also lock the profile's subject/SAN, client-auth extensions, algorithms, serial generation and validity rules.
 
-T3.2 defines and tests the contract only. T3.3 must generate a real supported key and CSR, verify the CSR cryptographically, construct the certificate from the profile, issue through the trusted tenant mapping, and add live tests for unauthorized enrollment and cross-tenant issuer denial.
+T3.2 defines and tests the contract. T3.3 implements it in [Certificate request and issuance](certificate-issuance.md): supported subject keys and CSRs are exercised cryptographically, the service constructs the certificate from this profile, resolves the trusted tenant mapping, and rejects unauthorized enrollment and cross-tenant issuer use.

@@ -12,6 +12,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `services/audit/` | Durable audit delivery, Fabric integration, reconciliation and verification |
 | `packages/contracts/` | Versioned request, event and decision schemas plus certificate profiles shared by producers and consumers |
 | `packages/tenant-context/` | Trusted authenticated tenant-context resolution, anti-switch checks, and tenant-scoped Redis key builders shared by enforcement points |
+| `packages/certificate-issuance/` | Trusted certificate request normalization, subject authorization, tenant issuer resolution and issued-certificate verification |
 | `packages/messaging/` | Context-bound NATS subject construction, JetStream stream defaults and tenant-filtered durable consumer defaults |
 | `infra/nats/` | NATS server configuration and tenant-specific demonstration permissions |
 | `policies/` | OPA policy source and policy test cases |
