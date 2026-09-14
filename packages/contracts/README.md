@@ -10,6 +10,8 @@ This package owns versioned JSON Schema contracts for security-relevant events a
 
 `schemas/pki/certificate-status.schema.json` defines the versioned application-status verdict shared by authentication and authorization consumers. An `accept` verdict is possible only for an authoritative, fresh `active` inventory match and always carries a bounded cache deadline. Every denial is non-cacheable. See [Certificate status validation](../../docs/architecture/certificate-status-validation.md).
 
+`schemas/pki/certificate-revocation-request.schema.json` permits callers to provide only the certificate target, an approved permanent reason, request identity and idempotency key. Tenant, actor, subject, issuer, certificate metadata, event identity and time come from trusted state. `certificate.revoked.v1` requires the resulting event to carry `revoked` state, canonical serial and fingerprint, and a reason. See [Authorized certificate revocation](../../docs/architecture/certificate-revocation.md).
+
 ## Identifier rules
 
 Identifiers are opaque lowercase UUIDs with a type prefix. Generate the UUID once when the entity or event is created. Never derive an identifier from a name, email address, certificate subject or other personal data.

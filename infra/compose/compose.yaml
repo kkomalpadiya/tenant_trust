@@ -88,6 +88,7 @@ services:
     volumes:
       - step-ca-data:/home/step
       - ../pki/verify-issuance.sh:/scripts/verify-issuance.sh:ro
+      - ../pki/verify-revocation.sh:/scripts/verify-revocation.sh:ro
     secrets:
       - step_ca_password
     healthcheck:

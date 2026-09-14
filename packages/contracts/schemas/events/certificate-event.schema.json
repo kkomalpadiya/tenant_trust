@@ -40,5 +40,5 @@
     }
   ],
   "if": { "type": "object", "properties": { "eventType": { "const": "certificate.revoked.v1" } } },
-  "then": { "type": "object", "properties": { "payload": { "type": "object", "properties": { "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" } }, "required": ["reasonCode", "fingerprintSha256", "serialNumber"] } } }
+  "then": { "type": "object", "properties": { "payload": { "type": "object", "properties": { "state": { "const": "revoked" }, "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" } }, "required": ["reasonCode", "fingerprintSha256", "serialNumber"] } } }
 }

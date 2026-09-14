@@ -8,7 +8,7 @@ Every certificate row has a tenant-qualified primary key and records the opaque 
 
 The database enforces globally unique certificate and event IDs, globally unique fingerprints, issuer-scoped serial uniqueness and tenant-scoped request/idempotency uniqueness. Immutable X.509 identity and issuance fields cannot be rewritten. Expiry and subject indexes support later authentication and lifecycle scans without dropping tenant scope.
 
-`identity.certificate_lifecycle_events` is append-only. Each event repeats the minimum certificate identity needed for a stable lifecycle audit projection and links to the inventory row. The initial event is `issued`, has state `active`, has no reason or causation event and uses the issuance request's idempotency identity. Renewal appends linked `renewed` and `superseded` events in the same transaction; revocation and expiry remain later guarded transitions.
+`identity.certificate_lifecycle_events` is append-only. Each event repeats the minimum certificate identity needed for a stable lifecycle audit projection and links to the inventory row. The initial event is `issued`, has state `active`, has no reason or causation event and uses the issuance request's idempotency identity. Renewal appends linked `renewed` and `superseded` events in the same transaction. Revocation appends a `revoked` event with the approved reason, actor, previous lifecycle event and authenticated issuer confirmation. Expiry remains a later guarded transition.
 
 ## Write and read boundaries
 
@@ -25,6 +25,8 @@ Identical reuse of an idempotency key returns the original certificate and event
 `@tenant-trust/certificate-issuance` now requires a `recordIssuedCertificate` dependency. It returns the public certificate only after that writer confirms the durable certificate ID, lifecycle event ID and `active` state. A PostgreSQL adapter maps the record fields to `identity.record_certificate_issuance`; an unavailable or unconfirmed write fails the issuance request instead of returning an unaudited success.
 
 `@tenant-trust/certificate-status` reads the same inventory as the certificate-validity authority for application requests. Its transaction-bound adapter selects the exact tenant, certificate, issuer, serial and fingerprint under forced row-level security; it never treats a missing or stale record as active. See [Certificate status validation](certificate-status-validation.md).
+
+`@tenant-trust/certificate-revocation` changes inventory only after the active mapped issuer confirms the exact tenant/certificate/issuer/serial/fingerprint target. `identity.record_certificate_revocation` rechecks the actor and target under a row lock and commits the terminal state plus reasoned event atomically. See [Authorized certificate revocation](certificate-revocation.md).
 
 ## Verification
 

@@ -73,6 +73,7 @@ npm run certificate-issuance:verify
 npm run certificate-inventory:verify
 npm run certificate-renewal:verify
 npm run certificate-status:verify
+npm run certificate-revocation:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -109,6 +110,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run certificate-renewal:verify` is the T3.5 renewal and rotation gate. It proves the final-quarter renewal window, active tenant/subject/membership and predecessor requirements, trusted pre-signing CSR key inspection, a different SPKI digest, real Smallstep certificate rotation, atomic successor activation and predecessor supersession, causal lifecycle events, idempotent replay and denial of early, suspended, revoked, superseded and foreign-tenant attempts. See [Certificate renewal and key rotation](architecture/certificate-renewal.md).
 
 `npm run certificate-status:verify` is the T3.6 certificate-status contract gate. It selects the PostgreSQL application inventory as the authority instead of assuming the configured CA exposes CRL or OCSP, and proves exact tenant/certificate binding, X.509 validity checks, five-second source freshness, a 30-second maximum successful-cache lifetime, and fail-closed behavior for unknown, revoked, expired, superseded, malformed, stale, timed-out or unavailable status. See [Certificate status validation](architecture/certificate-status-validation.md).
+
+`npm run certificate-revocation:verify` is the T3.7 authorized-revocation gate. It proves owner and same-tenant administrator authorization, exact certificate and issuer binding, approved permanent reasons, issuer-confirmation-before-persistence ordering, durable idempotent replay, active-to-revoked atomic state change, append-only reasoned events and denial of foreign, unauthorized, non-active or conflicting requests. The gate also issues and actively revokes a disposable Smallstep certificate and confirms it cannot renew. See [Authorized certificate revocation](architecture/certificate-revocation.md).
 
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 

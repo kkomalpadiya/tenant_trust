@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/pki/certificate-revocation-request.schema.json",
+  "title": "Certificate revocation request",
+  "type": "object",
+  "properties": {
+    "requestId": { "$ref": "../common.schema.json#/$defs/requestId" },
+    "certificateId": { "$ref": "../common.schema.json#/$defs/certificateId" },
+    "reasonCode": {
+      "enum": [
+        "KEY_COMPROMISE",
+        "CA_COMPROMISE",
+        "AFFILIATION_CHANGED",
+        "SUPERSEDED",
+        "CESSATION_OF_OPERATION",
+        "PRIVILEGE_WITHDRAWN",
+        "AA_COMPROMISE"
+      ]
+    },
+    "idempotencyKey": { "$ref": "../common.schema.json#/$defs/idempotencyKey" }
+  },
+  "required": ["requestId", "certificateId", "reasonCode", "idempotencyKey"],
+  "additionalProperties": false
+}

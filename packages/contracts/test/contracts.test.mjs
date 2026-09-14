@@ -104,6 +104,9 @@ test('rejection, revocation and failure events require their reason fields', () 
   assert.equal(validators['certificate-event.schema.json'](revoked), true);
   delete revoked.payload.reasonCode;
   assert.equal(validators['certificate-event.schema.json'](revoked), false);
+  revoked.payload.reasonCode = 'KEY_COMPROMISE';
+  revoked.payload.state = 'active';
+  assert.equal(validators['certificate-event.schema.json'](revoked), false);
 
   const rejected = { ...structuredClone(events['evidence-event.schema.json']), eventType: 'evidence.rejected.v1' };
   assert.equal(validators['evidence-event.schema.json'](rejected), false);

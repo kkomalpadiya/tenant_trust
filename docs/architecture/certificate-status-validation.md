@@ -4,7 +4,7 @@
 
 The prototype uses `application-status-v1`: every protected application request validates the presented certificate against the authoritative PostgreSQL certificate inventory. This is the required application authorization check in addition to ordinary X.509 chain, signature, hostname/purpose and validity validation at the TLS boundary.
 
-The choice is deliberately independent of Smallstep feature assumptions. The configured CA may later publish a CRL or OCSP response, but neither is required for this prototype's access decision. CA-side revocation execution and distribution remain separate lifecycle work; the application can deny a certificate as soon as its inventory state changes.
+The choice is deliberately independent of Smallstep feature assumptions. The configured CA may publish a CRL or OCSP response, but neither is required for this prototype's access decision. The authorized revocation workflow actively revokes through the mapped issuer before atomically changing inventory. Application validation then denies the certificate as soon as the authoritative row becomes `revoked`.
 
 ## Authoritative lookup and binding
 

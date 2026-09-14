@@ -73,6 +73,7 @@ run(process.execPath, ["scripts/verify-tenant-ca-definition.mjs"], "tenant CA de
 run(process.execPath, ["scripts/verify-certificate-issuance.mjs"], "certificate issuance verification");
 run(process.execPath, ["scripts/verify-certificate-inventory.mjs"], "certificate inventory verification");
 run(process.execPath, ["scripts/verify-certificate-renewal.mjs"], "certificate renewal verification");
+run(process.execPath, ["scripts/verify-certificate-revocation.mjs"], "certificate revocation verification");
 run(process.execPath, ["scripts/verify-tenant-isolation-phase.mjs"], "tenant isolation phase verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
