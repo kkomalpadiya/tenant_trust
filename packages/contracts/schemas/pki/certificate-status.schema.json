@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/pki/certificate-status.schema.json",
+  "title": "Certificate application-status verdict",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "mechanism": { "const": "application-status-v1" },
+    "outcome": { "enum": ["accept", "deny"] },
+    "reasonCode": {
+      "enum": [
+        "CERTIFICATE_ACTIVE",
+        "CERTIFICATE_NOT_YET_VALID",
+        "CERTIFICATE_UNKNOWN",
+        "CERTIFICATE_REVOKED",
+        "CERTIFICATE_EXPIRED",
+        "CERTIFICATE_SUPERSEDED",
+        "STATUS_SOURCE_TIMEOUT",
+        "STATUS_SOURCE_UNAVAILABLE",
+        "STATUS_SOURCE_INVALID",
+        "STATUS_SOURCE_STALE"
+      ]
+    },
+    "tenantId": { "$ref": "../common.schema.json#/$defs/tenantId" },
+    "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+    "certificateId": { "$ref": "../common.schema.json#/$defs/certificateId" },
+    "issuerId": { "$ref": "../common.schema.json#/$defs/issuerId" },
+    "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" },
+    "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
+    "inventoryState": { "enum": ["active", "revoked", "expired", "superseded", "unknown"] },
+    "sourceStatus": { "enum": ["authoritative", "unknown", "stale", "invalid", "unavailable", "not-queried"] },
+    "statusVersion": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+    "statusObservedAt": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, { "type": "null" }] },
+    "checkedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+    "cacheableUntil": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, { "type": "null" }] }
+  },
+  "required": [
+    "schemaVersion",
+    "mechanism",
+    "outcome",
+    "reasonCode",
+    "tenantId",
+    "subjectId",
+    "certificateId",
+    "issuerId",
+    "serialNumber",
+    "fingerprintSha256",
+    "inventoryState",
+    "sourceStatus",
+    "statusVersion",
+    "statusObservedAt",
+    "checkedAt",
+    "cacheableUntil"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "accept" } }, "required": ["outcome"] },
+      "then": {
+        "properties": {
+          "reasonCode": { "const": "CERTIFICATE_ACTIVE" },
+          "inventoryState": { "const": "active" },
+          "sourceStatus": { "const": "authoritative" },
+          "statusVersion": { "type": "integer", "minimum": 1 },
+          "statusObservedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+          "cacheableUntil": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "deny" } }, "required": ["outcome"] },
+      "then": { "properties": { "cacheableUntil": { "type": "null" } } }
+    }
+  ]
+}

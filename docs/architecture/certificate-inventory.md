@@ -24,6 +24,8 @@ Identical reuse of an idempotency key returns the original certificate and event
 
 `@tenant-trust/certificate-issuance` now requires a `recordIssuedCertificate` dependency. It returns the public certificate only after that writer confirms the durable certificate ID, lifecycle event ID and `active` state. A PostgreSQL adapter maps the record fields to `identity.record_certificate_issuance`; an unavailable or unconfirmed write fails the issuance request instead of returning an unaudited success.
 
+`@tenant-trust/certificate-status` reads the same inventory as the certificate-validity authority for application requests. Its transaction-bound adapter selects the exact tenant, certificate, issuer, serial and fingerprint under forced row-level security; it never treats a missing or stale record as active. See [Certificate status validation](certificate-status-validation.md).
+
 ## Verification
 
 Run `npm run certificate-inventory:verify` after migrations and deterministic demo provisioning. The gate runs package tests and a rolled-back PostgreSQL scenario that proves:
