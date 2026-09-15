@@ -80,6 +80,7 @@ npm run certificate-lifecycle:verify
 npm run mtls-gateway:verify
 npm run gateway-spoofing:verify
 npm run profile-record-api:verify
+npm run role-action-matrix:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -130,6 +131,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run gateway-spoofing:verify` is the T4.2 hostile-route gate. It runs the complete T4.1 path, then supplies a foreign certificate and tenant identity through every recognized and commonly spoofed header. The gate proves NGINX replaces or removes those values, rejects forged headers without a client certificate before proxying, rejects direct access without an internal client certificate before the handler, and rejects an internal-CA-valid non-gateway certificate at the exact gateway pin with the same uniform 401 response. See [mTLS gateway and application identity](architecture/mtls-gateway-identity.md).
 
 `npm run profile-record-api:verify` is the T4.3 protected-read gate. It exercises the Fastify routes against provisioned PostgreSQL state and proves certificate-authenticated profile access, member ownership scope, same-tenant administrator visibility, Alpha/Beta separation, ignored forged identity headers, and uniform denial for invisible record IDs. Every operation binds the trusted tenant and actor inside a transaction before querying under forced RLS. See [Profile and tenant-record API](architecture/profile-tenant-record-api.md).
+
+`npm run role-action-matrix:verify` is the T4.4 authorization-contract gate. It exhaustively checks the tenant-member and tenant-administrator rows for profile read, record read/write, export and administration; derives resource sensitivity from the action; rejects forged tenant contexts and unknown actions; and proves export/administration are non-allowing until their additional policy, bound step-up and audit controls exist. See [Role, action and resource-sensitivity matrix](architecture/role-action-sensitivity-matrix.md).
 
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 

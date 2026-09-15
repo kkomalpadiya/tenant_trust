@@ -25,7 +25,7 @@ Use two synthetic tenants, `tenant-alpha` and `tenant-beta`, with separate membe
 | Manage membership and certificates | Tenant administration only, with strict subject and issuer binding and an audit record. |
 | Rotate an administrative key | The initial policy example requires trust of at least 90 plus additional authentication. |
 
-The exact permissions and score boundaries will be implemented as a tested policy matrix. These initial examples do not imply a universal allow threshold for every operation.
+Role eligibility, action names and resource sensitivity are defined in the tested [role, action and sensitivity matrix](architecture/role-action-sensitivity-matrix.md). Score boundaries and final adaptive outcomes remain later policy work. These initial examples do not imply a universal allow threshold for every operation.
 
 ## Certificate and security states
 

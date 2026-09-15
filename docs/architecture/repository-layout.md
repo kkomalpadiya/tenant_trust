@@ -12,6 +12,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `services/audit/` | Durable audit delivery, Fabric integration, reconciliation and verification |
 | `packages/contracts/` | Versioned request, event and decision schemas plus certificate profiles shared by producers and consumers |
 | `packages/tenant-context/` | Trusted authenticated tenant-context resolution, anti-switch checks, and tenant-scoped Redis key builders shared by enforcement points |
+| `packages/authorization/` | Canonical tenant role/action eligibility, fixed resource-sensitivity classification and explicit default denial |
 | `packages/certificate-issuance/` | Trusted certificate request normalization, subject authorization, tenant issuer resolution and issued-certificate verification |
 | `packages/certificate-inventory/` | Trusted certificate/event identity generation, issuance binding checks and durable-inventory adapter boundary |
 | `packages/certificate-events/` | Canonical certificate-event construction, Ed25519 source authentication, acknowledged publication and transactional-outbox adapter |
@@ -36,6 +37,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 
 - NGINX validates the presented client chain and overwrites the versioned certificate headers before forwarding over mutually authenticated TLS. The application accepts those headers only when the TLS peer is the exact pinned gateway certificate, then re-verifies the leaf against the active issuer selected from its certificate tenant identity.
 - The API derives tenant identity from the gateway authentication result through `packages/tenant-context/`. Client headers and resource IDs can confirm that context but cannot select or replace it. Every store, cache key, event and policy lookup preserves tenant scope.
+- Role/action lookup accepts only that branded tenant context. Resource type and sensitivity come from the canonical action matrix, and export or administration remains non-allowing until all separately implemented controls pass.
 - Tenant database work runs inside a transaction with `identity.set_tenant_actor_context`; forced row-level security denies unbound, inactive, unauthorized and cross-tenant access even when application SQL omits a tenant predicate.
 - Platform tenant lifecycle work uses a separate transaction-local platform actor and execute-only role. Suspension denies live tenant activity; teardown removes tenant roles and retains referenced records plus append-only lifecycle history.
 - Tenant issuer mappings, evidence sources, trust settings and policy versions use tenant-qualified keys. Active members can read only their tenant's rows, and only its active administrators can change them.
