@@ -43,7 +43,7 @@ Restoring a compromised issuer reproduces the compromised key and is prohibited.
 5. Atomically activate the new issuer mapping. Keep the compromised issuer and its serial namespace permanently retired. Never re-enable it from backup.
 6. Reissue eligible tenant certificates with fresh subject keys. Reject old-chain, revoked, wrong-issuer and wrong-tenant certificates throughout the transition.
 7. Publish signed replacement, revocation and recovery events with incident correlation and causation IDs. Reconcile the inventory, event outbox and audit commitments before closing containment.
-8. Rotate the affected provisioner credentials and any backup or unlock secrets that might have been exposed. Retest tenant isolation, issuance, renewal, status, revocation, event delivery and the complete certificate-lifecycle gate.
+8. Rotate the affected provisioner credentials and any backup or unlock secrets that might have been exposed. Retest tenant isolation and run `npm run certificate-lifecycle:verify` before returning the issuer to service.
 
 ## Platform-root compromise
 
@@ -58,4 +58,3 @@ npm run pki-recovery:verify
 ```
 
 The gate creates a disposable source CA volume, confirms owner-only key permissions, writes an authenticated encrypted backup outside Git, rejects a wrong passphrase without creating a volume, restores into a distinct volume, compares the root identity, starts the recovered CA and issues a fresh disposable certificate. It then removes both volumes, the container, passphrases, ciphertext and plaintext staging data. It never reads, stops or changes the normal `tenant-trust-step-ca-data` volume.
-

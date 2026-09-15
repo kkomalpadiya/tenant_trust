@@ -69,14 +69,7 @@ console.log("PASS Compose configuration is valid");
 for (const service of services) await waitForHealthy(service);
 
 runNpm(["test"], "repository tests");
-run(process.execPath, ["scripts/verify-tenant-ca-definition.mjs"], "tenant CA definition verification");
-run(process.execPath, ["scripts/verify-certificate-issuance.mjs"], "certificate issuance verification");
-run(process.execPath, ["scripts/verify-certificate-inventory.mjs"], "certificate inventory verification");
-run(process.execPath, ["scripts/verify-certificate-renewal.mjs"], "certificate renewal verification");
-run(process.execPath, ["scripts/verify-certificate-revocation.mjs"], "certificate revocation verification");
-run(process.execPath, ["scripts/verify-certificate-event-outbox.mjs"], "certificate event outbox verification");
-run(process.execPath, ["scripts/verify-signed-certificate-events.mjs"], "signed certificate event verification");
-run(process.execPath, ["scripts/verify-pki-recovery.mjs"], "PKI key-protection and recovery verification");
+run(process.execPath, ["scripts/verify-certificate-lifecycle.mjs", "--skip-unit-tests"], "Phase 3 certificate lifecycle verification");
 run(process.execPath, ["scripts/verify-tenant-isolation-phase.mjs"], "tenant isolation phase verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");

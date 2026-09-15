@@ -41,6 +41,7 @@
     "pki:backup": "node scripts/pki-recovery.mjs backup",
     "pki:restore": "node scripts/pki-recovery.mjs restore",
     "pki-recovery:verify": "node scripts/verify-pki-recovery.mjs",
+    "certificate-lifecycle:verify": "node scripts/verify-certificate-lifecycle.mjs",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",

@@ -35,6 +35,7 @@ The repository contains the initial scope, repository design, selected technolog
 - [Redis and NATS tenant isolation](docs/architecture/runtime-tenant-isolation.md)
 - [Tenant certificate-authority model](docs/architecture/tenant-pki.md)
 - [PKI key protection and issuer recovery](docs/operations/pki-key-protection-and-recovery.md)
+- [Complete certificate lifecycle verification](docs/architecture/certificate-lifecycle-verification.md)
 - [Certificate identity profile and request contract](docs/architecture/certificate-identity-profile.md)
 - [Certificate request and issuance](docs/architecture/certificate-issuance.md)
 - [Certificate inventory and lifecycle records](docs/architecture/certificate-inventory.md)
@@ -45,7 +46,7 @@ The repository contains the initial scope, repository design, selected technolog
 - [Threat model and failure policy](docs/security/threat-model.md)
 - [Cross-tenant negative testing](docs/security/cross-tenant-negative-testing.md)
 
-Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run tenant-isolation:verify` for the Phase 2 gate, `npm run pki-definition:verify` for the tenant issuer design gate, `npm run certificate-profile:verify` for the certificate-contract gate, `npm run certificate-issuance:verify` for the enrollment gate, `npm run certificate-inventory:verify` for the durable inventory gate, `npm run certificate-renewal:verify` for the fresh-key renewal gate, `npm run certificate-status:verify` for the status-policy gate, `npm run certificate-revocation:verify` for the authorized-revocation gate, `npm run certificate-events:verify` for the signed lifecycle-event gate, `npm run pki-recovery:verify` for the disposable encrypted-backup and restore gate or `npm run foundation:check` for the complete foundation. Use `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
+Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run tenant-isolation:verify` for the Phase 2 gate, the individual `pki-definition`, certificate profile, issuance, inventory, renewal, status, revocation, event and recovery gates while diagnosing those boundaries, or `npm run certificate-lifecycle:verify` for the complete Phase 3 gate. Run `npm run foundation:check` for the complete foundation and `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
 
 ## Planned infrastructure
 
