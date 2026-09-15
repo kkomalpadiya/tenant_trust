@@ -1,0 +1,21 @@
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { composeArgs, environment, repositoryRoot } from "./lib/foundation-context.mjs";
+
+const verificationSql = readFileSync(resolve(repositoryRoot, "database/tests/verify-certificate-event-outbox.sql"), "utf8");
+const result = spawnSync(
+  "docker",
+  [
+    ...composeArgs,
+    "exec", "-T", "postgres", "psql", "-X", "-v", "ON_ERROR_STOP=1",
+    "-U", environment.POSTGRES_USER, "-d", environment.POSTGRES_DB,
+  ],
+  { cwd: repositoryRoot, encoding: "utf8", maxBuffer: 4 * 1024 * 1024, input: verificationSql },
+);
+if (result.status !== 0) {
+  throw new Error(`PostgreSQL certificate event outbox verification failed:\n${(result.stderr || result.stdout).trim()}`);
+}
+if (result.stdout.trim()) console.log(result.stdout.trim());
+if (result.stderr.trim()) console.error(result.stderr.trim());
+console.log("Certificate event outbox verification passed without retaining database test changes.");

@@ -24,8 +24,8 @@ const checks = [
   },
   {
     label: "Required foundation, isolation, security configuration and certificate lifecycle migrations are recorded",
-    args: [...psql, "SELECT count(*) FROM platform.schema_migrations WHERE migration_name IN ('001_foundation.sql', '002_tenant_subject_roles.sql', '003_tenant_row_level_security.sql', '004_tenant_resources_and_membership_rules.sql', '005_tenant_security_configuration.sql', '006_tenant_lifecycle_controls.sql', '007_certificate_inventory.sql', '008_certificate_renewal.sql', '009_certificate_revocation.sql', '010_revocation_confirmation_time.sql')"],
-    expected: "10",
+    args: [...psql, "SELECT count(*) FROM platform.schema_migrations WHERE migration_name IN ('001_foundation.sql', '002_tenant_subject_roles.sql', '003_tenant_row_level_security.sql', '004_tenant_resources_and_membership_rules.sql', '005_tenant_security_configuration.sql', '006_tenant_lifecycle_controls.sql', '007_certificate_inventory.sql', '008_certificate_renewal.sql', '009_certificate_revocation.sql', '010_revocation_confirmation_time.sql', '011_signed_certificate_event_outbox.sql')"],
+    expected: "11",
   },
   {
     label: "Identity, trust and audit schemas exist",

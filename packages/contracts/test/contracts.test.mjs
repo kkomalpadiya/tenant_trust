@@ -30,6 +30,13 @@ const ids = {
   correlation: 'cor_018f1234-5678-7abc-8def-0123456789ab'
 };
 const hash = 'ab'.repeat(32);
+const sourceAuthentication = {
+  algorithm: 'Ed25519',
+  canonicalization: 'tenant-trust-json-v1',
+  keyId: 'certificate-events:key-2026-01',
+  signedContentSha256: hash,
+  signatureBase64Url: 'A'.repeat(86),
+};
 function envelope(number, eventType, aggregateId, payload, overrides = {}) {
   return {
     schemaVersion: '1.0.0',
@@ -51,7 +58,7 @@ function envelope(number, eventType, aggregateId, payload, overrides = {}) {
 const events = {
   'tenant-event.schema.json': envelope(1, 'tenant.created.v1', ids.tenant, { state: 'active', displayName: 'Tenant Alpha' }, { subjectId: null }),
   'subject-event.schema.json': envelope(2, 'subject.provisioned.v1', ids.subject, { state: 'active', roles: ['tenant-member'] }),
-  'certificate-event.schema.json': envelope(3, 'certificate.issued.v1', ids.certificate, { certificateId: ids.certificate, issuerId: ids.issuer, serialNumber: '01AF'.padEnd(32, '0'), fingerprintSha256: hash, state: 'active', notBefore: '2026-09-10T10:03:00.000Z', notAfter: '2026-10-10T10:03:00.000Z', supersedesCertificateId: null }),
+  'certificate-event.schema.json': envelope(3, 'certificate.issued.v1', ids.certificate, { certificateId: ids.certificate, issuerId: ids.issuer, serialNumber: '01AF'.padEnd(32, '0'), fingerprintSha256: hash, state: 'active', notBefore: '2026-09-10T10:03:00.000Z', notAfter: '2026-10-10T10:03:00.000Z', supersedesCertificateId: null, actorSubjectId: ids.subject }, { causationId: null, sourceAuthentication }),
   'evidence-event.schema.json': envelope(4, 'evidence.accepted.v1', ids.evidence, { evidenceId: ids.evidence, sourceId: ids.source, evidenceType: 'device', observedAt: '2026-09-10T10:03:30.000Z', expiresAt: '2026-09-10T10:20:00.000Z', sourceSequence: 7, contentHashSha256: hash, synthetic: true }),
   'trust-event.schema.json': envelope(5, 'trust.updated.v1', ids.transition, { transitionId: ids.transition, previousScore: 86, newScore: 62, previousBand: 'trusted', newBand: 'restricted', modelVersion: '1.0.0', configurationVersion: 1, evidenceIds: [ids.evidence], explanationHashSha256: hash }),
   'policy-event.schema.json': envelope(6, 'policy.activated.v1', ids.policy, { policyVersionId: ids.policy, bundleVersion: 1, bundleHashSha256: hash, state: 'active', replacesPolicyVersionId: null }),
@@ -80,11 +87,11 @@ test('the registry maps every declared event type to its owning schema', () => {
   assert.equal(registry.registryVersion, '1.0.0');
 });
 
-test('the sample chain links each event to its immediate cause and one correlation', () => {
+test('the sample events preserve one correlation and declared immediate causes', () => {
   const chain = Object.values(events);
   for (let index = 0; index < chain.length; index++) {
     assert.equal(chain[index].correlationId, ids.correlation);
-    assert.equal(chain[index].causationId, index === 0 ? null : chain[index - 1].eventId);
+    assert.equal(chain[index].causationId, index === 0 || index === 2 ? null : chain[index - 1].eventId);
     assert.ok(Date.parse(chain[index].recordedAt) >= Date.parse(chain[index].occurredAt));
   }
 });
@@ -100,7 +107,7 @@ test('malformed tenant IDs, local timestamps, scores and unknown fields are reje
 });
 
 test('rejection, revocation and failure events require their reason fields', () => {
-  const revoked = envelope(9, 'certificate.revoked.v1', ids.certificate, { certificateId: ids.certificate, issuerId: ids.issuer, serialNumber: '01AF'.padEnd(32, '0'), fingerprintSha256: hash, state: 'revoked', reasonCode: 'KEY_COMPROMISE' });
+  const revoked = envelope(9, 'certificate.revoked.v1', ids.certificate, { certificateId: ids.certificate, issuerId: ids.issuer, serialNumber: '01AF'.padEnd(32, '0'), fingerprintSha256: hash, state: 'revoked', reasonCode: 'KEY_COMPROMISE', actorSubjectId: ids.subject, issuerConfirmationId: 'step-ca:revocation:contract-0001' }, { sourceAuthentication });
   assert.equal(validators['certificate-event.schema.json'](revoked), true);
   delete revoked.payload.reasonCode;
   assert.equal(validators['certificate-event.schema.json'](revoked), false);
@@ -130,7 +137,8 @@ test('renewal and supersession events require linked certificate lifecycle evide
     notBefore: '2026-10-10T10:02:00.000Z',
     notAfter: '2026-11-10T10:03:00.000Z',
     supersedesCertificateId: ids.certificate,
-  });
+    actorSubjectId: ids.subject,
+  }, { sourceAuthentication });
   assert.equal(validators['certificate-event.schema.json'](renewed), true);
   delete renewed.payload.supersedesCertificateId;
   assert.equal(validators['certificate-event.schema.json'](renewed), false);
@@ -142,10 +150,20 @@ test('renewal and supersession events require linked certificate lifecycle evide
     fingerprintSha256: hash,
     state: 'superseded',
     reasonCode: 'CERTIFICATE_RENEWED',
-  });
+    actorSubjectId: ids.subject,
+  }, { sourceAuthentication });
   assert.equal(validators['certificate-event.schema.json'](superseded), true);
   delete superseded.payload.reasonCode;
   assert.equal(validators['certificate-event.schema.json'](superseded), false);
+});
+
+test('certificate lifecycle events require exact Ed25519 source authentication', () => {
+  const issued = structuredClone(events['certificate-event.schema.json']);
+  delete issued.sourceAuthentication;
+  assert.equal(validators['certificate-event.schema.json'](issued), false);
+
+  issued.sourceAuthentication = { ...sourceAuthentication, algorithm: 'RS256' };
+  assert.equal(validators['certificate-event.schema.json'](issued), false);
 });
 
 test('certificate events use a non-zero 128-bit uppercase serial representation', () => {

@@ -14,7 +14,9 @@ The local stream retains up to 512 MiB for seven days and discards the oldest me
 
 Use a JetStream publish and wait for its server acknowledgement. Set the NATS message ID to the contract `eventId`. The stream rejects a repeat message ID during its two-minute duplicate window. This handles immediate publisher retries, while durable application constraints still enforce event and idempotency uniqueness beyond that window.
 
-Do not publish an event before its originating state change and outbox record commit. A later application task will implement the transactional outbox. A plain Core NATS publish does not provide the required persistence acknowledgement.
+Do not publish an event before its originating state change and outbox record commit. Certificate lifecycle records now create an outbox identity in the same PostgreSQL transaction through migration 011. The certificate publisher signs deterministic content, waits for the JetStream acknowledgement and records the acknowledged sequence before marking the exact claim published. Other event domains still require their own transactional outbox integration. A plain Core NATS publish does not provide the required persistence acknowledgement.
+
+Certificate-event consumers validate the event contract, expected tenant, canonical-content digest and Ed25519 signature before applying an effect. Public-key lookup is bound to tenant, producer service and instance, key ID and algorithm. This authenticates the configured producer but does not make a false source statement true. See [Signed certificate lifecycle events](signed-certificate-events.md).
 
 ## Consumption and retry
 
@@ -34,3 +36,5 @@ Each default consumer allows one unacknowledged message at a time. This preserve
 Create a separate durable consumer with an explicit start sequence or start time. Replay uses the same validation, tenant and idempotency checks as live delivery. An acknowledged message remains replayable because the stream uses limits retention rather than work-queue retention.
 
 Run `npm run messaging:verify` against the local stack. The verifier validates a synthetic event, publishes it with a message ID, proves duplicate suppression, negatively acknowledges the first delivery, confirms redelivery, acknowledges it and replays the same stored sequence through a second durable consumer. Run `npm run runtime-isolation:verify` to prove tenant-specific broker delivery and rejection of cross-tenant subscriptions.
+
+Run `npm run certificate-events:verify` to prove certificate lifecycle outbox, expiry, signing, acknowledged publication and consumer-side tamper rejection against PostgreSQL and the real local JetStream.

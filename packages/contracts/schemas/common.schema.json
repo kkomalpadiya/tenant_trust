@@ -32,6 +32,18 @@
       "required": ["service", "instanceId"],
       "additionalProperties": false
     },
+    "eventSourceAuthentication": {
+      "type": "object",
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "canonicalization": { "const": "tenant-trust-json-v1" },
+        "keyId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:/-]{7,159}$" },
+        "signedContentSha256": { "$ref": "#/$defs/sha256" },
+        "signatureBase64Url": { "type": "string", "pattern": "^[A-Za-z0-9_-]{86}$" }
+      },
+      "required": ["algorithm", "canonicalization", "keyId", "signedContentSha256", "signatureBase64Url"],
+      "additionalProperties": false
+    },
     "aggregateId": {
       "oneOf": [
         { "$ref": "#/$defs/tenantId" },
@@ -59,6 +71,7 @@
         "occurredAt": { "$ref": "#/$defs/rfc3339Utc" },
         "recordedAt": { "$ref": "#/$defs/rfc3339Utc" },
         "producer": { "$ref": "#/$defs/producer" },
+        "sourceAuthentication": { "$ref": "#/$defs/eventSourceAuthentication" },
         "payload": { "type": "object" }
       },
       "required": ["schemaVersion", "eventId", "eventType", "tenantId", "subjectId", "aggregateId", "correlationId", "causationId", "idempotencyKey", "occurredAt", "recordedAt", "producer", "payload"],

@@ -14,6 +14,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `packages/tenant-context/` | Trusted authenticated tenant-context resolution, anti-switch checks, and tenant-scoped Redis key builders shared by enforcement points |
 | `packages/certificate-issuance/` | Trusted certificate request normalization, subject authorization, tenant issuer resolution and issued-certificate verification |
 | `packages/certificate-inventory/` | Trusted certificate/event identity generation, issuance binding checks and durable-inventory adapter boundary |
+| `packages/certificate-events/` | Canonical certificate-event construction, Ed25519 source authentication, acknowledged publication and transactional-outbox adapter |
 | `packages/messaging/` | Context-bound NATS subject construction, JetStream stream defaults and tenant-filtered durable consumer defaults |
 | `infra/nats/` | NATS server configuration and tenant-specific demonstration permissions |
 | `policies/` | OPA policy source and policy test cases |

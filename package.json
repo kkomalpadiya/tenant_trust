@@ -37,6 +37,7 @@
     "certificate-renewal:verify": "npm run test:certificate-issuance && npm run test:certificate-inventory && node scripts/verify-certificate-issuance.mjs && node scripts/verify-certificate-renewal.mjs",
     "certificate-status:verify": "npm run test:contracts && npm run test:certificate-status",
     "certificate-revocation:verify": "npm run test:contracts && npm run test:certificate-revocation && node scripts/verify-certificate-revocation.mjs",
+    "certificate-events:verify": "npm run test:contracts && npm run test:certificate-events && node scripts/verify-certificate-event-outbox.mjs && node scripts/verify-signed-certificate-events.mjs",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",
@@ -46,7 +47,8 @@
     "test:certificate-issuance": "npm test --workspace @tenant-trust/certificate-issuance",
     "test:certificate-status": "npm test --workspace @tenant-trust/certificate-status",
     "test:certificate-revocation": "npm test --workspace @tenant-trust/certificate-revocation",
-    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation"
+    "test:certificate-events": "npm test --workspace @tenant-trust/certificate-events",
+    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events"
   },
   "engines": {
     "node": "24.20.0",

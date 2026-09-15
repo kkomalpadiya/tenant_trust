@@ -11,6 +11,7 @@
         "eventType": { "enum": ["certificate.requested.v1", "certificate.issued.v1", "certificate.renewed.v1", "certificate.superseded.v1", "certificate.revoked.v1", "certificate.expired.v1"] },
         "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
         "aggregateId": { "$ref": "../common.schema.json#/$defs/certificateId" },
+        "sourceAuthentication": { "$ref": "../common.schema.json#/$defs/eventSourceAuthentication" },
         "payload": {
           "type": "object",
           "properties": {
@@ -22,23 +23,33 @@
             "notBefore": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
             "notAfter": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
             "supersedesCertificateId": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/certificateId" }, { "type": "null" }] },
+            "actorSubjectId": { "oneOf": [{ "$ref": "../common.schema.json#/$defs/subjectId" }, { "type": "null" }] },
+            "issuerConfirmationId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{7,255}$" },
             "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }
           },
-          "required": ["certificateId", "issuerId", "state"],
+          "required": ["certificateId", "issuerId", "state", "actorSubjectId"],
           "additionalProperties": false
         }
       },
-      "required": ["payload"]
+      "required": ["sourceAuthentication", "payload"]
+    },
+    {
+      "if": { "properties": { "eventType": { "const": "certificate.issued.v1" } }, "required": ["eventType"] },
+      "then": { "properties": { "causationId": { "type": "null" }, "payload": { "type": "object", "properties": { "state": { "const": "active" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "notBefore": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, "notAfter": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, "supersedesCertificateId": { "type": "null" } }, "required": ["serialNumber", "fingerprintSha256", "notBefore", "notAfter", "supersedesCertificateId"] } } }
     },
     {
       "if": { "properties": { "eventType": { "const": "certificate.renewed.v1" } }, "required": ["eventType"] },
-      "then": { "properties": { "payload": { "type": "object", "properties": { "state": { "const": "active" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "notBefore": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, "notAfter": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, "supersedesCertificateId": { "$ref": "../common.schema.json#/$defs/certificateId" } }, "required": ["serialNumber", "fingerprintSha256", "notBefore", "notAfter", "supersedesCertificateId"] } } }
+      "then": { "properties": { "causationId": { "$ref": "../common.schema.json#/$defs/eventId" }, "payload": { "type": "object", "properties": { "state": { "const": "active" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "notBefore": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, "notAfter": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, "supersedesCertificateId": { "$ref": "../common.schema.json#/$defs/certificateId" } }, "required": ["serialNumber", "fingerprintSha256", "notBefore", "notAfter", "supersedesCertificateId"] } } }
     },
     {
       "if": { "properties": { "eventType": { "const": "certificate.superseded.v1" } }, "required": ["eventType"] },
-      "then": { "properties": { "payload": { "type": "object", "properties": { "state": { "const": "superseded" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" } }, "required": ["serialNumber", "fingerprintSha256", "reasonCode"] } } }
+      "then": { "properties": { "causationId": { "$ref": "../common.schema.json#/$defs/eventId" }, "payload": { "type": "object", "properties": { "state": { "const": "superseded" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" } }, "required": ["serialNumber", "fingerprintSha256", "reasonCode"] } } }
+    },
+    {
+      "if": { "properties": { "eventType": { "const": "certificate.expired.v1" } }, "required": ["eventType"] },
+      "then": { "properties": { "causationId": { "$ref": "../common.schema.json#/$defs/eventId" }, "payload": { "type": "object", "properties": { "state": { "const": "expired" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "notAfter": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }, "reasonCode": { "const": "CERTIFICATE_EXPIRED" } }, "required": ["serialNumber", "fingerprintSha256", "notAfter", "reasonCode"] } } }
     }
   ],
   "if": { "type": "object", "properties": { "eventType": { "const": "certificate.revoked.v1" } } },
-  "then": { "type": "object", "properties": { "payload": { "type": "object", "properties": { "state": { "const": "revoked" }, "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" } }, "required": ["reasonCode", "fingerprintSha256", "serialNumber"] } } }
+  "then": { "type": "object", "properties": { "causationId": { "$ref": "../common.schema.json#/$defs/eventId" }, "payload": { "type": "object", "properties": { "state": { "const": "revoked" }, "reasonCode": { "$ref": "../common.schema.json#/$defs/reasonCode" }, "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" }, "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" }, "issuerConfirmationId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{7,255}$" } }, "required": ["reasonCode", "fingerprintSha256", "serialNumber", "issuerConfirmationId"] } } }
 }

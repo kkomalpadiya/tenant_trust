@@ -12,6 +12,8 @@ This package owns versioned JSON Schema contracts for security-relevant events a
 
 `schemas/pki/certificate-revocation-request.schema.json` permits callers to provide only the certificate target, an approved permanent reason, request identity and idempotency key. Tenant, actor, subject, issuer, certificate metadata, event identity and time come from trusted state. `certificate.revoked.v1` requires the resulting event to carry `revoked` state, canonical serial and fingerprint, and a reason. See [Authorized certificate revocation](../../docs/architecture/certificate-revocation.md).
 
+Certificate lifecycle events require `sourceAuthentication` with Ed25519, the `tenant-trust-json-v1` canonicalization identifier, a tenant- and producer-bound key ID, the signed-content SHA-256 digest and an unpadded base64url signature. Issuance begins with null causation; renewal, supersession, revocation and expiry require an immediate lifecycle cause. Revocation also retains its issuer confirmation, and expiry uses `CERTIFICATE_EXPIRED`. See [Signed certificate lifecycle events](../../docs/architecture/signed-certificate-events.md).
+
 ## Identifier rules
 
 Identifiers are opaque lowercase UUIDs with a type prefix. Generate the UUID once when the entity or event is created. Never derive an identifier from a name, email address, certificate subject or other personal data.
