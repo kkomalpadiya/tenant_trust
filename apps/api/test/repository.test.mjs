@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
 import { AccessDeniedError, createPostgresTenantRepository } from "../src/index.mjs";
+
+const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
 const authentication = Object.freeze({
   source: "mtls-certificate",
@@ -58,7 +61,7 @@ test("record queries bind the authenticated actor and preserve explicit tenant s
       updated_at: new Date("2026-01-02T00:00:00.000Z"),
     }],
   }));
-  const repository = createPostgresTenantRepository({ pool });
+  const repository = createPostgresTenantRepository({ pool, authorizationMode });
 
   const record = await repository.getRecord(
     authentication,
@@ -81,7 +84,7 @@ test("record queries bind the authenticated actor and preserve explicit tenant s
 
 test("an invisible record rolls back and returns one access-denied type", async () => {
   const pool = createPool(() => ({ rowCount: 0, rows: [] }));
-  const repository = createPostgresTenantRepository({ pool });
+  const repository = createPostgresTenantRepository({ pool, authorizationMode });
 
   await assert.rejects(
     repository.getRecord(authentication, "res_018f1234-5678-7abc-8def-0123456789b2"),
@@ -112,7 +115,7 @@ test("database privilege denial is normalized and never commits", async () => {
       };
     },
   };
-  const repository = createPostgresTenantRepository({ pool });
+  const repository = createPostgresTenantRepository({ pool, authorizationMode });
 
   await assert.rejects(repository.listRecords(authentication), AccessDeniedError);
   assert.deepEqual(calls, [
@@ -127,6 +130,7 @@ test("database privilege denial is normalized and never commits", async () => {
 test("non-certificate or malformed authentication is denied before a connection is acquired", async () => {
   let connected = false;
   const repository = createPostgresTenantRepository({
+    authorizationMode,
     pool: {
       async connect() {
         connected = true;
@@ -144,4 +148,16 @@ test("non-certificate or malformed authentication is denied before a connection 
     AccessDeniedError,
   );
   assert.equal(connected, false);
+});
+
+test("repository construction requires explicit branded mode selection", () => {
+  const pool = { async connect() { throw new Error("must not connect"); } };
+  assert.throws(
+    () => createPostgresTenantRepository({ pool }),
+    /explicit supported authorization mode/u,
+  );
+  assert.throws(
+    () => createPostgresTenantRepository({ pool, authorizationMode: { ...authorizationMode } }),
+    /explicit supported authorization mode/u,
+  );
 });

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
 import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
 import {
   AccessDeniedError,
@@ -13,9 +14,11 @@ const alphaAuthentication = Object.freeze({
   tenantId: "tnt_018f1234-5678-7abc-8def-0123456789ab",
   subjectId: "sub_018f1234-5678-7abc-8def-0123456789ab",
 });
+const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
 function createRepository(overrides = {}) {
   return {
+    authorizationMode,
     async getProfile(authentication) {
       return { tenantId: authentication.tenantId, subjectId: authentication.subjectId };
     },
@@ -34,6 +37,39 @@ function createRepository(overrides = {}) {
     ...overrides,
   };
 }
+
+test("API construction requires a branded internal authorization mode", () => {
+  assert.throws(
+    () => createTenantTrustApi({
+      identityResolver: createIdentityResolver(),
+      repository: { ...createRepository(), authorizationMode: { ...authorizationMode } },
+    }),
+    /explicit supported authorization mode/u,
+  );
+});
+
+test("callers cannot select an authorization mode through query input", async (t) => {
+  let authenticationAttempts = 0;
+  const api = createTenantTrustApi({
+    identityResolver: createIdentityResolver(async () => {
+      authenticationAttempts += 1;
+      return alphaAuthentication;
+    }),
+    repository: createRepository(),
+  });
+  t.after(() => api.close());
+
+  for (const url of [
+    "/v1/profile?authorizationMode=adaptive-trust-v1",
+    "/v1/tenant-records?mode=pki-rbac-baseline-v1",
+    "/v1/tenant-records/res_018f1234-5678-7abc-8def-0123456789b0?mode=other",
+  ]) {
+    const response = await api.inject({ method: "GET", url });
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(response.json(), { error: { code: "INVALID_REQUEST" } });
+  }
+  assert.equal(authenticationAttempts, 0);
+});
 
 function createIdentityResolver(resolve = async () => alphaAuthentication) {
   return { resolve };

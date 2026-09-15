@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
 import { AccessDeniedError, createPostgresTenantRepository } from "../src/index.mjs";
+
+const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
 const ids = Object.freeze({
   tenant: "tnt_018f1234-5678-7abc-8def-0123456789ab",
@@ -74,6 +77,7 @@ function createPool({ roles = ["tenant-admin"], resourceRows = [], membershipRow
 function createAuthorizedRepository(pool, observe = () => {}) {
   return createPostgresTenantRepository({
     pool,
+    authorizationMode,
     operationIdFactory: () => ids.operation,
     sensitiveOperationAuthorizer: async (request) => {
       observe(request);
@@ -93,11 +97,14 @@ test("tenant-admin export is bounded, tenant-qualified and carries a server oper
   assert.equal(result.operation.action, "record:export");
   assert.equal(result.operation.tenantId, ids.tenant);
   assert.equal(result.operation.requestedBy, ids.admin);
+  assert.equal(result.operation.authorizationModeId, authorizationMode.modeId);
   assert.equal(result.operation.recordCount, 2);
   assert.deepEqual(result.records.map(({ recordId }) => recordId), [ids.recordA, ids.recordB]);
   assert.equal(authorizationRequest.context.tenantId, ids.tenant);
   assert.deepEqual(authorizationRequest.context.roles, ["tenant-admin"]);
   assert.equal(authorizationRequest.eligibility.disposition, "requires-controls");
+  assert.equal(authorizationRequest.authorization.modeId, authorizationMode.modeId);
+  assert.equal(authorizationRequest.authorization.adaptiveTrustUsed, false);
   assert.deepEqual(authorizationRequest.attributes, { requestedRecordCount: 2 });
 
   const exportQuery = pool.calls.find(({ text }) => text.includes("FROM app.resources"));
@@ -124,6 +131,7 @@ test("tenant members and missing control decisions are denied before sensitive d
   const memberPool = createPool({ roles: ["tenant-member"], resourceRows: [recordRow(ids.recordA)] });
   const memberRepository = createPostgresTenantRepository({
     pool: memberPool,
+    authorizationMode,
     operationIdFactory: () => ids.operation,
     sensitiveOperationAuthorizer: async () => {
       authorizerCalls += 1;
@@ -140,6 +148,7 @@ test("tenant members and missing control decisions are denied before sensitive d
   const defaultDenyPool = createPool({ resourceRows: [recordRow(ids.recordA)] });
   const defaultDenyRepository = createPostgresTenantRepository({
     pool: defaultDenyPool,
+    authorizationMode,
     operationIdFactory: () => ids.operation,
   });
   await assert.rejects(
@@ -168,6 +177,7 @@ test("membership review is tenant-admin-only and queries one tenant-qualified su
   assert.equal(result.operation.operationId, ids.operation);
   assert.equal(result.operation.action, "tenant:admin");
   assert.equal(result.operation.targetSubjectId, ids.member);
+  assert.equal(result.operation.authorizationModeId, authorizationMode.modeId);
   assert.deepEqual(result.membership, {
     subjectId: ids.member,
     displayName: "Alpha Member",
@@ -191,6 +201,7 @@ test("foreign, absent and malformed admin targets fail closed", async () => {
 
   let connected = false;
   const disconnectedRepository = createPostgresTenantRepository({
+    authorizationMode,
     pool: { async connect() { connected = true; throw new Error("must not connect"); } },
   });
   await assert.rejects(disconnectedRepository.reviewMembership(authentication(), "not-a-subject"), TypeError);

@@ -74,6 +74,7 @@ run(process.execPath, ["scripts/verify-mtls-gateway.mjs"], "mTLS gateway spoofin
 run(process.execPath, ["scripts/verify-tenant-isolation-phase.mjs"], "tenant isolation phase verification");
 run(process.execPath, ["scripts/verify-profile-record-api.mjs"], "profile and tenant-record API verification");
 run(process.execPath, ["scripts/verify-sensitive-demo-operations.mjs"], "sensitive demonstration operation verification");
+run(process.execPath, ["scripts/verify-pki-rbac-baseline.mjs"], "PKI plus RBAC baseline verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
 run(process.execPath, ["scripts/verify-event-delivery.mjs"], "event delivery verification");

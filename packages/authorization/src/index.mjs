@@ -5,6 +5,10 @@ export const TENANT_ROLES = Object.freeze([
   "tenant-admin",
 ]);
 
+export const AUTHORIZATION_MODE_IDS = Object.freeze({
+  PKI_RBAC_BASELINE: "pki-rbac-baseline-v1",
+});
+
 export const ACTIONS = Object.freeze([
   "profile:read",
   "record:read",
@@ -82,6 +86,7 @@ const DEFAULT_DENIAL = Object.freeze({
 const ACTION_SET = new Set(ACTIONS);
 const ROLE_PRECEDENCE = Object.freeze(["tenant-admin", "tenant-member"]);
 const RULES = new Map(ROLE_ACTION_MATRIX.map((entry) => [`${entry.role}\u0000${entry.action}`, entry]));
+const AUTHORIZATION_MODES = new WeakSet();
 
 export const AUTHORIZATION_DENIAL = Object.freeze({
   statusCode: 403,
@@ -96,6 +101,28 @@ export class AuthorizationError extends Error {
   }
 }
 
+const PKI_RBAC_BASELINE_MODE = Object.freeze({
+  modeId: AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE,
+  certificatePolicy: "tenant-scoped-x509",
+  rolePolicy: "role-action-matrix-v1",
+  adaptiveTrustUsed: false,
+});
+AUTHORIZATION_MODES.add(PKI_RBAC_BASELINE_MODE);
+
+export function selectAuthorizationMode(modeId) {
+  if (modeId !== AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE) {
+    throw new AuthorizationError("AUTHORIZATION_MODE_UNSUPPORTED");
+  }
+  return PKI_RBAC_BASELINE_MODE;
+}
+
+export function assertAuthorizationMode(mode) {
+  if (!mode || typeof mode !== "object" || !AUTHORIZATION_MODES.has(mode)) {
+    throw new AuthorizationError("AUTHORIZATION_MODE_INVALID");
+  }
+  return mode;
+}
+
 export function resolveRoleAction(context, action) {
   const trustedContext = assertNoTenantSwitch(context);
   if (!ACTION_SET.has(action)) return DEFAULT_DENIAL;
@@ -108,14 +135,31 @@ export function resolveRoleAction(context, action) {
   return DEFAULT_DENIAL;
 }
 
-export function assertBaselineActionAllowed(context, action) {
-  const decision = resolveRoleAction(context, action);
-  if (decision.disposition !== "allow") {
-    throw new AuthorizationError(decision.reason === "default-deny"
+export function evaluateAuthorizationMode(mode, context, action) {
+  const selectedMode = assertAuthorizationMode(mode);
+  const trustedContext = assertNoTenantSwitch(context);
+  if (trustedContext.authentication.source !== "mtls-certificate") {
+    throw new AuthorizationError("CERTIFICATE_AUTHENTICATION_REQUIRED");
+  }
+  const eligibility = resolveRoleAction(trustedContext, action);
+  return Object.freeze({
+    modeId: selectedMode.modeId,
+    certificatePolicy: selectedMode.certificatePolicy,
+    rolePolicy: selectedMode.rolePolicy,
+    adaptiveTrustUsed: false,
+    outcome: eligibility.disposition,
+    eligibility,
+  });
+}
+
+export function assertBaselineActionAllowed(mode, context, action) {
+  const decision = evaluateAuthorizationMode(mode, context, action);
+  if (decision.outcome !== "allow") {
+    throw new AuthorizationError(decision.eligibility.reason === "default-deny"
       ? "DEFAULT_DENY"
       : "ADDITIONAL_CONTROLS_REQUIRED");
   }
-  return decision;
+  return decision.eligibility;
 }
 
 export function authorizationSafeDenial(error) {

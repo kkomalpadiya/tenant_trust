@@ -1,4 +1,5 @@
 import Fastify, { LogController } from "fastify";
+import { AuthorizationError, assertAuthorizationMode } from "@tenant-trust/authorization";
 import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
 import { TenantContextError } from "@tenant-trust/tenant-context";
 import { AccessDeniedError } from "./repository.mjs";
@@ -27,6 +28,10 @@ export function createGatewayRequestAuthenticator(identityResolver) {
   };
 }
 
+function noQueryParameters() {
+  return { type: "object", additionalProperties: false };
+}
+
 export function createTenantTrustApi({ identityResolver, repository, logger = false } = {}) {
   if (!repository
     || typeof repository.getProfile !== "function"
@@ -35,6 +40,12 @@ export function createTenantTrustApi({ identityResolver, repository, logger = fa
     || typeof repository.exportRecords !== "function"
     || typeof repository.reviewMembership !== "function") {
     throw new TypeError("A tenant API repository is required.");
+  }
+  try {
+    assertAuthorizationMode(repository.authorizationMode);
+  } catch (error) {
+    if (!(error instanceof AuthorizationError)) throw error;
+    throw new TypeError("The tenant API repository must declare an explicit supported authorization mode.");
   }
 
   const authenticateRequest = createGatewayRequestAuthenticator(identityResolver);
@@ -62,18 +73,23 @@ export function createTenantTrustApi({ identityResolver, repository, logger = fa
     return reply.code(503).send(SERVICE_UNAVAILABLE);
   });
 
-  api.get("/v1/profile", async (request) => {
+  api.get("/v1/profile", {
+    schema: { querystring: noQueryParameters() },
+  }, async (request) => {
     const authentication = await authenticateRequest(request);
     return { profile: await repository.getProfile(authentication) };
   });
 
-  api.get("/v1/tenant-records", async (request) => {
+  api.get("/v1/tenant-records", {
+    schema: { querystring: noQueryParameters() },
+  }, async (request) => {
     const authentication = await authenticateRequest(request);
     return { records: await repository.listRecords(authentication) };
   });
 
   api.get("/v1/tenant-records/:recordId", {
     schema: {
+      querystring: noQueryParameters(),
       params: {
         type: "object",
         additionalProperties: false,

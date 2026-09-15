@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { Pool } from "pg";
-import { resolveRoleAction } from "@tenant-trust/authorization";
+import {
+  AUTHORIZATION_MODE_IDS,
+  resolveRoleAction,
+  selectAuthorizationMode,
+} from "@tenant-trust/authorization";
 import { createPostgresTenantRepository, createTenantTrustApi } from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
 
@@ -30,6 +34,7 @@ const records = Object.freeze({
   alphaAdmin: "res_018f1234-5678-7abc-8def-0123456789b1",
   betaMember: "res_018f1234-5678-7abc-8def-0123456789b2",
 });
+const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
 const operationIds = [];
 async function verificationControlAuthorizer(request) {
@@ -37,6 +42,8 @@ async function verificationControlAuthorizer(request) {
   assert.deepEqual(request.context.roles, ["tenant-admin"]);
   assert.equal(resolveRoleAction(request.context, request.action), request.eligibility);
   assert.equal(request.eligibility.disposition, "requires-controls");
+  assert.equal(request.authorization.modeId, authorizationMode.modeId);
+  assert.equal(request.authorization.adaptiveTrustUsed, false);
   assert.match(request.operationId, /^op_[0-9a-f-]{36}$/u);
   operationIds.push(request.operationId);
   return true;
@@ -58,6 +65,7 @@ const api = createTenantTrustApi({
   identityResolver: { resolve: async () => currentIdentity },
   repository: createPostgresTenantRepository({
     pool,
+    authorizationMode,
     sensitiveOperationAuthorizer: verificationControlAuthorizer,
   }),
 });

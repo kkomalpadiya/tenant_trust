@@ -3,14 +3,18 @@ import { test } from "node:test";
 import { resolveTenantContext, TenantContextError } from "@tenant-trust/tenant-context";
 import {
   ACTIONS,
+  AUTHORIZATION_MODE_IDS,
   AUTHORIZATION_DENIAL,
   AuthorizationError,
   RESOURCE_SENSITIVITY,
   RESOURCE_TYPES,
   ROLE_ACTION_MATRIX,
+  assertAuthorizationMode,
   assertBaselineActionAllowed,
   authorizationSafeDenial,
+  evaluateAuthorizationMode,
   resolveRoleAction,
+  selectAuthorizationMode,
 } from "../src/index.mjs";
 
 const ids = {
@@ -18,10 +22,10 @@ const ids = {
   subject: "sub_018f1234-5678-7abc-8def-0123456789ad",
 };
 
-function contextFor(roles) {
+function contextFor(roles, source = "mtls-certificate") {
   return resolveTenantContext({
     authentication: {
-      source: "mtls-certificate",
+      source,
       authenticationId: "crt_018f1234-5678-7abc-8def-0123456789ae",
       tenantId: ids.tenant,
       subjectId: ids.subject,
@@ -37,6 +41,56 @@ function contextFor(roles) {
 
 const member = contextFor(["tenant-member"]);
 const admin = contextFor(["tenant-admin"]);
+const baselineMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
+
+test("selects one immutable PKI plus RBAC baseline by exact internal mode ID", () => {
+  assert.deepEqual(baselineMode, {
+    modeId: "pki-rbac-baseline-v1",
+    certificatePolicy: "tenant-scoped-x509",
+    rolePolicy: "role-action-matrix-v1",
+    adaptiveTrustUsed: false,
+  });
+  assert.ok(Object.isFrozen(baselineMode));
+  assert.equal(assertAuthorizationMode(baselineMode), baselineMode);
+  assert.throws(
+    () => selectAuthorizationMode("adaptive-trust-v1"),
+    (error) => error instanceof AuthorizationError
+      && error.reasonCode === "AUTHORIZATION_MODE_UNSUPPORTED",
+  );
+  assert.throws(
+    () => assertAuthorizationMode({ ...baselineMode }),
+    (error) => error instanceof AuthorizationError
+      && error.reasonCode === "AUTHORIZATION_MODE_INVALID",
+  );
+});
+
+test("baseline decisions use only tenant-scoped certificate identity and the role matrix", () => {
+  const memberRead = evaluateAuthorizationMode(baselineMode, member, "record:read");
+  assert.deepEqual(memberRead, {
+    modeId: baselineMode.modeId,
+    certificatePolicy: "tenant-scoped-x509",
+    rolePolicy: "role-action-matrix-v1",
+    adaptiveTrustUsed: false,
+    outcome: "allow",
+    eligibility: resolveRoleAction(member, "record:read"),
+  });
+  assert.ok(Object.isFrozen(memberRead));
+
+  const adminExport = evaluateAuthorizationMode(baselineMode, admin, "record:export");
+  assert.equal(adminExport.outcome, "requires-controls");
+  assert.equal(adminExport.eligibility.scope, "tenant");
+  assert.equal("trustScore" in adminExport, false);
+  assert.equal("evidence" in adminExport, false);
+});
+
+test("baseline mode rejects trusted sessions even when tenant authority is otherwise valid", () => {
+  const sessionContext = contextFor(["tenant-member"], "trusted-session");
+  assert.throws(
+    () => evaluateAuthorizationMode(baselineMode, sessionContext, "profile:read"),
+    (error) => error instanceof AuthorizationError
+      && error.reasonCode === "CERTIFICATE_AUTHENTICATION_REQUIRED",
+  );
+});
 
 test("defines one immutable rule for every tenant role and action", () => {
   assert.equal(ROLE_ACTION_MATRIX.length, 10);
@@ -87,7 +141,7 @@ test("administrator permissions widen record scope but never implicitly allow se
     assert.equal(decision.requiredControls.includes("operation-policy"), true);
     assert.equal(decision.requiredControls.includes("bound-step-up"), true);
     assert.throws(
-      () => assertBaselineActionAllowed(admin, action),
+      () => assertBaselineActionAllowed(baselineMode, admin, action),
       (error) => error instanceof AuthorizationError
         && error.reasonCode === "ADDITIONAL_CONTROLS_REQUIRED",
     );
@@ -126,12 +180,12 @@ test("authorization accepts only a tenant context resolved from trusted identity
 });
 
 test("baseline enforcement allows only explicit allow entries and returns one safe denial", () => {
-  assert.equal(assertBaselineActionAllowed(member, "profile:read").scope, "self");
-  assert.equal(assertBaselineActionAllowed(admin, "record:write").scope, "tenant");
+  assert.equal(assertBaselineActionAllowed(baselineMode, member, "profile:read").scope, "self");
+  assert.equal(assertBaselineActionAllowed(baselineMode, admin, "record:write").scope, "tenant");
 
   for (const action of ["record:export", "tenant:admin", "not-defined"]) {
     try {
-      assertBaselineActionAllowed(member, action);
+      assertBaselineActionAllowed(baselineMode, member, action);
       assert.fail("denied action was accepted");
     } catch (error) {
       if (error?.code === "ERR_ASSERTION") throw error;

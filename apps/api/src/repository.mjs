@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { resolveRoleAction } from "@tenant-trust/authorization";
+import {
+  AuthorizationError,
+  assertAuthorizationMode,
+  evaluateAuthorizationMode,
+} from "@tenant-trust/authorization";
 import { resolveTenantContext } from "@tenant-trust/tenant-context";
 
 const RESOURCE_ID = /^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -120,22 +124,46 @@ async function rollbackQuietly(client) {
 
 export function createPostgresTenantRepository({
   pool,
+  authorizationMode,
   contextResolver = resolveTenantContext,
   sensitiveOperationAuthorizer = defaultSensitiveOperationAuthorizer,
   operationIdFactory = defaultOperationIdFactory,
 } = {}) {
   if (!pool || typeof pool.connect !== "function") throw new TypeError("A PostgreSQL pool is required.");
+  let selectedAuthorizationMode;
+  try {
+    selectedAuthorizationMode = assertAuthorizationMode(authorizationMode);
+  } catch (error) {
+    if (!(error instanceof AuthorizationError)) throw error;
+    throw new TypeError("An explicit supported authorization mode is required.");
+  }
   if (typeof contextResolver !== "function") throw new TypeError("A tenant context resolver is required.");
   if (typeof sensitiveOperationAuthorizer !== "function") {
     throw new TypeError("A sensitive operation authorizer must be a function.");
   }
   if (typeof operationIdFactory !== "function") throw new TypeError("An operation ID factory is required.");
 
+  function evaluateOperation(context, action) {
+    try {
+      return evaluateAuthorizationMode(selectedAuthorizationMode, context, action);
+    } catch (error) {
+      if (error instanceof AuthorizationError) throw new AccessDeniedError();
+      throw error;
+    }
+  }
+
+  function authorizeBaselineOperation(context, action) {
+    const authorization = evaluateOperation(context, action);
+    if (authorization.outcome !== "allow") throw new AccessDeniedError();
+    return authorization;
+  }
+
   async function authorizeSensitiveOperation(context, action, operationId, attributes) {
-    const eligibility = resolveRoleAction(context, action);
-    if (eligibility.role !== "tenant-admin"
-      || eligibility.scope !== "tenant"
-      || eligibility.disposition !== "requires-controls") {
+    const authorization = evaluateOperation(context, action);
+    const { eligibility } = authorization;
+    if (authorization.outcome !== "requires-controls"
+      || eligibility.role !== "tenant-admin"
+      || eligibility.scope !== "tenant") {
       throw new AccessDeniedError();
     }
 
@@ -143,6 +171,7 @@ export function createPostgresTenantRepository({
       operationId,
       action,
       context,
+      authorization,
       eligibility,
       attributes: Object.freeze({ ...attributes }),
     }));
@@ -207,8 +236,11 @@ export function createPostgresTenantRepository({
   }
 
   return Object.freeze({
+    authorizationMode: selectedAuthorizationMode,
+
     async getProfile(authentication) {
       return withTenantContext(authentication, async (client, context) => {
+        authorizeBaselineOperation(context, "profile:read");
         const result = await client.query(
           `SELECT
              tenant.tenant_id::text,
@@ -243,6 +275,7 @@ export function createPostgresTenantRepository({
 
     async listRecords(authentication) {
       return withTenantContext(authentication, async (client, context) => {
+        authorizeBaselineOperation(context, "record:read");
         const result = await client.query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
            FROM app.resources
@@ -258,6 +291,7 @@ export function createPostgresTenantRepository({
     async getRecord(authentication, recordId) {
       if (!RESOURCE_ID.test(recordId ?? "")) throw new TypeError("A valid record ID is required.");
       return withTenantContext(authentication, async (client, context) => {
+        authorizeBaselineOperation(context, "record:read");
         const result = await client.query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
            FROM app.resources
@@ -290,6 +324,7 @@ export function createPostgresTenantRepository({
         const records = Object.freeze(result.rows.map(mapRecord));
         return Object.freeze({
           operation: operationMetadata(context, operationId, "record:export", {
+            authorizationModeId: selectedAuthorizationMode.modeId,
             recordCount: records.length,
           }),
           records,
@@ -330,6 +365,7 @@ export function createPostgresTenantRepository({
         const row = result.rows[0];
         return Object.freeze({
           operation: operationMetadata(context, operationId, "tenant:admin", {
+            authorizationModeId: selectedAuthorizationMode.modeId,
             targetSubjectId: subjectId,
           }),
           membership: Object.freeze({

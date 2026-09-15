@@ -15,15 +15,15 @@ Both routes reject malformed, duplicate, oversized and caller-extended requests 
 
 The PostgreSQL adapter repeats the T4.3 transaction boundary: it assumes `tenant_trust_app`, binds the mTLS tenant and subject, loads authoritative active membership and roles, and resolves the branded tenant context. It then requires the T4.4 matrix row for the exact sensitive action to identify an eligible tenant administrator at tenant scope.
 
-Matrix eligibility is deliberately insufficient. A trusted internal `sensitiveOperationAuthorizer` must return exact boolean `true` for the context, action, immutable matrix row, server operation ID and bounded request attributes. Missing callbacks, false values, tenant members and malformed decisions deny before the sensitive data query. This callback is the fail-closed integration port for the later baseline and adaptive-policy tasks; clients cannot provide it over HTTP.
+Matrix eligibility is deliberately insufficient. T4.6 first evaluates the explicitly selected `pki-rbac-baseline-v1` mode and requires its immutable `requires-controls` decision for the same tenant-admin matrix row. A trusted internal `sensitiveOperationAuthorizer` must then return exact boolean `true` for the context, action, baseline decision, matrix row, server operation ID and bounded request attributes. Missing callbacks, false values, tenant members and malformed decisions deny before the sensitive data query. This callback remains the fail-closed integration port for later adaptive policy and bound step-up; clients cannot provide it over HTTP.
 
 Export SQL includes the context-derived tenant predicate and forced RLS. It returns data only when every requested ID is visible, so a mixed local/foreign or local/missing batch cannot reveal a partial result. Membership review also uses an explicit context-derived tenant predicate and returns one uniform denial for absent and foreign subjects.
 
 ## Operation identity and audit boundary
 
-Each role-eligible attempt receives a server-generated `op_<UUID>` identifier before the internal control decision. Successful responses expose an immutable metadata object containing the operation ID, action, context-derived tenant, authenticated requester and bounded target/count fields. IDs are neither accepted from clients nor derived from resource identifiers.
+Each role-eligible attempt receives a server-generated `op_<UUID>` identifier before the internal control decision. Successful responses expose an immutable metadata object containing the operation ID, selected authorization-mode ID, action, context-derived tenant, authenticated requester and bounded target/count fields. IDs are neither accepted from clients nor derived from resource identifiers.
 
-These identifiers make later outcome events correlatable, but T4.5 does not claim durable audit capture. T4.8 will record authentication and access outcomes, and the later Fabric phase will select and commit audit records. Until a real authorizer is configured, the production default is denial; the live T4.5 verifier uses an in-process verification-only authorizer to exercise the data path.
+These identifiers make later outcome events correlatable, but T4.5 does not claim durable audit capture. T4.8 will record authentication and access outcomes, and the later Fabric phase will select and commit audit records. Until the additional-control authorizer is configured, the default is denial; the explicit PKI/RBAC baseline does not turn `requires-controls` into allow. The live T4.5 verifier uses an in-process verification-only authorizer to exercise the data path.
 
 ## Verification
 

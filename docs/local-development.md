@@ -82,6 +82,7 @@ npm run gateway-spoofing:verify
 npm run profile-record-api:verify
 npm run role-action-matrix:verify
 npm run sensitive-operations:verify
+npm run pki-rbac-baseline:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -136,6 +137,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run role-action-matrix:verify` is the T4.4 authorization-contract gate. It exhaustively checks the tenant-member and tenant-administrator rows for profile read, record read/write, export and administration; derives resource sensitivity from the action; rejects forged tenant contexts and unknown actions; and proves export/administration are non-allowing until their additional policy, bound step-up and audit controls exist. See [Role, action and resource-sensitivity matrix](architecture/role-action-sensitivity-matrix.md).
 
 `npm run sensitive-operations:verify` is the T4.5 endpoint gate. It proves tenant members cannot reach export or administration data, tenant administrators can exercise an explicitly authorized verification path, exports are limited and all-or-nothing, Alpha cannot export Beta records or review a Beta subject, caller-supplied tenant controls are rejected, and successful operations receive unique server-generated IDs. The normal repository default remains denial until a trusted internal authorizer is configured. See [Sensitive export and administration demonstration operations](architecture/sensitive-demo-operations.md).
+
+`npm run pki-rbac-baseline:verify` is the T4.6 Baseline B gate. It proves application startup requires the exact branded `pki-rbac-baseline-v1` selection, all ordinary API operations evaluate tenant-scoped certificate identity and the T4.4 role matrix, member/admin resource scopes remain separated across Alpha and Beta, no trust or evidence input is consumed, and caller-selected modes or missing sensitive controls fail closed. See [PKI plus RBAC baseline mode](architecture/pki-rbac-baseline-mode.md).
 
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 

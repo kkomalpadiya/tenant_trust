@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { Pool } from "pg";
+import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
 import { createTenantTrustApi, createPostgresTenantRepository } from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
 
@@ -23,6 +24,7 @@ const identities = Object.freeze({
     subjectId: "sub_018f1234-5678-7abc-8def-0123456789ad",
   }),
 });
+const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
 const pool = new Pool({
   host: "127.0.0.1",
@@ -38,7 +40,7 @@ const pool = new Pool({
 let currentIdentity = identities.alphaMember;
 const api = createTenantTrustApi({
   identityResolver: { resolve: async () => currentIdentity },
-  repository: createPostgresTenantRepository({ pool }),
+  repository: createPostgresTenantRepository({ pool, authorizationMode }),
 });
 
 async function request(identity, options) {
