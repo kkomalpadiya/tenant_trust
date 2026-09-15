@@ -44,6 +44,7 @@
     "certificate-lifecycle:verify": "node scripts/verify-certificate-lifecycle.mjs",
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
     "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
+    "profile-record-api:verify": "node scripts/verify-profile-record-api.mjs",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",
@@ -55,7 +56,8 @@
     "test:certificate-revocation": "npm test --workspace @tenant-trust/certificate-revocation",
     "test:certificate-events": "npm test --workspace @tenant-trust/certificate-events",
     "test:gateway-identity": "npm test --workspace @tenant-trust/gateway-identity",
-    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:gateway-identity"
+    "test:api": "npm test --workspace @tenant-trust/api",
+    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:gateway-identity && npm run test:api"
   },
   "engines": {
     "node": "24.20.0",

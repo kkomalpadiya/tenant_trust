@@ -6,7 +6,7 @@ Use Git, Node.js 24.20.0, npm, Docker Desktop with Linux containers, Docker Comp
 
 The application image is `node:24.20.0-bookworm-slim`. `.node-version` records the host target, but it does not install or switch Node by itself. Upgrade host Node to that target before running application dependency installs. The basic checker can run on an earlier Node 24 patch and reports the mismatch explicitly. No host Go installation is needed for the selected TypeScript chaincode.
 
-Keep host npm dependencies and container Linux dependencies separate. Initial npm workspaces and their lockfile will be created when application packages are introduced.
+Keep host npm dependencies and container Linux dependencies separate. Install the committed npm workspaces from the lockfile with `npm ci`; the API workspace uses the pinned Fastify and node-postgres versions recorded in `config/toolchain.json`.
 
 ## Verify the environment
 
@@ -79,6 +79,7 @@ npm run pki-recovery:verify
 npm run certificate-lifecycle:verify
 npm run mtls-gateway:verify
 npm run gateway-spoofing:verify
+npm run profile-record-api:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -96,7 +97,7 @@ Migrations are ordered SQL files under `database/migrations`. `npm run infra:mig
 
 Tenant-scoped database code must start a transaction and call `identity.set_tenant_actor_context` with tenant and subject IDs from the resolved trusted context before querying. Forced row-level security then rechecks active membership and roles while limiting identity, resource and security-configuration rows to that actor. `npm run database-isolation:verify` proves tenant isolation and connection reuse. `npm run resource-membership:verify` proves owner-only member access, tenant-wide administrator access, role-change behavior, suspended-membership denial and last-administrator protection. `npm run security-configuration:verify` proves that issuer mappings, evidence sources, trust settings and policy versions remain tenant-owned and administrator-controlled.
 
-`npm run cross-tenant:verify` is the combined negative gate for client-selected tenant claims, guessed identifiers and reused connections across the API-facing resolver, PostgreSQL, Redis and NATS. Until the HTTP API exists, its API coverage is intentionally at the resolver and uniform-denial boundary; future routes must add endpoint-level cases. See [Cross-tenant negative testing](security/cross-tenant-negative-testing.md).
+`npm run cross-tenant:verify` is the combined negative gate for client-selected tenant claims, guessed identifiers and reused connections across the shared resolver, PostgreSQL, Redis and NATS. The profile and tenant-record routes add endpoint and live database cases in `npm run profile-record-api:verify`; future routes must extend the same negative coverage. See [Cross-tenant negative testing](security/cross-tenant-negative-testing.md).
 
 Platform tenant lifecycle operations use the separate `tenant_trust_platform_admin` privilege set and transaction-local `identity.set_platform_actor_context` binding. `npm run tenant-lifecycle:verify` proves that suspension immediately blocks existing and new database activity, reactivation is audited, and irreversible soft teardown removes tenant roles while retaining referenced identities, memberships, resources, configuration and append-only audit history. See [Tenant suspension and teardown controls](architecture/tenant-lifecycle-controls.md).
 
@@ -127,6 +128,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run mtls-gateway:verify` is the T4.1 boundary gate. It starts a disposable digest-pinned NGINX gateway and a TLS application receiver with generated test-only trust domains. NGINX requires and validates the tenant client chain, overwrites its identity headers and uses a dedicated client certificate while verifying the upstream server. The receiver accepts forwarded identity only from the exact pinned gateway certificate and re-verifies the leaf against the active tenant issuer. The gate rejects a missing client certificate, a platform-root-valid wrong-tenant issuer and an unauthenticated internal connection, then removes its container and private keys. See [mTLS gateway and application identity](architecture/mtls-gateway-identity.md).
 
 `npm run gateway-spoofing:verify` is the T4.2 hostile-route gate. It runs the complete T4.1 path, then supplies a foreign certificate and tenant identity through every recognized and commonly spoofed header. The gate proves NGINX replaces or removes those values, rejects forged headers without a client certificate before proxying, rejects direct access without an internal client certificate before the handler, and rejects an internal-CA-valid non-gateway certificate at the exact gateway pin with the same uniform 401 response. See [mTLS gateway and application identity](architecture/mtls-gateway-identity.md).
+
+`npm run profile-record-api:verify` is the T4.3 protected-read gate. It exercises the Fastify routes against provisioned PostgreSQL state and proves certificate-authenticated profile access, member ownership scope, same-tenant administrator visibility, Alpha/Beta separation, ignored forged identity headers, and uniform denial for invisible record IDs. Every operation binds the trusted tenant and actor inside a transaction before querying under forced RLS. See [Profile and tenant-record API](architecture/profile-tenant-record-api.md).
 
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 

@@ -4,7 +4,7 @@
 
 ## Covered boundaries
 
-The API-facing checks exercise the trusted tenant-context resolver directly because the HTTP API is not implemented yet. They submit Tenant Beta identifiers through header, path, query, body and resource claims while authenticated to Tenant Alpha, then verify every internal context failure becomes the same external response: `403 ACCESS_DENIED`. The response contains no tenant identifier, resource hint or internal reason code. Future HTTP routes must call this boundary and add endpoint-level negative cases to the same command.
+The shared resolver checks submit Tenant Beta identifiers through header, path, query, body and resource claims while authenticated to Tenant Alpha, then verify every internal context failure becomes the same external response: `403 ACCESS_DENIED`. The profile and tenant-record API additionally ignores forged ambient identity headers and queries only with the gateway authentication result. Its live gate proves same-tenant unauthorized and cross-tenant guessed record IDs produce the same response with no tenant identifier, resource hint or internal reason code. Future HTTP routes must call the shared boundary and add endpoint-level negative cases.
 
 The PostgreSQL check uses one `tenant_trust_app` backend session. Tenant Alpha and Tenant Beta administrators guess the other tenant's identity, resource, issuer, evidence-source, trust-configuration and policy identifiers. Reads return no rows, updates affect no rows and cross-tenant inserts fail row-level security. The same connection is then reused without actor context and must expose no tenant rows. Malformed identifiers and cross-tenant subject bindings are rejected. Every transaction rolls back.
 
@@ -20,4 +20,4 @@ Start, migrate and provision the local stack, then run:
 npm run cross-tenant:verify
 ```
 
-A pass is intentionally narrow: it proves the currently implemented boundary helpers, protected PostgreSQL tables, Redis key construction and demonstration NATS grants fail closed. It does not claim endpoint coverage for the planned HTTP API or tenant isolation for future tables and services. Every new tenant-owned route, table, key, event subject and credential grant must extend this suite before it is considered complete.
+A pass is intentionally narrow: `npm run cross-tenant:verify` proves the shared boundary helpers, protected PostgreSQL tables, Redis key construction and demonstration NATS grants fail closed. `npm run profile-record-api:verify` adds endpoint coverage for the implemented protected-read routes. Neither command claims tenant isolation for future routes, tables, or services. Every new tenant-owned route, table, key, event subject and credential grant must extend this suite before it is considered complete.
