@@ -10,6 +10,7 @@ Decision date: 9 September 2026. This document selects the implementation stack.
 | Language | TypeScript 5.9.3, strict type checking, ES modules | Shared contracts and explicit security-state types. Use a stable compiler compatible with the Fabric SDK toolchain. |
 | Package management | npm workspaces and a committed package-lock.json when packages are introduced | One dependency workflow without another globally installed package manager |
 | API | Fastify 5.12.3 | Request validation, lifecycle hooks and testable enforcement boundaries |
+| Client mTLS gateway | NGINX 1.31.3 | Required client-chain verification, gateway-owned identity forwarding and verified mutual TLS to the application |
 | Dashboard | React 19.2.8 with Vite 8.2.2 | A client-rendered dashboard with a separate protected API |
 | Persistence | PostgreSQL 17.11, explicit SQL migrations and node-postgres | Tenant-qualified queries and row-level security remain visible and testable |
 | Trust and evidence workers | TypeScript on the application Node runtime | Reuse schemas and deterministic scoring code across workers and tests |
@@ -26,6 +27,8 @@ Decision date: 9 September 2026. This document selects the implementation stack.
 Exact application package targets are recorded in `config/toolchain.json`. Infrastructure tasks must resolve, review and pin exact patches and image digests for Redis, NATS, OPA, step-ca and all Fabric images before starting them. Do not use floating `latest` tags. Recheck targets when a later phase begins rather than assuming this selection guarantees future support.
 
 Fastify follows supported Node LTS lines. Vite accepts the selected Node version. The current Gateway package requires Node >=22.12. Node chaincode 2.5.8 uses a Node 22 runtime, so chaincode code and dependencies must also be tested under that runtime; application Node 24 validation does not establish chaincode compatibility. [Node release policy](https://nodejs.org/en/about/previous-releases), [Fastify support](https://fastify.dev/docs/latest/Reference/LTS/), [Vite prerequisites](https://vite.dev/guide/), [Gateway package metadata](https://www.npmjs.com/package/@hyperledger/fabric-gateway), [chaincode compatibility](https://github.com/hyperledger/fabric-chaincode-node/blob/main/COMPATIBILITY.md)
+
+NGINX validates the client chain with `ssl_verify_client` and forwards the URL-escaped PEM only after successful verification. Its upstream client certificate, trusted server CA, SNI name and `proxy_ssl_verify` settings protect the internal connection. [NGINX client TLS](https://nginx.org/en/docs/http/ngx_http_ssl_module.html), [NGINX upstream TLS](https://nginx.org/en/docs/http/ngx_http_proxy_module.html)
 
 The PostgreSQL 17 line remains supported, and Fabric 2.5 is the selected LTS line. [PostgreSQL support](https://www.postgresql.org/support/versioning/), [Fabric 2.5 release](https://github.com/hyperledger/fabric/releases/tag/v2.5.16)
 

@@ -1,6 +1,7 @@
 {
   "node": "24.20.0",
   "nodeImage": "node:24.20.0-bookworm-slim",
+  "nginx": "1.31.3",
   "packageManager": "npm",
   "typescript": "5.9.3",
   "fastify": "5.12.3",
