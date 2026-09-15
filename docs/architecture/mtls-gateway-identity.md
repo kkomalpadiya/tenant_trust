@@ -36,8 +36,11 @@ npm run mtls-gateway:verify
 The gate creates disposable edge, internal and tenant certificate chains in ignored runtime storage, starts a digest-pinned NGINX container and a TLS application receiver, and proves:
 
 - a valid tenant client chain reaches the application as the expected tenant-bound identity;
-- a missing client certificate is rejected at NGINX;
+- forged gateway identity headers cannot replace the identity from the presented client certificate;
+- ambient certificate, tenant and subject headers are removed before the application receives the request;
+- a missing client certificate is rejected at NGINX even when the request supplies a complete forged identity-header set;
 - a platform-root-valid certificate signed by the wrong tenant issuer is rejected by the application;
-- the application TLS listener rejects a connection without the gateway's internal certificate.
+- direct access without an internal client certificate never reaches the protected handler; and
+- an internal-CA-valid certificate that is not the pinned gateway identity receives the same uniform authentication denial, even with forged headers.
 
-The gate removes its container and generated private keys in `finally`. It does not claim to complete T4.2: forged-header permutations and route-level direct-bypass testing remain the next task.
+The T4.2 command is `npm run gateway-spoofing:verify`. It executes the same complete gateway gate so the T4.1 positive path and the T4.2 hostile-route matrix cannot drift apart. The gate removes its container and generated private keys in `finally`.

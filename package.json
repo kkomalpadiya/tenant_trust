@@ -43,6 +43,7 @@
     "pki-recovery:verify": "node scripts/verify-pki-recovery.mjs",
     "certificate-lifecycle:verify": "node scripts/verify-certificate-lifecycle.mjs",
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
+    "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
     "test:contracts": "node --test packages/contracts/test/*.test.mjs",

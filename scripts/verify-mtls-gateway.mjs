@@ -16,6 +16,8 @@ const ids = {
   alphaTenant: `tnt_${randomUUID()}`,
   alphaSubject: `sub_${randomUUID()}`,
   alphaIssuer: `iss_${randomUUID()}`,
+  betaTenant: `tnt_${randomUUID()}`,
+  betaSubject: `sub_${randomUUID()}`,
   betaIssuer: `iss_${randomUUID()}`,
 };
 const runtimeRoot = resolve(repositoryRoot, "runtime");
@@ -171,6 +173,9 @@ let apiServer;
 let containerStarted = false;
 let primaryFailure;
 let cleanupFailure;
+let applicationRequestCount = 0;
+let lastApplicationHeaders;
+let lastApplicationRawHeaders;
 
 try {
   await mkdir(workingDirectory, { recursive: true });
@@ -182,11 +187,18 @@ try {
   await createServiceCertificate("gateway.tenant-trust.local", "gateway.tenant-trust.local", "edge-server", "edge");
   await createServiceCertificate("tenant-trust-api.internal", "tenant-trust-api.internal", "api-server", "internal");
   await createServiceCertificate("tenant-trust-gateway", "tenant-trust-gateway.internal", "gateway-client", "internal");
+  await createServiceCertificate("untrusted-internal-client", "untrusted-internal-client.internal", "untrusted-internal-client", "internal");
   await createClientCertificate({
     issuerPrefix: "alpha",
     outputPrefix: "alpha-client",
     tenantId: ids.alphaTenant,
     subjectId: ids.alphaSubject,
+  });
+  await createClientCertificate({
+    issuerPrefix: "beta",
+    outputPrefix: "beta-client",
+    tenantId: ids.betaTenant,
+    subjectId: ids.betaSubject,
   });
   await createClientCertificate({
     issuerPrefix: "beta",
@@ -200,6 +212,8 @@ try {
     apiServerCertificate,
     apiServerKey,
     gatewayClientCertificate,
+    untrustedInternalClientCertificate,
+    untrustedInternalClientKey,
     alphaIssuerCertificate,
     betaIssuerCertificate,
   ] = await Promise.all([
@@ -207,6 +221,8 @@ try {
     readFile(resolve(workingDirectory, "api-server.crt"), "utf8"),
     readFile(resolve(workingDirectory, "api-server.key"), "utf8"),
     readFile(resolve(workingDirectory, "gateway-client.crt"), "utf8"),
+    readFile(resolve(workingDirectory, "untrusted-internal-client.crt"), "utf8"),
+    readFile(resolve(workingDirectory, "untrusted-internal-client.key"), "utf8"),
     readFile(resolve(workingDirectory, "alpha-intermediate.crt"), "utf8"),
     readFile(resolve(workingDirectory, "beta-intermediate.crt"), "utf8"),
   ]);
@@ -216,6 +232,12 @@ try {
       issuerId: ids.alphaIssuer,
       state: "active",
       issuerCertificatePem: alphaIssuerCertificate,
+    }],
+    [ids.betaTenant, {
+      tenantId: ids.betaTenant,
+      issuerId: ids.betaIssuer,
+      state: "active",
+      issuerCertificatePem: betaIssuerCertificate,
     }],
   ]);
   const identityResolver = createGatewayIdentityResolver({
@@ -236,6 +258,9 @@ try {
       response.end('{"code":"NOT_FOUND"}\n');
       return;
     }
+    applicationRequestCount += 1;
+    lastApplicationHeaders = { ...incoming.headers };
+    lastApplicationRawHeaders = [...incoming.rawHeaders];
     try {
       const identity = await identityResolver.resolve({ socket: incoming.socket, headers: incoming.headers });
       response.writeHead(200, { "content-type": "application/json", connection: "close" });
@@ -291,6 +316,18 @@ try {
 
   const alphaClientCertificate = await readFile(resolve(workingDirectory, "alpha-client.crt"), "utf8");
   const alphaClientKey = await readFile(resolve(workingDirectory, "alpha-client.key"), "utf8");
+  const betaClientCertificate = await readFile(resolve(workingDirectory, "beta-client.crt"), "utf8");
+  const forgedHeaders = {
+    "Tenant-Trust-Gateway-Version": "1",
+    "Tenant-Trust-Client-Verification": "SUCCESS",
+    "Tenant-Trust-Forwarded-Protocol": "TLSv1.3",
+    "Tenant-Trust-Client-Certificate": encodeURIComponent(betaClientCertificate),
+    "X-Forwarded-Client-Cert": encodeURIComponent(betaClientCertificate),
+    "X-Client-Cert": encodeURIComponent(betaClientCertificate),
+    "X-SSL-Client-Cert": encodeURIComponent(betaClientCertificate),
+    "X-Tenant-Id": ids.betaTenant,
+    "X-Subject-Id": ids.betaSubject,
+  };
   const accepted = await request({
     ...baseRequest,
     cert: `${alphaClientCertificate}${alphaIssuerCertificate}`,
@@ -305,9 +342,39 @@ try {
   assert.match(identity.authenticationId, /^sha256:[0-9a-f]{64}$/u);
   console.log("PASS NGINX accepted a valid tenant client chain and the application derived its tenant-bound identity");
 
-  const missingCertificate = await request(baseRequest);
+  const requestCountBeforeMissingCertificate = applicationRequestCount;
+  const missingCertificate = await request({ ...baseRequest, headers: forgedHeaders });
   assert.ok(missingCertificate.statusCode >= 400);
-  console.log("PASS NGINX rejected a request without a client certificate before proxying it");
+  assert.equal(applicationRequestCount, requestCountBeforeMissingCertificate);
+  console.log("PASS forged identity headers could not bypass NGINX client-certificate authentication");
+
+  const overwritten = await request({
+    ...baseRequest,
+    cert: `${alphaClientCertificate}${alphaIssuerCertificate}`,
+    key: alphaClientKey,
+    headers: forgedHeaders,
+  });
+  assert.equal(overwritten.statusCode, 200);
+  const overwrittenIdentity = JSON.parse(overwritten.body);
+  assert.equal(overwrittenIdentity.tenantId, ids.alphaTenant);
+  assert.equal(overwrittenIdentity.subjectId, ids.alphaSubject);
+  assert.equal(overwrittenIdentity.certificate.issuerId, ids.alphaIssuer);
+  for (const headerName of [
+    "x-forwarded-client-cert",
+    "x-client-cert",
+    "x-ssl-client-cert",
+    "x-tenant-id",
+    "x-subject-id",
+  ]) assert.equal(lastApplicationHeaders[headerName], undefined);
+  for (const headerName of [
+    "tenant-trust-gateway-version",
+    "tenant-trust-client-verification",
+    "tenant-trust-forwarded-protocol",
+    "tenant-trust-client-certificate",
+  ]) {
+    assert.equal(lastApplicationRawHeaders.filter((value, index) => index % 2 === 0 && value.toLowerCase() === headerName).length, 1);
+  }
+  console.log("PASS NGINX replaced forged gateway identity headers and removed ambient tenant, subject and certificate headers");
 
   const wrongIssuerCertificate = await readFile(resolve(workingDirectory, "wrong-issuer-client.crt"), "utf8");
   const wrongIssuerKey = await readFile(resolve(workingDirectory, "wrong-issuer-client.key"), "utf8");
@@ -320,6 +387,7 @@ try {
   assert.deepEqual(JSON.parse(wrongIssuer.body), { statusCode: 401, code: "CLIENT_CERTIFICATE_REQUIRED" });
   console.log("PASS the application rejected a platform-root-valid certificate signed by the wrong tenant issuer");
 
+  const requestCountBeforeUnauthenticatedBypass = applicationRequestCount;
   await assert.rejects(request({
     host: "127.0.0.1",
     port: apiPort,
@@ -327,8 +395,25 @@ try {
     servername: "tenant-trust-api.internal",
     ca: internalRoot,
     rejectUnauthorized: true,
+    headers: forgedHeaders,
   }));
-  console.log("PASS the upstream application required an authenticated internal gateway certificate");
+  assert.equal(applicationRequestCount, requestCountBeforeUnauthenticatedBypass);
+  console.log("PASS direct forged-header access without an internal client certificate never reached the protected handler");
+
+  const untrustedInternalBypass = await request({
+    host: "127.0.0.1",
+    port: apiPort,
+    path: "/__t41/identity",
+    servername: "tenant-trust-api.internal",
+    ca: internalRoot,
+    cert: untrustedInternalClientCertificate,
+    key: untrustedInternalClientKey,
+    rejectUnauthorized: true,
+    headers: forgedHeaders,
+  });
+  assert.equal(untrustedInternalBypass.statusCode, 401);
+  assert.deepEqual(JSON.parse(untrustedInternalBypass.body), { statusCode: 401, code: "CLIENT_CERTIFICATE_REQUIRED" });
+  console.log("PASS an internal-CA-valid non-gateway certificate could not use forged headers to impersonate the pinned gateway");
 } catch (error) {
   primaryFailure = error;
 } finally {
@@ -354,4 +439,4 @@ try {
 
 if (primaryFailure) throw primaryFailure;
 if (cleanupFailure) throw cleanupFailure;
-console.log("mTLS gateway verification passed and removed its container and generated private keys.");
+console.log("mTLS gateway spoofing and bypass verification passed and removed its container and generated private keys.");

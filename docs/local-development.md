@@ -78,6 +78,7 @@ npm run certificate-events:verify
 npm run pki-recovery:verify
 npm run certificate-lifecycle:verify
 npm run mtls-gateway:verify
+npm run gateway-spoofing:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -124,6 +125,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run certificate-lifecycle:verify` is the T3.10 and Phase 3 completion gate. It runs the repository tests and every PKI implementation gate in a fixed fail-fast sequence. Its additional X.509 scenario accepts the exact active Alpha chain, rejects Beta's otherwise valid issuer under the shared platform root, rejects an untrusted look-alike issuer, rejects an Alpha certificate in Beta context, rotates the key during renewal, denies the superseded predecessor, denies the revoked successor and denies a correctly signed expired certificate before inventory lookup. See [Complete certificate lifecycle verification](architecture/certificate-lifecycle-verification.md).
 
 `npm run mtls-gateway:verify` is the T4.1 boundary gate. It starts a disposable digest-pinned NGINX gateway and a TLS application receiver with generated test-only trust domains. NGINX requires and validates the tenant client chain, overwrites its identity headers and uses a dedicated client certificate while verifying the upstream server. The receiver accepts forwarded identity only from the exact pinned gateway certificate and re-verifies the leaf against the active tenant issuer. The gate rejects a missing client certificate, a platform-root-valid wrong-tenant issuer and an unauthenticated internal connection, then removes its container and private keys. See [mTLS gateway and application identity](architecture/mtls-gateway-identity.md).
+
+`npm run gateway-spoofing:verify` is the T4.2 hostile-route gate. It runs the complete T4.1 path, then supplies a foreign certificate and tenant identity through every recognized and commonly spoofed header. The gate proves NGINX replaces or removes those values, rejects forged headers without a client certificate before proxying, rejects direct access without an internal client certificate before the handler, and rejects an internal-CA-valid non-gateway certificate at the exact gateway pin with the same uniform 401 response. See [mTLS gateway and application identity](architecture/mtls-gateway-identity.md).
 
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 
