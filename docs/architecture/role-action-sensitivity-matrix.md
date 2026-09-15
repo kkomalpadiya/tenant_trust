@@ -2,7 +2,7 @@
 
 ## Boundary
 
-T4.4 defines the role eligibility contract consumed by later API and policy-enforcement tasks. It does not add export or administration endpoints and does not claim that OPA, trust thresholds or bound step-up authentication are implemented.
+T4.4 defines the role eligibility contract consumed by later API and policy-enforcement tasks. T4.5 now consumes its sensitive rows through a fail-closed internal authorizer port, but the matrix itself does not claim that OPA, trust thresholds or bound step-up authentication are implemented.
 
 The resolver accepts only an immutable tenant context produced from gateway-authenticated certificate identity and authoritative active tenant, subject, membership and role state. It never accepts a role, tenant, subject, resource type or sensitivity from request input. PostgreSQL forced row-level security remains the authoritative resource-scope check.
 

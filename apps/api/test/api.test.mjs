@@ -25,6 +25,12 @@ function createRepository(overrides = {}) {
     async getRecord(authentication, recordId) {
       return { recordId, tenant: authentication.tenantId };
     },
+    async exportRecords(authentication, recordIds) {
+      return { operation: { operationId: "op_test" }, authentication, recordIds };
+    },
+    async reviewMembership(authentication, subjectId) {
+      return { operation: { operationId: "op_test" }, authentication, subjectId };
+    },
     ...overrides,
   };
 }

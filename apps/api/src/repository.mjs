@@ -1,8 +1,12 @@
+import { randomUUID } from "node:crypto";
+import { resolveRoleAction } from "@tenant-trust/authorization";
 import { resolveTenantContext } from "@tenant-trust/tenant-context";
 
 const RESOURCE_ID = /^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SUBJECT_ID = /^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const OPERATION_ID = /^op_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const MAX_EXPORT_RECORDS = 25;
 
 export class AccessDeniedError extends Error {
   constructor() {
@@ -55,6 +59,43 @@ function mapRecord(row) {
   });
 }
 
+function defaultOperationIdFactory() {
+  return `op_${randomUUID()}`;
+}
+
+async function defaultSensitiveOperationAuthorizer() {
+  throw new AccessDeniedError();
+}
+
+function normalizeRecordIds(recordIds) {
+  if (!Array.isArray(recordIds)
+    || recordIds.length < 1
+    || recordIds.length > MAX_EXPORT_RECORDS
+    || recordIds.some((recordId) => !RESOURCE_ID.test(recordId ?? ""))
+    || new Set(recordIds).size !== recordIds.length) {
+    throw new TypeError("A bounded list of unique record IDs is required.");
+  }
+  return Object.freeze([...recordIds]);
+}
+
+function createOperationId(operationIdFactory) {
+  const operationId = operationIdFactory();
+  if (!OPERATION_ID.test(operationId ?? "")) {
+    throw new TypeError("The operation ID factory returned an invalid ID.");
+  }
+  return operationId;
+}
+
+function operationMetadata(context, operationId, action, attributes = {}) {
+  return Object.freeze({
+    operationId,
+    action,
+    tenantId: context.tenantId,
+    requestedBy: context.subjectId,
+    ...attributes,
+  });
+}
+
 function assertCertificateAuthentication(authentication) {
   if (!authentication
     || typeof authentication !== "object"
@@ -77,9 +118,36 @@ async function rollbackQuietly(client) {
   }
 }
 
-export function createPostgresTenantRepository({ pool, contextResolver = resolveTenantContext } = {}) {
+export function createPostgresTenantRepository({
+  pool,
+  contextResolver = resolveTenantContext,
+  sensitiveOperationAuthorizer = defaultSensitiveOperationAuthorizer,
+  operationIdFactory = defaultOperationIdFactory,
+} = {}) {
   if (!pool || typeof pool.connect !== "function") throw new TypeError("A PostgreSQL pool is required.");
   if (typeof contextResolver !== "function") throw new TypeError("A tenant context resolver is required.");
+  if (typeof sensitiveOperationAuthorizer !== "function") {
+    throw new TypeError("A sensitive operation authorizer must be a function.");
+  }
+  if (typeof operationIdFactory !== "function") throw new TypeError("An operation ID factory is required.");
+
+  async function authorizeSensitiveOperation(context, action, operationId, attributes) {
+    const eligibility = resolveRoleAction(context, action);
+    if (eligibility.role !== "tenant-admin"
+      || eligibility.scope !== "tenant"
+      || eligibility.disposition !== "requires-controls") {
+      throw new AccessDeniedError();
+    }
+
+    const authorized = await sensitiveOperationAuthorizer(Object.freeze({
+      operationId,
+      action,
+      context,
+      eligibility,
+      attributes: Object.freeze({ ...attributes }),
+    }));
+    if (authorized !== true) throw new AccessDeniedError();
+  }
 
   async function withTenantContext(authentication, operation) {
     assertCertificateAuthentication(authentication);
@@ -199,6 +267,81 @@ export function createPostgresTenantRepository({ pool, contextResolver = resolve
         );
         if (result.rowCount !== 1) throw new AccessDeniedError();
         return mapRecord(result.rows[0]);
+      });
+    },
+
+    async exportRecords(authentication, recordIds) {
+      const requestedRecordIds = normalizeRecordIds(recordIds);
+      return withTenantContext(authentication, async (client, context) => {
+        const operationId = createOperationId(operationIdFactory);
+        await authorizeSensitiveOperation(context, "record:export", operationId, {
+          requestedRecordCount: requestedRecordIds.length,
+        });
+
+        const result = await client.query(
+          `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
+           FROM app.resources
+           WHERE tenant_id = $1::identity.tenant_id
+             AND resource_id = ANY($2::app.resource_id[])
+           ORDER BY resource_id`,
+          [context.tenantId, requestedRecordIds],
+        );
+        if (result.rowCount !== requestedRecordIds.length) throw new AccessDeniedError();
+        const records = Object.freeze(result.rows.map(mapRecord));
+        return Object.freeze({
+          operation: operationMetadata(context, operationId, "record:export", {
+            recordCount: records.length,
+          }),
+          records,
+        });
+      });
+    },
+
+    async reviewMembership(authentication, subjectId) {
+      if (!SUBJECT_ID.test(subjectId ?? "")) throw new TypeError("A valid subject ID is required.");
+      return withTenantContext(authentication, async (client, context) => {
+        const operationId = createOperationId(operationIdFactory);
+        await authorizeSensitiveOperation(context, "tenant:admin", operationId, {
+          targetSubjectId: subjectId,
+        });
+
+        const result = await client.query(
+          `SELECT
+             subject.subject_id::text,
+             subject.display_name,
+             subject.state::text AS subject_state,
+             subject.version AS subject_version,
+             membership.state::text AS membership_state,
+             membership.version AS membership_version,
+             array_agg(role_assignment.role_name::text ORDER BY role_assignment.role_name::text) AS roles
+           FROM identity.tenant_memberships AS membership
+           JOIN identity.subjects AS subject
+             ON subject.subject_id = membership.subject_id
+           JOIN identity.tenant_role_assignments AS role_assignment
+             ON role_assignment.tenant_id = membership.tenant_id
+            AND role_assignment.subject_id = membership.subject_id
+           WHERE membership.tenant_id = $1::identity.tenant_id
+             AND membership.subject_id = $2::identity.subject_id
+           GROUP BY subject.subject_id, subject.display_name, subject.state, subject.version,
+                    membership.state, membership.version`,
+          [context.tenantId, subjectId],
+        );
+        if (result.rowCount !== 1) throw new AccessDeniedError();
+        const row = result.rows[0];
+        return Object.freeze({
+          operation: operationMetadata(context, operationId, "tenant:admin", {
+            targetSubjectId: subjectId,
+          }),
+          membership: Object.freeze({
+            subjectId: row.subject_id,
+            displayName: row.display_name,
+            subjectState: row.subject_state,
+            subjectVersion: asSafeVersion(row.subject_version),
+            membershipState: row.membership_state,
+            membershipVersion: asSafeVersion(row.membership_version),
+            roles: Object.freeze([...row.roles]),
+          }),
+        });
       });
     },
   });

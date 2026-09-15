@@ -45,6 +45,7 @@
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
     "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
     "profile-record-api:verify": "node scripts/verify-profile-record-api.mjs",
+    "sensitive-operations:verify": "node scripts/verify-sensitive-demo-operations.mjs",
     "role-action-matrix:verify": "npm run test:authorization",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
