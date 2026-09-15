@@ -68,13 +68,15 @@ Tenant administration and CA execution are deliberately separate. Application au
 - Each tenant intermediate uses its own non-exportable key. Production should use a tenant-specific HSM/KMS policy. The local prototype may use an encrypted file only inside that tenant's isolated CA state volume.
 - Each provisioner credential is stored in a separate runtime secret and mounted only into the matching certificate-lifecycle service. It is never stored in the manifest, environment template, logs, events, database rows or test fixtures.
 - Database rows and the committed manifest contain identifiers, public certificate metadata and opaque references only. Key export, secret recovery and cross-tenant secret mounts are prohibited.
-- Backup and recovery must preserve tenant separation, encryption and access policy. T3.9 will exercise backup/restore and issuer-compromise recovery.
+- Backup and recovery preserve tenant separation, authenticated encryption and access policy. The local recovery command requires a stopped issuer, a destination outside Git and a separate passphrase, then restores only into a new empty volume while retaining owner-only key permissions. The disposable recovery gate proves the restored CA keeps the same public trust identity and can issue a fresh certificate. See [PKI key protection and issuer recovery](../operations/pki-key-protection-and-recovery.md).
 
 ## Lifecycle and failure behavior
 
 Issuer suspension blocks issue and renewal immediately. Revocation requests that cannot reach the CA remain visibly pending or failed; they are never reported as completed. Missing or inconsistent tenant context, mapping, chain, root version, fingerprint, state or authorization fails closed.
 
 Compromise of a tenant intermediate suspends only that issuer, restricts affected application access, revokes the intermediate during a platform-root ceremony, creates a fresh key and intermediate, and reissues affected tenant certificates. No step requires another tenant's key, provisioner credential or state store. Compromise of the platform root affects every tenant and requires a platform-wide root recovery and trust-bundle transition.
+
+Availability restoration and compromise recovery are deliberately separate. An authenticated backup may recover lost state only when compromise has been ruled out. Restoring a compromised key would preserve attacker authority, so issuer or root compromise always creates new keys and permanently retires the affected chain.
 
 Tenant suspension prevents new certificate operations even if its CA is healthy. Tenant teardown retires the mapping but retains the issuer identity and public metadata needed for historical audit verification. Revoked certificates and retired issuers never return to an active state.
 

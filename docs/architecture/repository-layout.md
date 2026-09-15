@@ -51,3 +51,5 @@ Use a single repository with explicit component boundaries. The paths below are 
 Track reproducible project inputs: source, schemas, migrations, policy bundles, network definitions, safe example configuration, lockfiles, scripts and documentation. Ignore generated artifacts and local machine state through the root `.gitignore`.
 
 Generated certificates and private material must use ignored runtime locations. Public synthetic certificate fixtures, if required later, need narrowly scoped ignore exceptions and an explicit description of their test purpose.
+
+Encrypted `.ttcab` CA backups also remain outside the repository. `scripts/pki-recovery.mjs` refuses repository-local backup and restore inputs, and restores only into a new Docker volume so recovery cannot overwrite preserved evidence.

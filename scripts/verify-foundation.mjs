@@ -76,6 +76,7 @@ run(process.execPath, ["scripts/verify-certificate-renewal.mjs"], "certificate r
 run(process.execPath, ["scripts/verify-certificate-revocation.mjs"], "certificate revocation verification");
 run(process.execPath, ["scripts/verify-certificate-event-outbox.mjs"], "certificate event outbox verification");
 run(process.execPath, ["scripts/verify-signed-certificate-events.mjs"], "signed certificate event verification");
+run(process.execPath, ["scripts/verify-pki-recovery.mjs"], "PKI key-protection and recovery verification");
 run(process.execPath, ["scripts/verify-tenant-isolation-phase.mjs"], "tenant isolation phase verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");

@@ -17,6 +17,7 @@ Tenant_Trust_Master_Task_List.xlsx
 *.pfx
 *.jks
 *.keystore
+*.ttcab
 
 # Generated PKI / Fabric identities and network artifacts
 **/peerOrganizations/
