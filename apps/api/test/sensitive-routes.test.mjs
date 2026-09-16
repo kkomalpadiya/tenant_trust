@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
-import { AccessDeniedError, createTenantTrustApi } from "../src/index.mjs";
+import { AccessDeniedError, REQUEST_STATE_POLICY, createTenantTrustApi } from "../src/index.mjs";
 
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
@@ -20,6 +20,7 @@ const recordIds = Object.freeze([
 function createRepository(overrides = {}) {
   return {
     authorizationMode,
+    requestStatePolicy: REQUEST_STATE_POLICY,
     async getProfile() { return {}; },
     async listRecords() { return []; },
     async getRecord() { return {}; },

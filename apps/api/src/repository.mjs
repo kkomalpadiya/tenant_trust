@@ -4,7 +4,12 @@ import {
   assertAuthorizationMode,
   evaluateAuthorizationMode,
 } from "@tenant-trust/authorization";
-import { resolveTenantContext } from "@tenant-trust/tenant-context";
+import { TenantContextError, resolveTenantContext } from "@tenant-trust/tenant-context";
+import {
+  REQUEST_STATE_POLICY,
+  assertPresentedCertificate,
+  createRequestStateRevalidator,
+} from "./request-state.mjs";
 
 const RESOURCE_ID = /^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -112,6 +117,7 @@ function assertCertificateAuthentication(authentication) {
     || !SUBJECT_ID.test(authentication.subjectId ?? "")) {
     throw new AccessDeniedError();
   }
+  assertPresentedCertificate(authentication);
 }
 
 async function rollbackQuietly(client) {
@@ -128,6 +134,7 @@ export function createPostgresTenantRepository({
   contextResolver = resolveTenantContext,
   sensitiveOperationAuthorizer = defaultSensitiveOperationAuthorizer,
   operationIdFactory = defaultOperationIdFactory,
+  clock = () => new Date(),
 } = {}) {
   if (!pool || typeof pool.connect !== "function") throw new TypeError("A PostgreSQL pool is required.");
   let selectedAuthorizationMode;
@@ -142,6 +149,8 @@ export function createPostgresTenantRepository({
     throw new TypeError("A sensitive operation authorizer must be a function.");
   }
   if (typeof operationIdFactory !== "function") throw new TypeError("An operation ID factory is required.");
+  if (typeof clock !== "function") throw new TypeError("A trusted request-state clock is required.");
+  const requestStateRevalidator = createRequestStateRevalidator({ clock });
 
   function evaluateOperation(context, action) {
     try {
@@ -223,12 +232,18 @@ export function createPostgresTenantRepository({
         authentication,
         authority: mapAuthority(authorityResult.rows[0]),
       });
-      const result = await operation(client, context);
+      const requestState = await requestStateRevalidator.validate({ client, authentication, context });
+      const queryProtected = async (text, parameters) => {
+        requestStateRevalidator.assertFresh(requestState);
+        return client.query(text, parameters);
+      };
+      const result = await operation(queryProtected, context);
       await client.query("COMMIT");
       return result;
     } catch (error) {
       if (transactionStarted) await rollbackQuietly(client);
       if (error?.code === "42501") throw new AccessDeniedError();
+      if (error instanceof TenantContextError) throw new AccessDeniedError();
       throw error;
     } finally {
       client.release();
@@ -237,11 +252,12 @@ export function createPostgresTenantRepository({
 
   return Object.freeze({
     authorizationMode: selectedAuthorizationMode,
+    requestStatePolicy: REQUEST_STATE_POLICY,
 
     async getProfile(authentication) {
-      return withTenantContext(authentication, async (client, context) => {
+      return withTenantContext(authentication, async (query, context) => {
         authorizeBaselineOperation(context, "profile:read");
-        const result = await client.query(
+        const result = await query(
           `SELECT
              tenant.tenant_id::text,
              tenant.display_name AS tenant_display_name,
@@ -274,9 +290,9 @@ export function createPostgresTenantRepository({
     },
 
     async listRecords(authentication) {
-      return withTenantContext(authentication, async (client, context) => {
+      return withTenantContext(authentication, async (query, context) => {
         authorizeBaselineOperation(context, "record:read");
-        const result = await client.query(
+        const result = await query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
            FROM app.resources
            WHERE tenant_id = $1::identity.tenant_id
@@ -290,9 +306,9 @@ export function createPostgresTenantRepository({
 
     async getRecord(authentication, recordId) {
       if (!RESOURCE_ID.test(recordId ?? "")) throw new TypeError("A valid record ID is required.");
-      return withTenantContext(authentication, async (client, context) => {
+      return withTenantContext(authentication, async (query, context) => {
         authorizeBaselineOperation(context, "record:read");
-        const result = await client.query(
+        const result = await query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
            FROM app.resources
            WHERE tenant_id = $1::identity.tenant_id
@@ -306,13 +322,13 @@ export function createPostgresTenantRepository({
 
     async exportRecords(authentication, recordIds) {
       const requestedRecordIds = normalizeRecordIds(recordIds);
-      return withTenantContext(authentication, async (client, context) => {
+      return withTenantContext(authentication, async (query, context) => {
         const operationId = createOperationId(operationIdFactory);
         await authorizeSensitiveOperation(context, "record:export", operationId, {
           requestedRecordCount: requestedRecordIds.length,
         });
 
-        const result = await client.query(
+        const result = await query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
            FROM app.resources
            WHERE tenant_id = $1::identity.tenant_id
@@ -334,13 +350,13 @@ export function createPostgresTenantRepository({
 
     async reviewMembership(authentication, subjectId) {
       if (!SUBJECT_ID.test(subjectId ?? "")) throw new TypeError("A valid subject ID is required.");
-      return withTenantContext(authentication, async (client, context) => {
+      return withTenantContext(authentication, async (query, context) => {
         const operationId = createOperationId(operationIdFactory);
         await authorizeSensitiveOperation(context, "tenant:admin", operationId, {
           targetSubjectId: subjectId,
         });
 
-        const result = await client.query(
+        const result = await query(
           `SELECT
              subject.subject_id::text,
              subject.display_name,

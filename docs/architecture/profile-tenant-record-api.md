@@ -22,9 +22,10 @@ For each operation, the PostgreSQL adapter performs this sequence on one checked
 2. Call `identity.set_tenant_actor_context` with only the tenant and subject from authenticated gateway identity. The function rejects inactive tenants, subjects, memberships, and actors without a tenant role.
 3. Read the exact authoritative tenant, subject, membership, versions, and tenant roles through forced RLS.
 4. Resolve the branded immutable context with `@tenant-trust/tenant-context`.
-5. Evaluate the exact action through the explicitly selected `pki-rbac-baseline-v1` mode. This requires certificate authentication and the T4.4 role rule without reading adaptive trust inputs.
-6. Execute the profile or record query with an explicit context-derived tenant predicate while forced actor-aware RLS independently limits rows by tenant, ownership, and tenant-administrator status.
-7. Commit on success; roll back on every denial or error. The transaction-local role and actor settings cannot leak to a reused connection.
+5. Match the gateway certificate's tenant, subject, issuer, profile, serial, fingerprint and validity timestamps to one inventory row, then apply the fresh `application-status-v1` verdict.
+6. Evaluate the exact action through the explicitly selected `pki-rbac-baseline-v1` mode. This requires certificate authentication and the T4.4 role rule without reading adaptive trust inputs.
+7. Recheck the five-second request-state deadline and execute the profile or record query with an explicit context-derived tenant predicate while forced actor-aware RLS independently limits rows by tenant, ownership, and tenant-administrator status.
+8. Commit on success; roll back on every denial or error. The transaction-local role and actor settings cannot leak to a reused connection, and no earlier allow is reused by another request.
 
 Malformed record IDs return `400 INVALID_REQUEST`. Gateway identity failures return uniform `401 CLIENT_CERTIFICATE_REQUIRED`. Inactive, unauthorized, absent, and invisible resources return uniform `403 ACCESS_DENIED`. Unexpected authority or repository failures return `503 SERVICE_UNAVAILABLE` without internal error details.
 
@@ -32,4 +33,4 @@ Malformed record IDs return `400 INVALID_REQUEST`. Gateway identity failures ret
 
 `npm run test:api` checks route input handling, gateway-adapter inputs, transaction ordering, tenant-qualified SQL, rollback, error normalization, and resistance to forged ambient identity headers. `npm run profile-record-api:verify` uses the provisioned PostgreSQL database and Fastify injection to prove that an Alpha member sees only their record, an Alpha administrator sees both Alpha records, a Beta member sees only their Beta record, and guessed same-tenant or cross-tenant record IDs are indistinguishable denials.
 
-The live API check injects an already authenticated `mtls-certificate` result because the full cryptographic gateway path is independently exercised by `npm run gateway-spoofing:verify`. It does not replace that gateway check. T4.4 defines the generalized action matrix, T4.5 adds [sensitive demonstration operations](sensitive-demo-operations.md), and T4.6 makes the [PKI plus RBAC baseline mode](pki-rbac-baseline-mode.md) explicit across the API repository. T4.7 will add freshness-bounded certificate, membership, and restriction revalidation.
+The live API check injects an already authenticated `mtls-certificate` result because the full cryptographic gateway path is independently exercised by `npm run gateway-spoofing:verify`. Its disposable certificate metadata is nevertheless matched to authoritative inventory state. It does not replace the gateway check. T4.4 defines the generalized action matrix, T4.5 adds [sensitive demonstration operations](sensitive-demo-operations.md), T4.6 makes the [PKI plus RBAC baseline mode](pki-rbac-baseline-mode.md) explicit, and T4.7 adds [per-request certificate and tenant-state revalidation](request-state-revalidation.md).

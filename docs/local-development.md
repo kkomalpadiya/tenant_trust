@@ -140,6 +140,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 
 `npm run pki-rbac-baseline:verify` is the T4.6 Baseline B gate. It proves application startup requires the exact branded `pki-rbac-baseline-v1` selection, all ordinary API operations evaluate tenant-scoped certificate identity and the T4.4 role matrix, member/admin resource scopes remain separated across Alpha and Beta, no trust or evidence input is consumed, and caller-selected modes or missing sensitive controls fail closed. See [PKI plus RBAC baseline mode](architecture/pki-rbac-baseline-mode.md).
 
+`npm run request-state:verify` is the T4.7 freshness gate. It reuses one authenticated identity and one PostgreSQL backend while changing current membership, tenant and certificate state between requests. The next request denies suspended membership, suspended tenant and revoked certificate state; the five-second policy permits no cross-request allow cache, and the verifier restores shared seed state and removes disposable certificate rows. See [Per-request certificate and tenant-state revalidation](architecture/request-state-revalidation.md).
+
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 
 ## Foundation verification

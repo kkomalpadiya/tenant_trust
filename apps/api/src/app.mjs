@@ -3,6 +3,11 @@ import { AuthorizationError, assertAuthorizationMode } from "@tenant-trust/autho
 import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
 import { TenantContextError } from "@tenant-trust/tenant-context";
 import { AccessDeniedError } from "./repository.mjs";
+import {
+  CertificateNotAcceptedError,
+  REQUEST_STATE_POLICY,
+  RequestStateUnavailableError,
+} from "./request-state.mjs";
 
 const RECORD_ID_PATTERN = "^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 const SUBJECT_ID_PATTERN = "^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
@@ -11,6 +16,9 @@ const MAX_EXPORT_RECORDS = 25;
 const ACCESS_DENIED = Object.freeze({ error: Object.freeze({ code: "ACCESS_DENIED" }) });
 const AUTHENTICATION_REQUIRED = Object.freeze({
   error: Object.freeze({ code: "CLIENT_CERTIFICATE_REQUIRED" }),
+});
+const CERTIFICATE_NOT_ACCEPTED = Object.freeze({
+  error: Object.freeze({ code: "CERTIFICATE_NOT_ACCEPTED" }),
 });
 const INVALID_REQUEST = Object.freeze({ error: Object.freeze({ code: "INVALID_REQUEST" }) });
 const REQUEST_TOO_LARGE = Object.freeze({ error: Object.freeze({ code: "REQUEST_TOO_LARGE" }) });
@@ -47,6 +55,9 @@ export function createTenantTrustApi({ identityResolver, repository, logger = fa
     if (!(error instanceof AuthorizationError)) throw error;
     throw new TypeError("The tenant API repository must declare an explicit supported authorization mode.");
   }
+  if (repository.requestStatePolicy !== REQUEST_STATE_POLICY) {
+    throw new TypeError("The tenant API repository must declare authoritative per-request state revalidation.");
+  }
 
   const authenticateRequest = createGatewayRequestAuthenticator(identityResolver);
 
@@ -66,9 +77,11 @@ export function createTenantTrustApi({ identityResolver, repository, logger = fa
       return reply.code(413).send(REQUEST_TOO_LARGE);
     }
     if (error instanceof GatewayIdentityError) return reply.code(401).send(AUTHENTICATION_REQUIRED);
+    if (error instanceof CertificateNotAcceptedError) return reply.code(401).send(CERTIFICATE_NOT_ACCEPTED);
     if (error instanceof TenantContextError || error instanceof AccessDeniedError) {
       return reply.code(403).send(ACCESS_DENIED);
     }
+    if (error instanceof RequestStateUnavailableError) return reply.code(503).send(SERVICE_UNAVAILABLE);
     request.log.error({ err: error }, "Tenant API request failed");
     return reply.code(503).send(SERVICE_UNAVAILABLE);
   });

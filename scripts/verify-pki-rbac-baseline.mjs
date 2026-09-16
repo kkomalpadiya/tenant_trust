@@ -7,6 +7,7 @@ import {
 } from "@tenant-trust/authorization";
 import { createPostgresTenantRepository, createTenantTrustApi } from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
+import { createLiveRequestStateFixture } from "./lib/request-state-fixtures.mjs";
 
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 assert.deepEqual(authorizationMode, {
@@ -20,27 +21,6 @@ assert.throws(
   (error) => error instanceof AuthorizationError
     && error.reasonCode === "AUTHORIZATION_MODE_UNSUPPORTED",
 );
-
-const identities = Object.freeze({
-  alphaMember: Object.freeze({
-    source: "mtls-certificate",
-    authenticationId: "sha256:alpha-member-baseline-verification",
-    tenantId: "tnt_018f1234-5678-7abc-8def-0123456789ab",
-    subjectId: "sub_018f1234-5678-7abc-8def-0123456789ab",
-  }),
-  alphaAdmin: Object.freeze({
-    source: "mtls-certificate",
-    authenticationId: "sha256:alpha-admin-baseline-verification",
-    tenantId: "tnt_018f1234-5678-7abc-8def-0123456789ab",
-    subjectId: "sub_018f1234-5678-7abc-8def-0123456789ac",
-  }),
-  betaMember: Object.freeze({
-    source: "mtls-certificate",
-    authenticationId: "sha256:beta-member-baseline-verification",
-    tenantId: "tnt_018f1234-5678-7abc-8def-0123456789ac",
-    subjectId: "sub_018f1234-5678-7abc-8def-0123456789ad",
-  }),
-});
 
 const records = Object.freeze({
   alphaMember: "res_018f1234-5678-7abc-8def-0123456789b0",
@@ -58,6 +38,8 @@ const pool = new Pool({
   connectionTimeoutMillis: 5_000,
   idleTimeoutMillis: 1_000,
 });
+const fixture = await createLiveRequestStateFixture(pool);
+const { identities } = fixture;
 
 assert.throws(
   () => createPostgresTenantRepository({ pool }),
@@ -172,5 +154,6 @@ try {
 } finally {
   if (defaultDenyApi) await defaultDenyApi.close();
   await api.close();
+  await fixture.cleanup();
   await pool.end();
 }

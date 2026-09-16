@@ -4,6 +4,9 @@ import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/a
 import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
 import {
   AccessDeniedError,
+  CertificateNotAcceptedError,
+  REQUEST_STATE_POLICY,
+  RequestStateUnavailableError,
   createGatewayRequestAuthenticator,
   createTenantTrustApi,
 } from "../src/index.mjs";
@@ -19,6 +22,7 @@ const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBA
 function createRepository(overrides = {}) {
   return {
     authorizationMode,
+    requestStatePolicy: REQUEST_STATE_POLICY,
     async getProfile(authentication) {
       return { tenantId: authentication.tenantId, subjectId: authentication.subjectId };
     },
@@ -45,6 +49,16 @@ test("API construction requires a branded internal authorization mode", () => {
       repository: { ...createRepository(), authorizationMode: { ...authorizationMode } },
     }),
     /explicit supported authorization mode/u,
+  );
+});
+
+test("API construction requires the fixed authoritative request-state policy", () => {
+  assert.throws(
+    () => createTenantTrustApi({
+      identityResolver: createIdentityResolver(),
+      repository: { ...createRepository(), requestStatePolicy: { ...REQUEST_STATE_POLICY } },
+    }),
+    /authoritative per-request state revalidation/u,
   );
 });
 
@@ -196,6 +210,24 @@ test("unexpected repository failures fail closed without leaking details", async
   assert.equal(response.statusCode, 503);
   assert.deepEqual(response.json(), { error: { code: "SERVICE_UNAVAILABLE" } });
   assert.doesNotMatch(response.body, /password|should-not-leak/u);
+});
+
+test("certificate rejection and unavailable current state use bounded safe responses", async (t) => {
+  let failure = new CertificateNotAcceptedError();
+  const api = createTenantTrustApi({
+    identityResolver: createIdentityResolver(),
+    repository: createRepository({ async getProfile() { throw failure; } }),
+  });
+  t.after(() => api.close());
+
+  const rejected = await api.inject({ method: "GET", url: "/v1/profile" });
+  assert.equal(rejected.statusCode, 401);
+  assert.deepEqual(rejected.json(), { error: { code: "CERTIFICATE_NOT_ACCEPTED" } });
+
+  failure = new RequestStateUnavailableError();
+  const unavailable = await api.inject({ method: "GET", url: "/v1/profile" });
+  assert.equal(unavailable.statusCode, 503);
+  assert.deepEqual(unavailable.json(), { error: { code: "SERVICE_UNAVAILABLE" } });
 });
 
 test("gateway adapter forwards only the raw socket and request headers", async () => {

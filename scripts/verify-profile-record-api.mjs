@@ -3,27 +3,7 @@ import { Pool } from "pg";
 import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
 import { createTenantTrustApi, createPostgresTenantRepository } from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
-
-const identities = Object.freeze({
-  alphaMember: Object.freeze({
-    source: "mtls-certificate",
-    authenticationId: "sha256:alpha-member-api-verification",
-    tenantId: "tnt_018f1234-5678-7abc-8def-0123456789ab",
-    subjectId: "sub_018f1234-5678-7abc-8def-0123456789ab",
-  }),
-  alphaAdmin: Object.freeze({
-    source: "mtls-certificate",
-    authenticationId: "sha256:alpha-admin-api-verification",
-    tenantId: "tnt_018f1234-5678-7abc-8def-0123456789ab",
-    subjectId: "sub_018f1234-5678-7abc-8def-0123456789ac",
-  }),
-  betaMember: Object.freeze({
-    source: "mtls-certificate",
-    authenticationId: "sha256:beta-member-api-verification",
-    tenantId: "tnt_018f1234-5678-7abc-8def-0123456789ac",
-    subjectId: "sub_018f1234-5678-7abc-8def-0123456789ad",
-  }),
-});
+import { createLiveRequestStateFixture } from "./lib/request-state-fixtures.mjs";
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
 const pool = new Pool({
@@ -36,6 +16,8 @@ const pool = new Pool({
   connectionTimeoutMillis: 5_000,
   idleTimeoutMillis: 1_000,
 });
+const fixture = await createLiveRequestStateFixture(pool);
+const { identities } = fixture;
 
 let currentIdentity = identities.alphaMember;
 const api = createTenantTrustApi({
@@ -116,5 +98,6 @@ try {
   console.log("PASS forged identity headers cannot select API tenant context and guessed records return a uniform denial");
 } finally {
   await api.close();
+  await fixture.cleanup();
   await pool.end();
 }

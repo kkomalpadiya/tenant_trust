@@ -13,13 +13,38 @@ const ids = Object.freeze({
   recordB: "res_018f1234-5678-7abc-8def-0123456789b1",
   operation: "op_018f1234-5678-4abc-8def-0123456789b4",
 });
+const fixedClock = () => new Date("2026-09-15T10:00:01.000Z");
+const certificates = Object.freeze({
+  [ids.admin]: Object.freeze({
+    certificateId: "crt_018f1234-5678-7abc-8def-0123456789d0",
+    serialNumber: "01".padEnd(32, "0"),
+    fingerprintSha256: "aa".repeat(32),
+    publicKeySha256: "ab".repeat(32),
+  }),
+  [ids.member]: Object.freeze({
+    certificateId: "crt_018f1234-5678-7abc-8def-0123456789d1",
+    serialNumber: "02".padEnd(32, "0"),
+    fingerprintSha256: "ba".repeat(32),
+    publicKeySha256: "bb".repeat(32),
+  }),
+});
 
 function authentication(subjectId = ids.admin) {
+  const certificate = certificates[subjectId];
   return Object.freeze({
     source: "mtls-certificate",
-    authenticationId: `sha256:${subjectId}`,
+    authenticationId: `sha256:${certificate.fingerprintSha256}`,
     tenantId: ids.tenant,
     subjectId,
+    certificate: Object.freeze({
+      profileId: "tenant-client-auth-v1",
+      issuerId: "iss_018f1234-5678-7abc-8def-0123456789b4",
+      serialNumber: certificate.serialNumber,
+      fingerprintSha256: certificate.fingerprintSha256,
+      publicKeySha256: certificate.publicKeySha256,
+      notBefore: "2026-09-15T09:00:00.000Z",
+      notAfter: "2026-09-15T11:00:00.000Z",
+    }),
   });
 }
 
@@ -52,13 +77,38 @@ function createPool({ roles = ["tenant-admin"], resourceRows = [], membershipRow
   const calls = [];
   let released = false;
   const client = {
-    async query(text, parameters) {
+    async query(input, parameters) {
+      const text = typeof input === "string" ? input : input.text;
+      parameters = typeof input === "string" ? parameters : input.values;
       calls.push({ text, parameters });
       if (text.includes("FROM identity.tenants AS tenant")) {
         return { rowCount: 1, rows: [authorityRow(parameters[1], roles)] };
       }
       if (text.includes("FROM app.resources")) {
         return { rowCount: resourceRows.length, rows: resourceRows };
+      }
+      if (text.includes("transaction_timestamp() AS status_observed_at")) {
+        const subjectId = parameters[0] === ids.tenant && parameters[1]?.startsWith("crt_")
+          ? Object.keys(certificates).find((subject) => certificates[subject].certificateId === parameters[1])
+          : ids.admin;
+        const auth = authentication(subjectId);
+        return { rowCount: 1, rows: [{
+          tenant_id: ids.tenant,
+          certificate_id: certificates[subjectId].certificateId,
+          subject_id: subjectId,
+          issuer_id: auth.certificate.issuerId,
+          serial_number: auth.certificate.serialNumber,
+          fingerprint_sha256: auth.certificate.fingerprintSha256,
+          state: "active",
+          not_before: auth.certificate.notBefore,
+          not_after: auth.certificate.notAfter,
+          version: 1,
+          status_observed_at: "2026-09-15T10:00:00.000Z",
+        }] };
+      }
+      if (text.includes("FROM identity.certificates")) {
+        const subjectId = parameters[1];
+        return { rowCount: 1, rows: [{ certificate_id: certificates[subjectId].certificateId }] };
       }
       if (text.includes("FROM identity.tenant_memberships AS membership")) {
         return { rowCount: membershipRows.length, rows: membershipRows };
@@ -79,6 +129,7 @@ function createAuthorizedRepository(pool, observe = () => {}) {
     pool,
     authorizationMode,
     operationIdFactory: () => ids.operation,
+    clock: fixedClock,
     sensitiveOperationAuthorizer: async (request) => {
       observe(request);
       return true;
@@ -133,6 +184,7 @@ test("tenant members and missing control decisions are denied before sensitive d
     pool: memberPool,
     authorizationMode,
     operationIdFactory: () => ids.operation,
+    clock: fixedClock,
     sensitiveOperationAuthorizer: async () => {
       authorizerCalls += 1;
       return true;
@@ -150,6 +202,7 @@ test("tenant members and missing control decisions are denied before sensitive d
     pool: defaultDenyPool,
     authorizationMode,
     operationIdFactory: () => ids.operation,
+    clock: fixedClock,
   });
   await assert.rejects(
     defaultDenyRepository.exportRecords(authentication(), [ids.recordA]),

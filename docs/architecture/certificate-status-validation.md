@@ -40,6 +40,6 @@ Known credential rejection maps to `401 CERTIFICATE_NOT_ACCEPTED`. Status-source
 
 ## Consumer contract
 
-Authentication middleware must first complete cryptographic certificate verification, resolve trusted tenant context, then call the status validator before trust or policy evaluation. It may proceed only when `outcome` is `accept` and the current time is strictly before `cacheableUntil`. It must treat exceptions, unknown schema versions, malformed verdicts and missed deadlines as denial.
+Authentication middleware must first complete cryptographic certificate verification, resolve trusted tenant context, then call the status validator before trust or policy evaluation. The SaaS API now performs this check inside every protected request transaction. It additionally enforces the stricter five-second request-state deadline immediately before the protected data query and never carries an allow into another request. It may proceed only when `outcome` is `accept` and the current time is strictly before both deadlines. It treats exceptions, unknown schema versions, malformed verdicts and missed deadlines as denial.
 
 The JSON Schema at `packages/contracts/schemas/pki/certificate-status.schema.json` fixes the shared verdict shape. Run `npm run certificate-status:verify` to validate the contract and exercise active, revoked, expired, superseded, unknown, stale, future-dated, mismatched, timed-out and unavailable behavior. The repository adapter tests also verify bound SQL parameters and timestamp normalization.

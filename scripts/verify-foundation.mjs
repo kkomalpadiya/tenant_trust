@@ -75,6 +75,7 @@ run(process.execPath, ["scripts/verify-tenant-isolation-phase.mjs"], "tenant iso
 run(process.execPath, ["scripts/verify-profile-record-api.mjs"], "profile and tenant-record API verification");
 run(process.execPath, ["scripts/verify-sensitive-demo-operations.mjs"], "sensitive demonstration operation verification");
 run(process.execPath, ["scripts/verify-pki-rbac-baseline.mjs"], "PKI plus RBAC baseline verification");
+run(process.execPath, ["scripts/verify-request-state-revalidation.mjs"], "per-request certificate and tenant state verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
 run(process.execPath, ["scripts/verify-event-delivery.mjs"], "event delivery verification");

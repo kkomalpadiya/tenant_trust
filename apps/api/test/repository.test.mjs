@@ -1,16 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
-import { AccessDeniedError, createPostgresTenantRepository } from "../src/index.mjs";
+import {
+  AccessDeniedError,
+  CertificateNotAcceptedError,
+  createPostgresTenantRepository,
+} from "../src/index.mjs";
 
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
+const fingerprint = "aa".repeat(32);
 const authentication = Object.freeze({
   source: "mtls-certificate",
-  authenticationId: "sha256:alpha",
+  authenticationId: `sha256:${fingerprint}`,
   tenantId: "tnt_018f1234-5678-7abc-8def-0123456789ab",
   subjectId: "sub_018f1234-5678-7abc-8def-0123456789ab",
+  certificate: Object.freeze({
+    profileId: "tenant-client-auth-v1",
+    issuerId: "iss_018f1234-5678-7abc-8def-0123456789b4",
+    serialNumber: "01".padEnd(32, "0"),
+    fingerprintSha256: fingerprint,
+    publicKeySha256: "bb".repeat(32),
+    notBefore: "2026-09-15T09:00:00.000Z",
+    notAfter: "2026-09-15T11:00:00.000Z",
+  }),
 });
+const certificateId = "crt_018f1234-5678-7abc-8def-0123456789d0";
+const fixedClock = () => new Date("2026-09-15T10:00:01.000Z");
 
 const authorityRow = {
   tenant_id: authentication.tenantId,
@@ -28,9 +44,30 @@ function createPool(queryResult) {
   const calls = [];
   let released = false;
   const client = {
-    async query(text, parameters) {
+    async query(input, parameters) {
+      const text = typeof input === "string" ? input : input.text;
+      const values = typeof input === "string" ? parameters : input.values;
+      parameters = values;
       calls.push({ text, parameters });
       if (text.includes("array_agg")) return { rowCount: 1, rows: [authorityRow] };
+      if (text.includes("transaction_timestamp() AS status_observed_at")) {
+        return { rowCount: 1, rows: [{
+          tenant_id: authentication.tenantId,
+          certificate_id: certificateId,
+          subject_id: authentication.subjectId,
+          issuer_id: authentication.certificate.issuerId,
+          serial_number: authentication.certificate.serialNumber,
+          fingerprint_sha256: authentication.certificate.fingerprintSha256,
+          state: "active",
+          not_before: authentication.certificate.notBefore,
+          not_after: authentication.certificate.notAfter,
+          version: 1,
+          status_observed_at: "2026-09-15T10:00:00.000Z",
+        }] };
+      }
+      if (text.includes("FROM identity.certificates")) {
+        return { rowCount: 1, rows: [{ certificate_id: certificateId }] };
+      }
       if (text.includes("FROM app.resources")) return queryResult(text, parameters);
       return { rowCount: null, rows: [] };
     },
@@ -61,7 +98,7 @@ test("record queries bind the authenticated actor and preserve explicit tenant s
       updated_at: new Date("2026-01-02T00:00:00.000Z"),
     }],
   }));
-  const repository = createPostgresTenantRepository({ pool, authorizationMode });
+  const repository = createPostgresTenantRepository({ pool, authorizationMode, clock: fixedClock });
 
   const record = await repository.getRecord(
     authentication,
@@ -73,18 +110,21 @@ test("record queries bind the authenticated actor and preserve explicit tenant s
   assert.equal(pool.calls[0].text, "BEGIN");
   assert.equal(pool.calls[1].text, "SET LOCAL ROLE tenant_trust_app");
   assert.deepEqual(pool.calls[2].parameters, [authentication.tenantId, authentication.subjectId]);
-  assert.deepEqual(pool.calls[4].parameters, [
+  const recordQuery = pool.calls.find(({ text }) => text.includes("FROM app.resources"));
+  assert.deepEqual(recordQuery.parameters, [
     authentication.tenantId,
     "res_018f1234-5678-7abc-8def-0123456789b0",
   ]);
-  assert.match(pool.calls[4].text, /WHERE tenant_id = \$1/u);
+  assert.match(recordQuery.text, /WHERE tenant_id = \$1/u);
+  assert.ok(pool.calls.findIndex(({ text }) => text.includes("transaction_timestamp() AS status_observed_at"))
+    < pool.calls.findIndex(({ text }) => text.includes("FROM app.resources")));
   assert.equal(pool.calls.at(-1).text, "COMMIT");
   assert.equal(pool.released, true);
 });
 
 test("an invisible record rolls back and returns one access-denied type", async () => {
   const pool = createPool(() => ({ rowCount: 0, rows: [] }));
-  const repository = createPostgresTenantRepository({ pool, authorizationMode });
+  const repository = createPostgresTenantRepository({ pool, authorizationMode, clock: fixedClock });
 
   await assert.rejects(
     repository.getRecord(authentication, "res_018f1234-5678-7abc-8def-0123456789b2"),
@@ -115,7 +155,7 @@ test("database privilege denial is normalized and never commits", async () => {
       };
     },
   };
-  const repository = createPostgresTenantRepository({ pool, authorizationMode });
+  const repository = createPostgresTenantRepository({ pool, authorizationMode, clock: fixedClock });
 
   await assert.rejects(repository.listRecords(authentication), AccessDeniedError);
   assert.deepEqual(calls, [
@@ -147,7 +187,78 @@ test("non-certificate or malformed authentication is denied before a connection 
     repository.getProfile({ ...authentication, tenantId: "not-a-tenant" }),
     AccessDeniedError,
   );
+  await assert.rejects(
+    repository.getProfile({ ...authentication, certificate: undefined }),
+    CertificateNotAcceptedError,
+  );
   assert.equal(connected, false);
+});
+
+test("one repository and pooled connection recheck certificate, tenant and membership state on every request", async () => {
+  let certificateState = "active";
+  let tenantState = "active";
+  let membershipState = "active";
+  let connections = 0;
+  const client = {
+    async query(input, parameters) {
+      const text = typeof input === "string" ? input : input.text;
+      const values = typeof input === "string" ? parameters : input.values;
+      if (text.includes("array_agg")) {
+        return { rowCount: 1, rows: [{
+          ...authorityRow,
+          tenant_state: tenantState,
+          membership_state: membershipState,
+        }] };
+      }
+      if (text.includes("transaction_timestamp() AS status_observed_at")) {
+        return { rowCount: 1, rows: [{
+          tenant_id: authentication.tenantId,
+          certificate_id: certificateId,
+          subject_id: authentication.subjectId,
+          issuer_id: authentication.certificate.issuerId,
+          serial_number: authentication.certificate.serialNumber,
+          fingerprint_sha256: authentication.certificate.fingerprintSha256,
+          state: certificateState,
+          not_before: authentication.certificate.notBefore,
+          not_after: authentication.certificate.notAfter,
+          version: certificateState === "active" ? 1 : 2,
+          status_observed_at: "2026-09-15T10:00:00.000Z",
+        }] };
+      }
+      if (text.includes("FROM identity.certificates")) {
+        assert.deepEqual(values.slice(0, 2), [authentication.tenantId, authentication.subjectId]);
+        return { rowCount: 1, rows: [{ certificate_id: certificateId }] };
+      }
+      if (text.includes("tenant.display_name AS tenant_display_name")) {
+        return { rowCount: 1, rows: [{
+          tenant_display_name: "Tenant Alpha",
+          display_name: "Alice",
+          subject_kind: "human",
+          member_since: new Date("2026-01-01T00:00:00.000Z"),
+        }] };
+      }
+      return { rowCount: null, rows: [] };
+    },
+    release() {},
+  };
+  const pool = {
+    async connect() {
+      connections += 1;
+      return client;
+    },
+  };
+  const repository = createPostgresTenantRepository({ pool, authorizationMode, clock: fixedClock });
+
+  assert.equal((await repository.getProfile(authentication)).tenantId, authentication.tenantId);
+  certificateState = "revoked";
+  await assert.rejects(repository.getProfile(authentication), CertificateNotAcceptedError);
+  certificateState = "active";
+  membershipState = "suspended";
+  await assert.rejects(repository.getProfile(authentication), AccessDeniedError);
+  membershipState = "active";
+  tenantState = "suspended";
+  await assert.rejects(repository.getProfile(authentication), AccessDeniedError);
+  assert.equal(connections, 4);
 });
 
 test("repository construction requires explicit branded mode selection", () => {

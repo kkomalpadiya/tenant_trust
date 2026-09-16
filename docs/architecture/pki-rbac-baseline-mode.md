@@ -4,7 +4,7 @@
 
 `pki-rbac-baseline-v1` is Baseline B for later comparative evaluation. It authorizes from tenant-scoped X.509 identity, current authoritative tenant membership and the T4.4 role/action matrix. It intentionally does not read evidence, trust scores, trust thresholds or adaptive-policy results.
 
-The mode is an evaluation baseline, not a claim that certificate possession alone is sufficient. Certificate identity, active tenant/subject/membership state, role eligibility, explicit tenant predicates and forced PostgreSQL row-level security must all agree. Sensitive operations retain the separate T4.5 additional-control boundary.
+The mode is an evaluation baseline, not a claim that certificate possession alone is sufficient. Certificate identity, fresh active certificate inventory, active tenant/subject/membership state, role eligibility, explicit tenant predicates and forced PostgreSQL row-level security must all agree. Sensitive operations retain the separate T4.5 additional-control boundary.
 
 ## Explicit selection
 
