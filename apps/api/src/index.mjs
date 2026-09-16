@@ -18,3 +18,16 @@ export {
   createRequestAuditRecorder,
   hashAuditResourceIdentifier,
 } from "./request-audit.mjs";
+export {
+  IdempotencyConflictError,
+  REQUEST_SAFEGUARD_POLICY,
+  RequestTimeoutError,
+  SENSITIVE_IDEMPOTENCY_KEY_PATTERN,
+  UnsupportedSessionError,
+  assertRequestTimeoutMilliseconds,
+  assertStatelessMtlsRequest,
+  hashSensitiveIdempotencyKey,
+  hashSensitiveRequest,
+  normalizeSensitiveIdempotencyKey,
+  runWithRequestTimeout,
+} from "./request-safeguards.mjs";

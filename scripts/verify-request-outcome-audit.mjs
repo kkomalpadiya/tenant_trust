@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
 import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
@@ -7,6 +8,7 @@ import {
   createPostgresTenantRepository,
   createTenantTrustApi,
   hashAuditResourceIdentifier,
+  hashSensitiveIdempotencyKey,
 } from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
 import { createLiveRequestStateFixture } from "./lib/request-state-fixtures.mjs";
@@ -16,6 +18,8 @@ const alphaRecord = "res_018f1234-5678-7abc-8def-0123456789b0";
 const betaRecord = "res_018f1234-5678-7abc-8def-0123456789b2";
 const forgedRequestId = "req_018f1234-5678-7abc-8def-0123456789ff";
 const forgedCorrelationId = "cor_018f1234-5678-7abc-8def-0123456789ff";
+const idempotencyKey = `idem_${randomUUID()}`;
+const idempotencyKeyHash = hashSensitiveIdempotencyKey(idempotencyKey);
 
 const pool = new Pool({
   host: "127.0.0.1",
@@ -77,8 +81,8 @@ try {
     method: "POST",
     url: "/v1/tenant-records/export",
     headers: {
-      authorization: "Bearer audit-secret-must-not-appear",
-      cookie: "session=audit-secret-must-not-appear",
+      "idempotency-key": idempotencyKey,
+      "x-audit-secret": "audit-secret-must-not-appear",
       "x-request-id": forgedRequestId,
       "x-correlation-id": forgedCorrelationId,
       "x-tenant-id": identities.betaMember.tenantId,
@@ -158,6 +162,10 @@ try {
   await api.close();
   await auditClient.query("ROLLBACK");
   auditClient.release();
+  await pool.query(
+    "DELETE FROM audit.api_sensitive_operation_receipts WHERE idempotency_key_hash_sha256 = $1",
+    [idempotencyKeyHash],
+  );
   await fixture.cleanup();
   await pool.end();
 }

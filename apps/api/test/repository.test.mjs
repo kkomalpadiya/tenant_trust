@@ -109,7 +109,10 @@ test("record queries bind the authenticated actor and preserve explicit tenant s
   assert.equal(record.version, 1);
   assert.equal(pool.calls[0].text, "BEGIN");
   assert.equal(pool.calls[1].text, "SET LOCAL ROLE tenant_trust_app");
-  assert.deepEqual(pool.calls[2].parameters, [authentication.tenantId, authentication.subjectId]);
+  const actorBinding = pool.calls.find(({ text }) => text.startsWith("SELECT identity.set_tenant_actor_context"));
+  assert.deepEqual(actorBinding.parameters, [authentication.tenantId, authentication.subjectId]);
+  const timeoutSetup = pool.calls.find(({ text }) => text.includes("set_config('statement_timeout'"));
+  assert.deepEqual(timeoutSetup.parameters, ["4000ms", "1000ms", "5000ms"]);
   const recordQuery = pool.calls.find(({ text }) => text.includes("FROM app.resources"));
   assert.deepEqual(recordQuery.parameters, [
     authentication.tenantId,
@@ -140,7 +143,8 @@ test("database privilege denial is normalized and never commits", async () => {
   const pool = {
     async connect() {
       return {
-        async query(text) {
+        async query(input) {
+          const text = typeof input === "string" ? input : input.text;
           calls.push(text);
           if (text.startsWith("SELECT identity.set_tenant_actor_context")) {
             const error = new Error("Tenant actor context denied.");
@@ -161,6 +165,10 @@ test("database privilege denial is normalized and never commits", async () => {
   assert.deepEqual(calls, [
     "BEGIN",
     "SET LOCAL ROLE tenant_trust_app",
+    `SELECT
+           set_config('statement_timeout', $1, true),
+           set_config('lock_timeout', $2, true),
+           set_config('idle_in_transaction_session_timeout', $3, true)`,
     "SELECT identity.set_tenant_actor_context($1::identity.tenant_id, $2::identity.subject_id)",
     "ROLLBACK",
   ]);

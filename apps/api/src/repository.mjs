@@ -10,6 +10,14 @@ import {
   assertPresentedCertificate,
   createRequestStateRevalidator,
 } from "./request-state.mjs";
+import {
+  IdempotencyConflictError,
+  REQUEST_SAFEGUARD_POLICY,
+  RequestTimeoutError,
+  hashSensitiveIdempotencyKey,
+  hashSensitiveRequest,
+  normalizeSensitiveIdempotencyKey,
+} from "./request-safeguards.mjs";
 
 const RESOURCE_ID = /^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -95,12 +103,13 @@ function createOperationId(operationIdFactory) {
   return operationId;
 }
 
-function operationMetadata(context, operationId, action, attributes = {}) {
+function operationMetadata(context, operationId, action, replayed, attributes = {}) {
   return Object.freeze({
     operationId,
     action,
     tenantId: context.tenantId,
     requestedBy: context.subjectId,
+    idempotentReplay: replayed,
     ...attributes,
   });
 }
@@ -126,6 +135,17 @@ async function rollbackQuietly(client) {
   } catch {
     // The original failure remains authoritative and is mapped by the API boundary.
   }
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw new RequestTimeoutError();
+}
+
+function isTimeoutError(error, signal) {
+  return signal?.aborted
+    || error?.code === "57014"
+    || error?.code === "ABORT_ERR"
+    || error?.name === "AbortError";
 }
 
 export function createPostgresTenantRepository({
@@ -167,7 +187,7 @@ export function createPostgresTenantRepository({
     return authorization;
   }
 
-  async function authorizeSensitiveOperation(context, action, operationId, attributes) {
+  async function authorizeSensitiveOperation(context, action, operationId, attributes, signal) {
     const authorization = evaluateOperation(context, action);
     const { eligibility } = authorization;
     if (authorization.outcome !== "requires-controls"
@@ -183,24 +203,42 @@ export function createPostgresTenantRepository({
       authorization,
       eligibility,
       attributes: Object.freeze({ ...attributes }),
+      signal,
     }));
     if (authorized !== true) throw new AccessDeniedError();
   }
 
-  async function withTenantContext(authentication, operation) {
+  async function withTenantContext(authentication, operation, { signal } = {}) {
     assertCertificateAuthentication(authentication);
+    throwIfAborted(signal);
     const client = await pool.connect();
     let transactionStarted = false;
     try {
-      await client.query("BEGIN");
+      throwIfAborted(signal);
+      const query = (text, values = []) => {
+        throwIfAborted(signal);
+        return client.query({ text, values, signal });
+      };
+      await query("BEGIN");
       transactionStarted = true;
-      await client.query("SET LOCAL ROLE tenant_trust_app");
-      await client.query(
+      await query("SET LOCAL ROLE tenant_trust_app");
+      await query(
+        `SELECT
+           set_config('statement_timeout', $1, true),
+           set_config('lock_timeout', $2, true),
+           set_config('idle_in_transaction_session_timeout', $3, true)`,
+        [
+          `${REQUEST_SAFEGUARD_POLICY.databaseStatementTimeoutMilliseconds}ms`,
+          `${REQUEST_SAFEGUARD_POLICY.databaseLockTimeoutMilliseconds}ms`,
+          `${REQUEST_SAFEGUARD_POLICY.requestTimeoutMilliseconds}ms`,
+        ],
+      );
+      await query(
         "SELECT identity.set_tenant_actor_context($1::identity.tenant_id, $2::identity.subject_id)",
         [authentication.tenantId, authentication.subjectId],
       );
 
-      const authorityResult = await client.query(
+      const authorityResult = await query(
         `SELECT
            tenant.tenant_id::text,
            tenant.state::text AS tenant_state,
@@ -232,16 +270,34 @@ export function createPostgresTenantRepository({
         authentication,
         authority: mapAuthority(authorityResult.rows[0]),
       });
-      const requestState = await requestStateRevalidator.validate({ client, authentication, context });
+      const transactionClient = Object.freeze({
+        query(input, values) {
+          if (typeof input === "object" && input !== null) {
+            return query(input.text, input.values);
+          }
+          return query(input, values);
+        },
+      });
+      const requestState = await requestStateRevalidator.validate({
+        client: transactionClient,
+        authentication,
+        context,
+      });
       const queryProtected = async (text, parameters) => {
+        throwIfAborted(signal);
         requestStateRevalidator.assertFresh(requestState);
-        return client.query(text, parameters);
+        return query(text, parameters);
       };
-      const result = await operation(queryProtected, context);
-      await client.query("COMMIT");
+      const result = await operation(queryProtected, context, signal);
+      throwIfAborted(signal);
+      await query("COMMIT");
       return result;
     } catch (error) {
       if (transactionStarted) await rollbackQuietly(client);
+      if (isTimeoutError(error, signal)) throw new RequestTimeoutError();
+      if (error?.code === "P0001" && error?.message === "SENSITIVE_OPERATION_IDEMPOTENCY_CONFLICT") {
+        throw new IdempotencyConflictError();
+      }
       if (error?.code === "42501") throw new AccessDeniedError();
       if (error instanceof TenantContextError) throw new AccessDeniedError();
       throw error;
@@ -253,8 +309,9 @@ export function createPostgresTenantRepository({
   return Object.freeze({
     authorizationMode: selectedAuthorizationMode,
     requestStatePolicy: REQUEST_STATE_POLICY,
+    requestSafeguardPolicy: REQUEST_SAFEGUARD_POLICY,
 
-    async getProfile(authentication) {
+    async getProfile(authentication, { signal } = {}) {
       return withTenantContext(authentication, async (query, context) => {
         authorizeBaselineOperation(context, "profile:read");
         const result = await query(
@@ -286,10 +343,10 @@ export function createPostgresTenantRepository({
           memberSince: asIsoTimestamp(row.member_since),
           authorityVersions: context.versions,
         });
-      });
+      }, { signal });
     },
 
-    async listRecords(authentication) {
+    async listRecords(authentication, { signal } = {}) {
       return withTenantContext(authentication, async (query, context) => {
         authorizeBaselineOperation(context, "record:read");
         const result = await query(
@@ -301,10 +358,10 @@ export function createPostgresTenantRepository({
           [context.tenantId],
         );
         return Object.freeze(result.rows.map(mapRecord));
-      });
+      }, { signal });
     },
 
-    async getRecord(authentication, recordId) {
+    async getRecord(authentication, recordId, { signal } = {}) {
       if (!RESOURCE_ID.test(recordId ?? "")) throw new TypeError("A valid record ID is required.");
       return withTenantContext(authentication, async (query, context) => {
         authorizeBaselineOperation(context, "record:read");
@@ -317,16 +374,29 @@ export function createPostgresTenantRepository({
         );
         if (result.rowCount !== 1) throw new AccessDeniedError();
         return mapRecord(result.rows[0]);
-      });
+      }, { signal });
     },
 
-    async exportRecords(authentication, recordIds) {
+    async exportRecords(authentication, recordIds, { idempotencyKey, signal } = {}) {
       const requestedRecordIds = normalizeRecordIds(recordIds);
-      return withTenantContext(authentication, async (query, context) => {
-        const operationId = createOperationId(operationIdFactory);
+      const normalizedIdempotencyKey = normalizeSensitiveIdempotencyKey(idempotencyKey);
+      const keyHash = hashSensitiveIdempotencyKey(normalizedIdempotencyKey);
+      const requestHash = hashSensitiveRequest("record:export", requestedRecordIds);
+      return withTenantContext(authentication, async (query, context, operationSignal) => {
+        const candidateOperationId = createOperationId(operationIdFactory);
+        const reservation = await query(
+          `SELECT operation_id, replayed
+           FROM audit.reserve_api_sensitive_operation($1, $2, $3, $4, $5, $6)`,
+          [context.tenantId, context.subjectId, "record:export", keyHash, requestHash, candidateOperationId],
+        );
+        if (reservation.rowCount !== 1 || !OPERATION_ID.test(reservation.rows[0].operation_id ?? "")
+          || typeof reservation.rows[0].replayed !== "boolean") {
+          throw new TypeError("The sensitive-operation receipt was invalid.");
+        }
+        const operationId = reservation.rows[0].operation_id;
         await authorizeSensitiveOperation(context, "record:export", operationId, {
           requestedRecordCount: requestedRecordIds.length,
-        });
+        }, operationSignal);
 
         const result = await query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
@@ -339,22 +409,35 @@ export function createPostgresTenantRepository({
         if (result.rowCount !== requestedRecordIds.length) throw new AccessDeniedError();
         const records = Object.freeze(result.rows.map(mapRecord));
         return Object.freeze({
-          operation: operationMetadata(context, operationId, "record:export", {
+          operation: operationMetadata(context, operationId, "record:export", reservation.rows[0].replayed, {
             authorizationModeId: selectedAuthorizationMode.modeId,
             recordCount: records.length,
           }),
           records,
         });
-      });
+      }, { signal });
     },
 
-    async reviewMembership(authentication, subjectId) {
+    async reviewMembership(authentication, subjectId, { idempotencyKey, signal } = {}) {
       if (!SUBJECT_ID.test(subjectId ?? "")) throw new TypeError("A valid subject ID is required.");
-      return withTenantContext(authentication, async (query, context) => {
-        const operationId = createOperationId(operationIdFactory);
+      const normalizedIdempotencyKey = normalizeSensitiveIdempotencyKey(idempotencyKey);
+      const keyHash = hashSensitiveIdempotencyKey(normalizedIdempotencyKey);
+      const requestHash = hashSensitiveRequest("tenant:admin", [subjectId]);
+      return withTenantContext(authentication, async (query, context, operationSignal) => {
+        const candidateOperationId = createOperationId(operationIdFactory);
+        const reservation = await query(
+          `SELECT operation_id, replayed
+           FROM audit.reserve_api_sensitive_operation($1, $2, $3, $4, $5, $6)`,
+          [context.tenantId, context.subjectId, "tenant:admin", keyHash, requestHash, candidateOperationId],
+        );
+        if (reservation.rowCount !== 1 || !OPERATION_ID.test(reservation.rows[0].operation_id ?? "")
+          || typeof reservation.rows[0].replayed !== "boolean") {
+          throw new TypeError("The sensitive-operation receipt was invalid.");
+        }
+        const operationId = reservation.rows[0].operation_id;
         await authorizeSensitiveOperation(context, "tenant:admin", operationId, {
           targetSubjectId: subjectId,
-        });
+        }, operationSignal);
 
         const result = await query(
           `SELECT
@@ -380,7 +463,7 @@ export function createPostgresTenantRepository({
         if (result.rowCount !== 1) throw new AccessDeniedError();
         const row = result.rows[0];
         return Object.freeze({
-          operation: operationMetadata(context, operationId, "tenant:admin", {
+          operation: operationMetadata(context, operationId, "tenant:admin", reservation.rows[0].replayed, {
             authorizationModeId: selectedAuthorizationMode.modeId,
             targetSubjectId: subjectId,
           }),
@@ -394,7 +477,7 @@ export function createPostgresTenantRepository({
             roles: Object.freeze([...row.roles]),
           }),
         });
-      });
+      }, { signal });
     },
   });
 }

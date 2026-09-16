@@ -5,6 +5,7 @@ import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
 import {
   AccessDeniedError,
   CertificateNotAcceptedError,
+  REQUEST_SAFEGUARD_POLICY,
   REQUEST_STATE_POLICY,
   RequestStateUnavailableError,
   createGatewayRequestAuthenticator,
@@ -28,6 +29,7 @@ function createTenantTrustApi(options) {
 function createRepository(overrides = {}) {
   return {
     authorizationMode,
+    requestSafeguardPolicy: REQUEST_SAFEGUARD_POLICY,
     requestStatePolicy: REQUEST_STATE_POLICY,
     async getProfile(authentication) {
       return { tenantId: authentication.tenantId, subjectId: authentication.subjectId };
@@ -65,6 +67,16 @@ test("API construction requires the fixed authoritative request-state policy", (
       repository: { ...createRepository(), requestStatePolicy: { ...REQUEST_STATE_POLICY } },
     }),
     /authoritative per-request state revalidation/u,
+  );
+});
+
+test("API construction requires the fixed request safeguard policy", () => {
+  assert.throws(
+    () => createTenantTrustApi({
+      identityResolver: createIdentityResolver(),
+      repository: { ...createRepository(), requestSafeguardPolicy: { ...REQUEST_SAFEGUARD_POLICY } },
+    }),
+    /fixed request safeguard policy/u,
   );
 });
 

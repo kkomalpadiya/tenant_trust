@@ -85,6 +85,7 @@ npm run sensitive-operations:verify
 npm run pki-rbac-baseline:verify
 npm run request-state:verify
 npm run request-outcomes:verify
+npm run request-safeguards:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -146,11 +147,13 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 
 `npm run request-outcomes:verify` is the T4.8 request-audit gate. It proves API startup requires the branded fail-closed recorder, server-generated request/correlation IDs override forged headers, authentication and access events retain trusted actor/tenant/action/resource-decision metadata, resource identifiers are hashed, sensitive successes carry their operation ID, and the constrained append-only PostgreSQL writer stores no raw headers, secrets or payloads. Both database scenarios roll back and disposable certificate rows are removed. See [Request outcome and correlation audit](architecture/request-outcome-audit.md).
 
+`npm run request-safeguards:verify` is the T4.9 session, timeout and replay gate. It proves protected requests reject ambient cookie/bearer sessions, responses are not cacheable, bodies and exports remain bounded, PostgreSQL work honors the five-second request deadline, timeout rolls back, identical sensitive retries reuse one server operation ID, conflicting key reuse fails closed, and the runtime role cannot access durable receipt rows directly. The live verifier removes its receipts. See [Session, timeout and replay safeguards](architecture/request-safeguards.md).
+
 PostgreSQL, Redis, NATS and step-ca use separate named volumes. Redis enables append-only persistence and disables eviction. NATS enables JetStream file storage. `npm run runtime-isolation:verify` proves tenant-derived cache and lock keys plus tenant-specific NATS delivery permissions. See [Redis and NATS tenant isolation](architecture/runtime-tenant-isolation.md), [Reliable event delivery](architecture/event-delivery.md) and [Tenant certificate-authority model](architecture/tenant-pki.md).
 
 ## Foundation verification
 
-Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests including trusted tenant-context resolution, lifecycle revalidation and request-outcome capture, the complete Tenant Alpha/Tenant Beta isolation phase gate, the complete Phase 3 certificate-lifecycle gate, OPA policy, NATS delivery and replay, and the dependency audit.
+Run `npm run foundation:check` when the normal development stack is running, migrated and provisioned. It validates the host resource budget, Compose configuration, container health, repository tests including trusted tenant-context resolution, lifecycle revalidation, request-outcome capture and session/timeout/replay safeguards, the complete Tenant Alpha/Tenant Beta isolation phase gate, the complete Phase 3 certificate-lifecycle gate, OPA policy, NATS delivery and replay, and the dependency audit.
 
 Run `npm run foundation:clean` to prove a first start from empty service state. The command generates temporary credentials and free loopback ports, creates uniquely named containers, volumes and a network, initializes the CA, applies migrations, runs the complete foundation verification, and then removes those disposable resources. It does not reuse or delete the normal `tenant-trust-*` volumes or `runtime/secrets` files.
 

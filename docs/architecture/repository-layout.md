@@ -4,7 +4,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 
 | Path | Responsibility |
 | --- | --- |
-| `apps/api/` | SaaS API, tenant and subject management, protected resources, request enforcement, sanitized request-outcome capture and internal service adapters |
+| `apps/api/` | SaaS API, tenant and subject management, protected resources, request enforcement, stateless-session/deadline/replay safeguards, sanitized request-outcome capture and internal service adapters |
 | `apps/web/` | Tenant dashboard, certificate controls, trust explanations and audit views |
 | `services/evidence/` | Source enrollment, signature and freshness validation, accepted evidence delivery |
 | `services/trust/` | Score calculation, temporal smoothing, state transitions and explanations |
@@ -21,7 +21,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `infra/nats/` | NATS server configuration and tenant-specific demonstration permissions |
 | `infra/gateway/` | NGINX client-mTLS termination and mutually authenticated TLS forwarding configuration |
 | `policies/` | OPA policy source and policy test cases |
-| `database/migrations/` | Ordered application schema changes, including tenant, actor, membership, resource, security-configuration and lifecycle controls |
+| `database/migrations/` | Ordered application schema changes, including tenant, actor, membership, resource, security-configuration, lifecycle, request-audit and sensitive-operation receipt controls |
 | `database/seeds/` | Idempotent synthetic development identities, resources and tenant-owned security configuration with deterministic identifiers and no credentials |
 | `infra/compose/` | Local container service definitions and safe configuration templates |
 | `infra/pki/` | Machine-checked tenant CA hierarchy, issuer-boundary definitions, provisioning scripts and certificate profile templates |
@@ -49,6 +49,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 - Component paths define responsibilities, not a requirement to run every component in a separate process. Deployment granularity will follow the local resource budget.
 - Certificate validation and policy enforcement gate protected operations. Trust computation supplies versioned input to policy decisions.
 - Protected API outcomes use server-generated request correlation and an append-only constrained PostgreSQL writer. Audit rows allowlist metadata and store resource hashes instead of raw identifiers, headers or payloads.
+- Protected API requests reject ambient cookie/bearer sessions, apply bounded body and execution limits, and pass abort signals through the repository. Sensitive POSTs reserve a tenant/actor/action-scoped hashed idempotency receipt in the same transaction as authorization and data access.
 - Durable off-chain state supports runtime decisions. Fabric delivery runs asynchronously and exposes pending, committed and failed audit states.
 - Keep unit tests with their components when the selected language convention supports that. Place cross-component tests under `tests/`.
 

@@ -14,6 +14,7 @@ const ids = Object.freeze({
   operation: "op_018f1234-5678-4abc-8def-0123456789b4",
 });
 const fixedClock = () => new Date("2026-09-15T10:00:01.000Z");
+const idempotencyKey = "idem_018f1234-5678-4abc-8def-0123456789a1";
 const certificates = Object.freeze({
   [ids.admin]: Object.freeze({
     certificateId: "crt_018f1234-5678-7abc-8def-0123456789d0",
@@ -84,6 +85,9 @@ function createPool({ roles = ["tenant-admin"], resourceRows = [], membershipRow
       if (text.includes("FROM identity.tenants AS tenant")) {
         return { rowCount: 1, rows: [authorityRow(parameters[1], roles)] };
       }
+      if (text.includes("audit.reserve_api_sensitive_operation")) {
+        return { rowCount: 1, rows: [{ operation_id: ids.operation, replayed: false }] };
+      }
       if (text.includes("FROM app.resources")) {
         return { rowCount: resourceRows.length, rows: resourceRows };
       }
@@ -142,7 +146,11 @@ test("tenant-admin export is bounded, tenant-qualified and carries a server oper
   const pool = createPool({ resourceRows: [recordRow(ids.recordA), recordRow(ids.recordB, ids.admin)] });
   const repository = createAuthorizedRepository(pool, (request) => { authorizationRequest = request; });
 
-  const result = await repository.exportRecords(authentication(), [ids.recordA, ids.recordB]);
+  const result = await repository.exportRecords(
+    authentication(),
+    [ids.recordA, ids.recordB],
+    { idempotencyKey },
+  );
 
   assert.equal(result.operation.operationId, ids.operation);
   assert.equal(result.operation.action, "record:export");
@@ -150,6 +158,7 @@ test("tenant-admin export is bounded, tenant-qualified and carries a server oper
   assert.equal(result.operation.requestedBy, ids.admin);
   assert.equal(result.operation.authorizationModeId, authorizationMode.modeId);
   assert.equal(result.operation.recordCount, 2);
+  assert.equal(result.operation.idempotentReplay, false);
   assert.deepEqual(result.records.map(({ recordId }) => recordId), [ids.recordA, ids.recordB]);
   assert.equal(authorizationRequest.context.tenantId, ids.tenant);
   assert.deepEqual(authorizationRequest.context.roles, ["tenant-admin"]);
@@ -171,7 +180,7 @@ test("export is all-or-nothing when any requested record is not visible", async 
   const repository = createAuthorizedRepository(pool);
 
   await assert.rejects(
-    repository.exportRecords(authentication(), [ids.recordA, ids.recordB]),
+    repository.exportRecords(authentication(), [ids.recordA, ids.recordB], { idempotencyKey }),
     AccessDeniedError,
   );
   assert.equal(pool.calls.at(-1).text, "ROLLBACK");
@@ -191,7 +200,7 @@ test("tenant members and missing control decisions are denied before sensitive d
     },
   });
   await assert.rejects(
-    memberRepository.exportRecords(authentication(ids.member), [ids.recordA]),
+    memberRepository.exportRecords(authentication(ids.member), [ids.recordA], { idempotencyKey }),
     AccessDeniedError,
   );
   assert.equal(authorizerCalls, 0);
@@ -205,7 +214,7 @@ test("tenant members and missing control decisions are denied before sensitive d
     clock: fixedClock,
   });
   await assert.rejects(
-    defaultDenyRepository.exportRecords(authentication(), [ids.recordA]),
+    defaultDenyRepository.exportRecords(authentication(), [ids.recordA], { idempotencyKey }),
     AccessDeniedError,
   );
   assert.equal(defaultDenyPool.calls.some(({ text }) => text.includes("FROM app.resources")), false);
@@ -225,12 +234,13 @@ test("membership review is tenant-admin-only and queries one tenant-qualified su
   const pool = createPool({ membershipRows: [membershipRow] });
   const repository = createAuthorizedRepository(pool, (request) => { authorizationRequest = request; });
 
-  const result = await repository.reviewMembership(authentication(), ids.member);
+  const result = await repository.reviewMembership(authentication(), ids.member, { idempotencyKey });
 
   assert.equal(result.operation.operationId, ids.operation);
   assert.equal(result.operation.action, "tenant:admin");
   assert.equal(result.operation.targetSubjectId, ids.member);
   assert.equal(result.operation.authorizationModeId, authorizationMode.modeId);
+  assert.equal(result.operation.idempotentReplay, false);
   assert.deepEqual(result.membership, {
     subjectId: ids.member,
     displayName: "Alpha Member",
@@ -249,7 +259,10 @@ test("membership review is tenant-admin-only and queries one tenant-qualified su
 test("foreign, absent and malformed admin targets fail closed", async () => {
   const pool = createPool();
   const repository = createAuthorizedRepository(pool);
-  await assert.rejects(repository.reviewMembership(authentication(), ids.member), AccessDeniedError);
+  await assert.rejects(
+    repository.reviewMembership(authentication(), ids.member, { idempotencyKey }),
+    AccessDeniedError,
+  );
   assert.equal(pool.calls.at(-1).text, "ROLLBACK");
 
   let connected = false;
@@ -257,8 +270,14 @@ test("foreign, absent and malformed admin targets fail closed", async () => {
     authorizationMode,
     pool: { async connect() { connected = true; throw new Error("must not connect"); } },
   });
-  await assert.rejects(disconnectedRepository.reviewMembership(authentication(), "not-a-subject"), TypeError);
-  await assert.rejects(disconnectedRepository.exportRecords(authentication(), []), TypeError);
-  await assert.rejects(disconnectedRepository.exportRecords(authentication(), [ids.recordA, ids.recordA]), TypeError);
+  await assert.rejects(
+    disconnectedRepository.reviewMembership(authentication(), "not-a-subject", { idempotencyKey }),
+    TypeError,
+  );
+  await assert.rejects(disconnectedRepository.exportRecords(authentication(), [], { idempotencyKey }), TypeError);
+  await assert.rejects(
+    disconnectedRepository.exportRecords(authentication(), [ids.recordA, ids.recordA], { idempotencyKey }),
+    TypeError,
+  );
   assert.equal(connected, false);
 });

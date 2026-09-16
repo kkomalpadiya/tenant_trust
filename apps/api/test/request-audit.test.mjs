@@ -5,6 +5,7 @@ import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
 import {
   AccessDeniedError,
   REQUEST_AUDIT_POLICY,
+  REQUEST_SAFEGUARD_POLICY,
   REQUEST_STATE_POLICY,
   RequestAuditUnavailableError,
   createPostgresRequestAuditRecorder,
@@ -53,6 +54,7 @@ function event(overrides = {}) {
 function repository(overrides = {}) {
   return {
     authorizationMode,
+    requestSafeguardPolicy: REQUEST_SAFEGUARD_POLICY,
     requestStatePolicy: REQUEST_STATE_POLICY,
     async getProfile() { return { tenantId, subjectId }; },
     async listRecords() { return []; },
@@ -142,7 +144,7 @@ test("successful requests capture correlated authentication and access outcomes"
     method: "GET",
     url: "/v1/profile",
     headers: {
-      authorization: "Bearer secret-value",
+      "x-test-secret": "secret-value",
       "x-request-id": "req_018f1234-5678-7abc-8def-0123456789ff",
       "x-correlation-id": "cor_018f1234-5678-7abc-8def-0123456789ff",
     },

@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import {
   AUTHORIZATION_MODE_IDS,
   resolveRoleAction,
   selectAuthorizationMode,
 } from "@tenant-trust/authorization";
-import { createPostgresTenantRepository, createTenantTrustApi } from "@tenant-trust/api";
+import {
+  createPostgresTenantRepository,
+  createTenantTrustApi,
+  hashSensitiveIdempotencyKey,
+} from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
 import { createVerificationRequestAuditRecorder } from "./lib/request-audit-fixtures.mjs";
 import { createLiveRequestStateFixture } from "./lib/request-state-fixtures.mjs";
@@ -18,6 +23,12 @@ const records = Object.freeze({
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
 const operationIds = [];
+const receiptKeyHashes = [];
+function idempotencyHeaders(existing = {}) {
+  const key = `idem_${randomUUID()}`;
+  receiptKeyHashes.push(hashSensitiveIdempotencyKey(key));
+  return { ...existing, "idempotency-key": key };
+}
 async function verificationControlAuthorizer(request) {
   assert.equal(request.context.authentication.source, "mtls-certificate");
   assert.deepEqual(request.context.roles, ["tenant-admin"]);
@@ -63,6 +74,7 @@ try {
   const memberExport = await request(identities.alphaMember, {
     method: "POST",
     url: "/v1/tenant-records/export",
+    headers: idempotencyHeaders(),
     payload: { recordIds: [records.alphaMember] },
   });
   assert.equal(memberExport.statusCode, 403);
@@ -72,10 +84,10 @@ try {
   const alphaExport = await request(identities.alphaAdmin, {
     method: "POST",
     url: "/v1/tenant-records/export",
-    headers: {
+    headers: idempotencyHeaders({
       "x-tenant-id": identities.betaMember.tenantId,
       "x-subject-id": identities.betaMember.subjectId,
-    },
+    }),
     payload: { recordIds: [records.alphaMember, records.alphaAdmin] },
   });
   assert.equal(alphaExport.statusCode, 200);
@@ -91,11 +103,13 @@ try {
   const foreignExport = await request(identities.alphaAdmin, {
     method: "POST",
     url: "/v1/tenant-records/export",
+    headers: idempotencyHeaders(),
     payload: { recordIds: [records.alphaMember, records.betaMember] },
   });
   const absentExport = await request(identities.alphaAdmin, {
     method: "POST",
     url: "/v1/tenant-records/export",
+    headers: idempotencyHeaders(),
     payload: { recordIds: [records.alphaMember, "res_018f1234-5678-7abc-8def-0123456789bf"] },
   });
   assert.equal(foreignExport.statusCode, 403);
@@ -104,6 +118,7 @@ try {
   const memberReview = await request(identities.alphaMember, {
     method: "POST",
     url: "/v1/admin/membership-reviews",
+    headers: idempotencyHeaders(),
     payload: { subjectId: identities.alphaMember.subjectId },
   });
   assert.equal(memberReview.statusCode, 403);
@@ -111,6 +126,7 @@ try {
   const alphaReview = await request(identities.alphaAdmin, {
     method: "POST",
     url: "/v1/admin/membership-reviews",
+    headers: idempotencyHeaders(),
     payload: { subjectId: identities.alphaMember.subjectId },
   });
   assert.equal(alphaReview.statusCode, 200);
@@ -121,6 +137,7 @@ try {
   const foreignReview = await request(identities.alphaAdmin, {
     method: "POST",
     url: "/v1/admin/membership-reviews",
+    headers: idempotencyHeaders(),
     payload: { subjectId: identities.betaMember.subjectId },
   });
   assert.equal(foreignReview.statusCode, 403);
@@ -129,6 +146,7 @@ try {
   const injectedTenant = await request(identities.alphaAdmin, {
     method: "POST",
     url: "/v1/admin/membership-reviews?tenantId=tnt_other",
+    headers: idempotencyHeaders(),
     payload: { subjectId: identities.alphaMember.subjectId },
   });
   assert.equal(injectedTenant.statusCode, 400);
@@ -143,6 +161,12 @@ try {
   console.log("PASS successful sensitive operations expose unique server-generated operation IDs for later audit capture");
 } finally {
   await api.close();
+  if (receiptKeyHashes.length > 0) {
+    await pool.query(
+      "DELETE FROM audit.api_sensitive_operation_receipts WHERE idempotency_key_hash_sha256 = ANY($1::text[])",
+      [receiptKeyHashes],
+    );
+  }
   await fixture.cleanup();
   await pool.end();
 }

@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import {
   AUTHORIZATION_MODE_IDS,
   AuthorizationError,
   selectAuthorizationMode,
 } from "@tenant-trust/authorization";
-import { createPostgresTenantRepository, createTenantTrustApi } from "@tenant-trust/api";
+import {
+  createPostgresTenantRepository,
+  createTenantTrustApi,
+  hashSensitiveIdempotencyKey,
+} from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
 import { createVerificationRequestAuditRecorder } from "./lib/request-audit-fixtures.mjs";
 import { createLiveRequestStateFixture } from "./lib/request-state-fixtures.mjs";
@@ -28,6 +33,12 @@ const records = Object.freeze({
   alphaAdmin: "res_018f1234-5678-7abc-8def-0123456789b1",
   betaMember: "res_018f1234-5678-7abc-8def-0123456789b2",
 });
+const receiptKeyHashes = [];
+function idempotencyHeaders() {
+  const key = `idem_${randomUUID()}`;
+  receiptKeyHashes.push(hashSensitiveIdempotencyKey(key));
+  return { "idempotency-key": key };
+}
 
 const pool = new Pool({
   host: "127.0.0.1",
@@ -107,6 +118,7 @@ try {
   const memberExport = await request(identities.alphaMember, {
     method: "POST",
     url: "/v1/tenant-records/export",
+    headers: idempotencyHeaders(),
     payload: { recordIds: [records.alphaMember] },
   });
   assert.equal(memberExport.statusCode, 403);
@@ -115,6 +127,7 @@ try {
   const adminExport = await request(identities.alphaAdmin, {
     method: "POST",
     url: "/v1/tenant-records/export",
+    headers: idempotencyHeaders(),
     payload: { recordIds: [records.alphaMember, records.alphaAdmin] },
   });
   assert.equal(adminExport.statusCode, 200);
@@ -147,6 +160,7 @@ try {
   const missingControls = await defaultDenyApi.inject({
     method: "POST",
     url: "/v1/tenant-records/export",
+    headers: idempotencyHeaders(),
     payload: { recordIds: [records.alphaMember] },
   });
   assert.equal(missingControls.statusCode, 403);
@@ -157,6 +171,12 @@ try {
 } finally {
   if (defaultDenyApi) await defaultDenyApi.close();
   await api.close();
+  if (receiptKeyHashes.length > 0) {
+    await pool.query(
+      "DELETE FROM audit.api_sensitive_operation_receipts WHERE idempotency_key_hash_sha256 = ANY($1::text[])",
+      [receiptKeyHashes],
+    );
+  }
   await fixture.cleanup();
   await pool.end();
 }

@@ -3,6 +3,7 @@ import test from "node:test";
 import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
 import {
   AccessDeniedError,
+  REQUEST_SAFEGUARD_POLICY,
   REQUEST_STATE_POLICY,
   createRequestAuditRecorder,
   createTenantTrustApi as createTenantTrustApiWithAudit,
@@ -26,10 +27,12 @@ const recordIds = Object.freeze([
   "res_018f1234-5678-7abc-8def-0123456789b0",
   "res_018f1234-5678-7abc-8def-0123456789b1",
 ]);
+const idempotencyKey = "idem_018f1234-5678-4abc-8def-0123456789a1";
 
 function createRepository(overrides = {}) {
   return {
     authorizationMode,
+    requestSafeguardPolicy: REQUEST_SAFEGUARD_POLICY,
     requestStatePolicy: REQUEST_STATE_POLICY,
     async getProfile() { return {}; },
     async listRecords() { return []; },
@@ -60,6 +63,7 @@ test("export accepts only a bounded record-ID list and trusted authentication", 
     method: "POST",
     url: "/v1/tenant-records/export",
     headers: {
+      "idempotency-key": idempotencyKey,
       "x-tenant-id": "tnt_018f1234-5678-7abc-8def-0123456789ff",
       "x-subject-id": "sub_018f1234-5678-7abc-8def-0123456789ff",
     },
@@ -94,6 +98,7 @@ test("membership review accepts one validated subject and no caller-selected ten
   const response = await api.inject({
     method: "POST",
     url: "/v1/admin/membership-reviews",
+    headers: { "idempotency-key": idempotencyKey },
     payload: { subjectId: targetSubjectId },
   });
 
@@ -103,6 +108,7 @@ test("membership review accepts one validated subject and no caller-selected ten
   const injectedTenant = await api.inject({
     method: "POST",
     url: "/v1/admin/membership-reviews",
+    headers: { "idempotency-key": idempotencyKey },
     payload: { subjectId: targetSubjectId, tenantId: authentication.tenantId },
   });
   assert.equal(injectedTenant.statusCode, 400);
@@ -145,7 +151,7 @@ test("sensitive request bodies are capped at four KiB", async (t) => {
   const response = await api.inject({
     method: "POST",
     url: "/v1/admin/membership-reviews",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "idempotency-key": idempotencyKey },
     payload: JSON.stringify({ subjectId: authentication.subjectId, padding: "x".repeat(4_096) }),
   });
   assert.equal(response.statusCode, 413);
@@ -166,7 +172,11 @@ test("authorization denials remain uniform and non-enumerating", async (t) => {
     { url: "/v1/tenant-records/export", payload: { recordIds: [recordIds[0]] } },
     { url: "/v1/admin/membership-reviews", payload: { subjectId: authentication.subjectId } },
   ]) {
-    const response = await api.inject({ method: "POST", ...options });
+    const response = await api.inject({
+      method: "POST",
+      headers: { "idempotency-key": idempotencyKey },
+      ...options,
+    });
     assert.equal(response.statusCode, 403);
     assert.deepEqual(response.json(), { error: { code: "ACCESS_DENIED" } });
     assert.doesNotMatch(response.body, /tenant|subject|record|operation/u);

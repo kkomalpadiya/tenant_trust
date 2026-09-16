@@ -14,11 +14,19 @@ import {
   REQUEST_STATE_POLICY,
   RequestStateUnavailableError,
 } from "./request-state.mjs";
+import {
+  IdempotencyConflictError,
+  REQUEST_SAFEGUARD_POLICY,
+  RequestTimeoutError,
+  SENSITIVE_IDEMPOTENCY_KEY_PATTERN,
+  UnsupportedSessionError,
+  assertRequestTimeoutMilliseconds,
+  assertStatelessMtlsRequest,
+  runWithRequestTimeout,
+} from "./request-safeguards.mjs";
 
 const RECORD_ID_PATTERN = "^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 const SUBJECT_ID_PATTERN = "^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
-const SENSITIVE_BODY_LIMIT_BYTES = 4_096;
-const MAX_EXPORT_RECORDS = 25;
 const ACCESS_DENIED = Object.freeze({ error: Object.freeze({ code: "ACCESS_DENIED" }) });
 const AUTHENTICATION_REQUIRED = Object.freeze({
   error: Object.freeze({ code: "CLIENT_CERTIFICATE_REQUIRED" }),
@@ -28,6 +36,9 @@ const CERTIFICATE_NOT_ACCEPTED = Object.freeze({
 });
 const INVALID_REQUEST = Object.freeze({ error: Object.freeze({ code: "INVALID_REQUEST" }) });
 const REQUEST_TOO_LARGE = Object.freeze({ error: Object.freeze({ code: "REQUEST_TOO_LARGE" }) });
+const IDEMPOTENCY_CONFLICT = Object.freeze({
+  error: Object.freeze({ code: "IDEMPOTENCY_CONFLICT" }),
+});
 const SERVICE_UNAVAILABLE = Object.freeze({ error: Object.freeze({ code: "SERVICE_UNAVAILABLE" }) });
 const REQUEST_ID = /^req_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const CORRELATION_ID = /^cor_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -45,6 +56,9 @@ function failureDecision(error) {
   if (error instanceof GatewayIdentityError) {
     return Object.freeze({ statusCode: 401, reasonCode: "CLIENT_CERTIFICATE_REQUIRED" });
   }
+  if (error instanceof UnsupportedSessionError) {
+    return Object.freeze({ statusCode: 401, reasonCode: "SESSION_CREDENTIAL_UNSUPPORTED" });
+  }
   if (error instanceof CertificateNotAcceptedError) {
     return Object.freeze({ statusCode: 401, reasonCode: "CERTIFICATE_NOT_ACCEPTED" });
   }
@@ -53,6 +67,12 @@ function failureDecision(error) {
   }
   if (error instanceof RequestStateUnavailableError) {
     return Object.freeze({ statusCode: 503, reasonCode: "AUTHORITY_UNAVAILABLE" });
+  }
+  if (error instanceof IdempotencyConflictError) {
+    return Object.freeze({ statusCode: 409, reasonCode: "IDEMPOTENCY_CONFLICT" });
+  }
+  if (error instanceof RequestTimeoutError) {
+    return Object.freeze({ statusCode: 503, reasonCode: "REQUEST_TIMEOUT" });
   }
   return Object.freeze({ statusCode: 503, reasonCode: "INTERNAL_FAILURE" });
 }
@@ -80,6 +100,16 @@ function noQueryParameters() {
   return { type: "object", additionalProperties: false };
 }
 
+function sensitiveRequestHeaders() {
+  return {
+    type: "object",
+    required: ["idempotency-key"],
+    properties: {
+      "idempotency-key": { type: "string", pattern: SENSITIVE_IDEMPOTENCY_KEY_PATTERN },
+    },
+  };
+}
+
 export function createTenantTrustApi({
   identityResolver,
   repository,
@@ -87,6 +117,7 @@ export function createTenantTrustApi({
   requestIdFactory = defaultRequestIdFactory,
   correlationIdFactory = defaultCorrelationIdFactory,
   clock = () => new Date(),
+  requestTimeoutMilliseconds = REQUEST_SAFEGUARD_POLICY.requestTimeoutMilliseconds,
   logger = false,
 } = {}) {
   if (!repository
@@ -106,16 +137,21 @@ export function createTenantTrustApi({
   if (repository.requestStatePolicy !== REQUEST_STATE_POLICY) {
     throw new TypeError("The tenant API repository must declare authoritative per-request state revalidation.");
   }
+  if (repository.requestSafeguardPolicy !== REQUEST_SAFEGUARD_POLICY) {
+    throw new TypeError("The tenant API repository must declare the fixed request safeguard policy.");
+  }
   assertRequestAuditRecorder(requestAuditRecorder);
   if (typeof requestIdFactory !== "function" || typeof correlationIdFactory !== "function") {
     throw new TypeError("Server-side request and correlation ID factories are required.");
   }
   if (typeof clock !== "function") throw new TypeError("A trusted request audit clock is required.");
+  assertRequestTimeoutMilliseconds(requestTimeoutMilliseconds);
 
   const authenticateRequest = createGatewayRequestAuthenticator(identityResolver);
 
   const api = Fastify({
     logger,
+    bodyLimit: REQUEST_SAFEGUARD_POLICY.sensitiveBodyLimitBytes,
     logController: new LogController({ disableRequestLogging: true }),
     ajv: {
       customOptions: {
@@ -133,6 +169,8 @@ export function createTenantTrustApi({
     request[requestAuditContext] = Object.freeze({ requestId, correlationId });
     reply.header("x-request-id", requestId);
     reply.header("x-correlation-id", correlationId);
+    reply.header("cache-control", "no-store");
+    reply.header("pragma", "no-cache");
   });
 
   api.setErrorHandler((error, request, reply) => {
@@ -141,13 +179,18 @@ export function createTenantTrustApi({
       return reply.code(413).send(REQUEST_TOO_LARGE);
     }
     if (error instanceof GatewayIdentityError) return reply.code(401).send(AUTHENTICATION_REQUIRED);
+    if (error instanceof UnsupportedSessionError) return reply.code(401).send(AUTHENTICATION_REQUIRED);
     if (error instanceof CertificateNotAcceptedError) return reply.code(401).send(CERTIFICATE_NOT_ACCEPTED);
     if (error instanceof TenantContextError || error instanceof AccessDeniedError) {
       return reply.code(403).send(ACCESS_DENIED);
     }
+    if (error instanceof IdempotencyConflictError) {
+      return reply.code(409).send(IDEMPOTENCY_CONFLICT);
+    }
     if (error instanceof RequestStateUnavailableError || error instanceof RequestAuditUnavailableError) {
       return reply.code(503).send(SERVICE_UNAVAILABLE);
     }
+    if (error instanceof RequestTimeoutError) return reply.code(503).send(SERVICE_UNAVAILABLE);
     request.log.error({ err: error }, "Tenant API request failed");
     return reply.code(503).send(SERVICE_UNAVAILABLE);
   });
@@ -163,6 +206,7 @@ export function createTenantTrustApi({
       const correlation = request[requestAuditContext];
       let authentication;
       try {
+        assertStatelessMtlsRequest(request.headers);
         authentication = await authenticateRequest(request);
         if (authentication?.source !== "mtls-certificate") {
           throw new GatewayIdentityError("AUTHENTICATION_SOURCE_INVALID");
@@ -216,7 +260,10 @@ export function createTenantTrustApi({
 
       let result;
       try {
-        result = await execute(authentication, request);
+        result = await runWithRequestTimeout(
+          (signal) => execute(authentication, request, signal),
+          requestTimeoutMilliseconds,
+        );
       } catch (error) {
         const failure = failureDecision(error);
         await requestAuditRecorder.record({
@@ -274,7 +321,9 @@ export function createTenantTrustApi({
     resourceType: "tenant-profile",
     routeTemplate: "/v1/profile",
     resourceIdentifier: (_request, authentication) => authentication.subjectId,
-    execute: async (authentication) => ({ profile: await repository.getProfile(authentication) }),
+    execute: async (authentication, _request, signal) => ({
+      profile: await repository.getProfile(authentication, { signal }),
+    }),
   }));
 
   api.get("/v1/tenant-records", {
@@ -284,7 +333,9 @@ export function createTenantTrustApi({
     resourceType: "tenant-records",
     routeTemplate: "/v1/tenant-records",
     resourceIdentifier: (_request, authentication) => authentication.tenantId,
-    execute: async (authentication) => ({ records: await repository.listRecords(authentication) }),
+    execute: async (authentication, _request, signal) => ({
+      records: await repository.listRecords(authentication, { signal }),
+    }),
   }));
 
   api.get("/v1/tenant-records/:recordId", {
@@ -304,14 +355,15 @@ export function createTenantTrustApi({
     resourceType: "tenant-record",
     routeTemplate: "/v1/tenant-records/:recordId",
     resourceIdentifier: (request) => request.params.recordId,
-    execute: async (authentication, request) => ({
-      record: await repository.getRecord(authentication, request.params.recordId),
+    execute: async (authentication, request, signal) => ({
+      record: await repository.getRecord(authentication, request.params.recordId, { signal }),
     }),
   }));
 
   api.post("/v1/tenant-records/export", {
-    bodyLimit: SENSITIVE_BODY_LIMIT_BYTES,
+    bodyLimit: REQUEST_SAFEGUARD_POLICY.sensitiveBodyLimitBytes,
     schema: {
+      headers: sensitiveRequestHeaders(),
       querystring: {
         type: "object",
         additionalProperties: false,
@@ -324,7 +376,7 @@ export function createTenantTrustApi({
           recordIds: {
             type: "array",
             minItems: 1,
-            maxItems: MAX_EXPORT_RECORDS,
+            maxItems: REQUEST_SAFEGUARD_POLICY.maximumExportRecords,
             uniqueItems: true,
             items: { type: "string", pattern: RECORD_ID_PATTERN },
           },
@@ -336,15 +388,17 @@ export function createTenantTrustApi({
     resourceType: "tenant-record-export",
     routeTemplate: "/v1/tenant-records/export",
     resourceIdentifier: (request) => [...request.body.recordIds].sort().join(","),
-    execute: async (authentication, request) => repository.exportRecords(
+    execute: async (authentication, request, signal) => repository.exportRecords(
       authentication,
       request.body.recordIds,
+      { idempotencyKey: request.headers["idempotency-key"], signal },
     ),
   }));
 
   api.post("/v1/admin/membership-reviews", {
-    bodyLimit: SENSITIVE_BODY_LIMIT_BYTES,
+    bodyLimit: REQUEST_SAFEGUARD_POLICY.sensitiveBodyLimitBytes,
     schema: {
+      headers: sensitiveRequestHeaders(),
       querystring: {
         type: "object",
         additionalProperties: false,
@@ -363,9 +417,10 @@ export function createTenantTrustApi({
     resourceType: "tenant-membership",
     routeTemplate: "/v1/admin/membership-reviews",
     resourceIdentifier: (request) => request.body.subjectId,
-    execute: async (authentication, request) => repository.reviewMembership(
+    execute: async (authentication, request, signal) => repository.reviewMembership(
       authentication,
       request.body.subjectId,
+      { idempotencyKey: request.headers["idempotency-key"], signal },
     ),
   }));
 
