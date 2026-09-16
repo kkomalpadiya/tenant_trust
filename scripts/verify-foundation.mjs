@@ -70,16 +70,8 @@ for (const service of services) await waitForHealthy(service);
 
 runNpm(["test"], "repository tests");
 run(process.execPath, ["scripts/verify-certificate-lifecycle.mjs", "--skip-unit-tests"], "Phase 3 certificate lifecycle verification");
-run(process.execPath, ["scripts/verify-mtls-gateway.mjs"], "mTLS gateway spoofing and bypass verification");
 run(process.execPath, ["scripts/verify-tenant-isolation-phase.mjs"], "tenant isolation phase verification");
-run(process.execPath, ["scripts/verify-profile-record-api.mjs"], "profile and tenant-record API verification");
-run(process.execPath, ["scripts/verify-sensitive-demo-operations.mjs"], "sensitive demonstration operation verification");
-run(process.execPath, ["scripts/verify-pki-rbac-baseline.mjs"], "PKI plus RBAC baseline verification");
-run(process.execPath, ["scripts/verify-request-state-revalidation.mjs"], "per-request certificate and tenant state verification");
-run(process.execPath, ["scripts/verify-api-request-audit.mjs"], "API request audit schema verification");
-run(process.execPath, ["scripts/verify-request-outcome-audit.mjs"], "request outcome and correlation audit verification");
-run(process.execPath, ["scripts/verify-api-request-safeguards.mjs"], "API request safeguard schema verification");
-run(process.execPath, ["scripts/verify-request-safeguards.mjs"], "session, timeout and replay safeguard verification");
+run(process.execPath, ["scripts/verify-protected-saas-baseline.mjs", "--skip-unit-tests"], "Phase 4 protected SaaS baseline verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
 run(process.execPath, ["scripts/verify-event-delivery.mjs"], "event delivery verification");

@@ -29,7 +29,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `chaincode/audit/` | Audit commitment contract source and contract tests |
 | `tests/` | Integration and end-to-end tests, synthetic fixtures and isolation checks |
 | `evaluation/` | Baseline configurations, reproducible workloads and measurement scripts |
-| `scripts/` | Developer setup, verification and operational scripts |
+| `scripts/` | Developer setup, operational scripts and fail-fast Phase 2, Phase 3 and Phase 4 verification gates |
 | `docs/` | Scope, architecture decisions, API documentation, operational procedures and evaluation conclusions |
 | `runtime/` | Ignored local volumes, generated identities and other service state |
 
