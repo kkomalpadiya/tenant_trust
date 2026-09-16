@@ -10,3 +10,11 @@ export {
   assertPresentedCertificate,
   createRequestStateRevalidator,
 } from "./request-state.mjs";
+export {
+  REQUEST_AUDIT_POLICY,
+  RequestAuditUnavailableError,
+  assertRequestAuditRecorder,
+  createPostgresRequestAuditRecorder,
+  createRequestAuditRecorder,
+  hashAuditResourceIdentifier,
+} from "./request-audit.mjs";

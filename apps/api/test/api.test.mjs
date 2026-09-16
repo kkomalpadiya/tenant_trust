@@ -8,7 +8,8 @@ import {
   REQUEST_STATE_POLICY,
   RequestStateUnavailableError,
   createGatewayRequestAuthenticator,
-  createTenantTrustApi,
+  createRequestAuditRecorder,
+  createTenantTrustApi as createTenantTrustApiWithAudit,
 } from "../src/index.mjs";
 
 const alphaAuthentication = Object.freeze({
@@ -18,6 +19,11 @@ const alphaAuthentication = Object.freeze({
   subjectId: "sub_018f1234-5678-7abc-8def-0123456789ab",
 });
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
+const requestAuditRecorder = createRequestAuditRecorder({ async write() {} });
+
+function createTenantTrustApi(options) {
+  return createTenantTrustApiWithAudit({ requestAuditRecorder, ...options });
+}
 
 function createRepository(overrides = {}) {
   return {

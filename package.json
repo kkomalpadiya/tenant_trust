@@ -48,6 +48,7 @@
     "sensitive-operations:verify": "node scripts/verify-sensitive-demo-operations.mjs",
     "pki-rbac-baseline:verify": "node scripts/verify-pki-rbac-baseline.mjs",
     "request-state:verify": "node scripts/verify-request-state-revalidation.mjs",
+    "request-outcomes:verify": "npm run test:api && node scripts/verify-api-request-audit.mjs && node scripts/verify-request-outcome-audit.mjs",
     "role-action-matrix:verify": "npm run test:authorization",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",

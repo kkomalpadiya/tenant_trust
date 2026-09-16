@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
 import { createTenantTrustApi, createPostgresTenantRepository } from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
+import { createVerificationRequestAuditRecorder } from "./lib/request-audit-fixtures.mjs";
 import { createLiveRequestStateFixture } from "./lib/request-state-fixtures.mjs";
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
@@ -23,6 +24,7 @@ let currentIdentity = identities.alphaMember;
 const api = createTenantTrustApi({
   identityResolver: { resolve: async () => currentIdentity },
   repository: createPostgresTenantRepository({ pool, authorizationMode }),
+  requestAuditRecorder: createVerificationRequestAuditRecorder(),
 });
 
 async function request(identity, options) {

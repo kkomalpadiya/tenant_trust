@@ -10,7 +10,7 @@ The mode is an evaluation baseline, not a claim that certificate possession alon
 
 Application composition selects the exact closed identifier `pki-rbac-baseline-v1` through `selectAuthorizationMode`. The returned configuration is immutable and internally branded. A missing mode, unsupported identifier or copied lookalike object prevents API/repository construction.
 
-Every API repository exposes its selected branded mode, and the Fastify application validates that declaration before registering routes. HTTP bodies and query strings cannot select or override the mode. Profile and record routes reject all query parameters before authentication, while the existing sensitive schemas reject their query controls and extra body fields.
+Every API repository exposes its selected branded mode, and the Fastify application validates that declaration before registering routes. The application also requires the branded fail-closed request-audit recorder, so each access outcome identifies this exact mode. HTTP bodies, query strings and correlation headers cannot select or override the mode or audit identity. Profile and record routes reject all query parameters before authentication, while the existing sensitive schemas reject their query controls and extra body fields.
 
 ## Decision boundary
 
@@ -23,7 +23,7 @@ For every operation, the baseline evaluator requires:
 
 An ordinary matrix `allow` permits the operation to continue to its explicit tenant-qualified query under forced RLS. A matrix `deny` remains denial. A `requires-controls` result is not converted into allow: export and tenant administration may proceed only when the trusted internal sensitive-operation authorizer separately returns exact boolean `true`. Missing additional controls remain a uniform denial.
 
-The decision records `adaptiveTrustUsed: false`, the fixed certificate policy, the fixed role-policy version and the immutable matrix row. No trust or evidence parameter exists in the evaluator signature, so this mode cannot silently consume adaptive inputs.
+The decision records `adaptiveTrustUsed: false`, the fixed certificate policy, the fixed role-policy version and the immutable matrix row. The sanitized access outcome stores only the mode ID rather than a caller-provided or copied decision object. No trust or evidence parameter exists in the evaluator signature, so this mode cannot silently consume adaptive inputs.
 
 ## Verification
 

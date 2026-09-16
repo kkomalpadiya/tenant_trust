@@ -76,6 +76,8 @@ run(process.execPath, ["scripts/verify-profile-record-api.mjs"], "profile and te
 run(process.execPath, ["scripts/verify-sensitive-demo-operations.mjs"], "sensitive demonstration operation verification");
 run(process.execPath, ["scripts/verify-pki-rbac-baseline.mjs"], "PKI plus RBAC baseline verification");
 run(process.execPath, ["scripts/verify-request-state-revalidation.mjs"], "per-request certificate and tenant state verification");
+run(process.execPath, ["scripts/verify-api-request-audit.mjs"], "API request audit schema verification");
+run(process.execPath, ["scripts/verify-request-outcome-audit.mjs"], "request outcome and correlation audit verification");
 compose(["--profile", "tools", "run", "--rm", "opa-test"], "OPA policy tests");
 run(process.execPath, ["scripts/check-core-services.mjs"], "core service checks");
 run(process.execPath, ["scripts/verify-event-delivery.mjs"], "event delivery verification");

@@ -7,6 +7,7 @@ import {
 } from "@tenant-trust/authorization";
 import { createPostgresTenantRepository, createTenantTrustApi } from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
+import { createVerificationRequestAuditRecorder } from "./lib/request-audit-fixtures.mjs";
 import { createLiveRequestStateFixture } from "./lib/request-state-fixtures.mjs";
 
 const records = Object.freeze({
@@ -50,6 +51,7 @@ const api = createTenantTrustApi({
     authorizationMode,
     sensitiveOperationAuthorizer: verificationControlAuthorizer,
   }),
+  requestAuditRecorder: createVerificationRequestAuditRecorder(),
 });
 
 async function request(identity, options) {

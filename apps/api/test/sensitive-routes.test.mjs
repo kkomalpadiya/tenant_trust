@@ -1,9 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
-import { AccessDeniedError, REQUEST_STATE_POLICY, createTenantTrustApi } from "../src/index.mjs";
+import {
+  AccessDeniedError,
+  REQUEST_STATE_POLICY,
+  createRequestAuditRecorder,
+  createTenantTrustApi as createTenantTrustApiWithAudit,
+} from "../src/index.mjs";
 
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
+const requestAuditRecorder = createRequestAuditRecorder({ async write() {} });
+
+function createTenantTrustApi(options) {
+  return createTenantTrustApiWithAudit({ requestAuditRecorder, ...options });
+}
 
 const authentication = Object.freeze({
   source: "mtls-certificate",

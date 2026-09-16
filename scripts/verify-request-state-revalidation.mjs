@@ -7,6 +7,7 @@ import {
   createTenantTrustApi,
 } from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
+import { createVerificationRequestAuditRecorder } from "./lib/request-audit-fixtures.mjs";
 import { createLiveRequestStateFixture } from "./lib/request-state-fixtures.mjs";
 
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
@@ -56,6 +57,7 @@ try {
       },
     },
     repository: createPostgresTenantRepository({ pool, authorizationMode }),
+    requestAuditRecorder: createVerificationRequestAuditRecorder(),
   });
 
   const backendBefore = await pool.query("SELECT pg_backend_pid() AS pid");

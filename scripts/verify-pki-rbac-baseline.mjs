@@ -7,6 +7,7 @@ import {
 } from "@tenant-trust/authorization";
 import { createPostgresTenantRepository, createTenantTrustApi } from "@tenant-trust/api";
 import { environment } from "./lib/foundation-context.mjs";
+import { createVerificationRequestAuditRecorder } from "./lib/request-audit-fixtures.mjs";
 import { createLiveRequestStateFixture } from "./lib/request-state-fixtures.mjs";
 
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
@@ -70,6 +71,7 @@ const api = createTenantTrustApi({
     },
   },
   repository,
+  requestAuditRecorder: createVerificationRequestAuditRecorder(),
 });
 
 async function request(identity, options) {
@@ -134,12 +136,13 @@ try {
     { ...identities.alphaMember, source: "trusted-session" },
     { method: "GET", url: "/v1/profile" },
   );
-  assert.equal(sessionAttempt.statusCode, 403);
-  assert.deepEqual(sessionAttempt.json(), { error: { code: "ACCESS_DENIED" } });
+  assert.equal(sessionAttempt.statusCode, 401);
+  assert.deepEqual(sessionAttempt.json(), { error: { code: "CLIENT_CERTIFICATE_REQUIRED" } });
 
   defaultDenyApi = createTenantTrustApi({
     identityResolver: { resolve: async () => identities.alphaAdmin },
     repository: createPostgresTenantRepository({ pool, authorizationMode }),
+    requestAuditRecorder: createVerificationRequestAuditRecorder(),
   });
   const missingControls = await defaultDenyApi.inject({
     method: "POST",
