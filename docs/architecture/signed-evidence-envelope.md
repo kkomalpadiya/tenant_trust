@@ -62,4 +62,4 @@ Raw payloads stay off-chain and are not published on the ordinary event stream. 
 
 Run `npm run evidence-envelope:verify`. The tests compile the schema, accept all supported evidence types and reject missing identity, freshness, ordering or signature fields; malformed identifiers and timestamps; weak or ambiguous signature metadata; invalid sequence/nonce values; empty payloads; unknown fields and unsupported evidence types.
 
-T5.1 defines the envelope. T5.2 implements source enrollment and key history. T5.3 provides deterministic signed synthetic fixtures for all five evidence types. T5.4 and T5.5 will implement cryptographic verification, trusted tenant/subject binding, freshness, replay and ordering checks.
+T5.1 defines the envelope. T5.2 implements source enrollment and key history. T5.3 provides deterministic signed synthetic fixtures for all five evidence types. T5.4 implements the size-bounded endpoint, exact active tenant/source/key/subject resolution, canonical digest reconstruction and Ed25519 verification. T5.5 will add freshness, replay and ordering checks. See [Signed evidence ingestion](evidence-ingestion.md).

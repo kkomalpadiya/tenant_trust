@@ -77,6 +77,10 @@ npm run certificate-revocation:verify
 npm run certificate-events:verify
 npm run pki-recovery:verify
 npm run certificate-lifecycle:verify
+npm run evidence-envelope:verify
+npm run evidence-sources:verify
+npm run evidence-simulators:verify
+npm run evidence-ingestion:verify
 npm run mtls-gateway:verify
 npm run gateway-spoofing:verify
 npm run profile-record-api:verify
@@ -143,6 +147,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run evidence-sources:verify` is the T5.2 evidence-source enrollment gate. It proves that only an authoritative tenant administrator can activate a pre-authorized source, that Ed25519 key material and fingerprints are validated, and that rotation, revocation and post-revocation recovery append key epochs without destroying historical verification material. The live PostgreSQL checks roll back their changes. See [Evidence source enrollment and key registry](architecture/evidence-source-key-registry.md).
 
 `npm run evidence-simulators:verify` is the T5.3 deterministic fixture gate. It generates identity, device, behaviour, certificate and compliance envelopes twice, validates the shared contract, recomputes every digest, verifies each Ed25519 signature and confirms tenant separation plus explicit synthetic posture/compliance markers. Use `npm run evidence-simulators:generate -- --tenant alpha` to print a fixture set. See [Deterministic evidence simulators](architecture/deterministic-evidence-simulators.md).
+
+`npm run evidence-ingestion:verify` is the T5.4 ingestion endpoint gate. It proves schema and byte limits precede authoritative lookup, all five fixture types verify against their exact enrolled key, tampering and key substitution fail, the source-authenticated route does not invoke human mTLS identity resolution, and public denials remain bounded. Its rolled-back PostgreSQL check proves exact active tenant/source/key/subject resolution, cross-binding invisibility and revoked-key denial. See [Signed evidence ingestion](architecture/evidence-ingestion.md).
 
 `npm run sensitive-operations:verify` is the T4.5 endpoint gate. It proves tenant members cannot reach export or administration data, tenant administrators can exercise an explicitly authorized verification path, exports are limited and all-or-nothing, Alpha cannot export Beta records or review a Beta subject, caller-supplied tenant controls are rejected, and successful operations receive unique server-generated IDs. The normal repository default remains denial until a trusted internal authorizer is configured. See [Sensitive export and administration demonstration operations](architecture/sensitive-demo-operations.md).
 

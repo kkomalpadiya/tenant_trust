@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import Fastify, { LogController } from "fastify";
 import { AuthorizationError, assertAuthorizationMode } from "@tenant-trust/authorization";
+import {
+  EVIDENCE_INGESTION_POLICY,
+  EvidenceIngestionUnavailableError,
+  EvidenceRejectedError,
+  assertEvidenceIngestionService,
+} from "@tenant-trust/evidence";
 import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
 import { TenantContextError } from "@tenant-trust/tenant-context";
 import { AccessDeniedError } from "./repository.mjs";
@@ -36,6 +42,7 @@ const CERTIFICATE_NOT_ACCEPTED = Object.freeze({
 });
 const INVALID_REQUEST = Object.freeze({ error: Object.freeze({ code: "INVALID_REQUEST" }) });
 const REQUEST_TOO_LARGE = Object.freeze({ error: Object.freeze({ code: "REQUEST_TOO_LARGE" }) });
+const EVIDENCE_REJECTED = Object.freeze({ error: Object.freeze({ code: "EVIDENCE_REJECTED" }) });
 const IDEMPOTENCY_CONFLICT = Object.freeze({
   error: Object.freeze({ code: "IDEMPOTENCY_CONFLICT" }),
 });
@@ -118,6 +125,7 @@ export function createTenantTrustApi({
   correlationIdFactory = defaultCorrelationIdFactory,
   clock = () => new Date(),
   requestTimeoutMilliseconds = REQUEST_SAFEGUARD_POLICY.requestTimeoutMilliseconds,
+  evidenceIngestionService,
   logger = false,
 } = {}) {
   if (!repository
@@ -146,6 +154,7 @@ export function createTenantTrustApi({
   }
   if (typeof clock !== "function") throw new TypeError("A trusted request audit clock is required.");
   assertRequestTimeoutMilliseconds(requestTimeoutMilliseconds);
+  if (evidenceIngestionService !== undefined) assertEvidenceIngestionService(evidenceIngestionService);
 
   const authenticateRequest = createGatewayRequestAuthenticator(identityResolver);
 
@@ -177,6 +186,18 @@ export function createTenantTrustApi({
     if (error.validation) return reply.code(400).send(INVALID_REQUEST);
     if (error.code === "FST_ERR_CTP_BODY_TOO_LARGE") {
       return reply.code(413).send(REQUEST_TOO_LARGE);
+    }
+    if (error instanceof EvidenceRejectedError) {
+      if (error.reasonCode === "EVIDENCE_SCHEMA_INVALID") {
+        return reply.code(400).send(INVALID_REQUEST);
+      }
+      if (error.reasonCode === "EVIDENCE_TOO_LARGE" || error.reasonCode === "EVIDENCE_SIZE_INVALID") {
+        return reply.code(413).send(REQUEST_TOO_LARGE);
+      }
+      return reply.code(422).send(EVIDENCE_REJECTED);
+    }
+    if (error instanceof EvidenceIngestionUnavailableError) {
+      return reply.code(503).send(SERVICE_UNAVAILABLE);
     }
     if (error instanceof GatewayIdentityError) return reply.code(401).send(AUTHENTICATION_REQUIRED);
     if (error instanceof UnsupportedSessionError) return reply.code(401).send(AUTHENTICATION_REQUIRED);
@@ -423,6 +444,23 @@ export function createTenantTrustApi({
       { idempotencyKey: request.headers["idempotency-key"], signal },
     ),
   }));
+
+  if (evidenceIngestionService) {
+    api.post(EVIDENCE_INGESTION_POLICY.endpoint, {
+      bodyLimit: EVIDENCE_INGESTION_POLICY.maximumEnvelopeBytes,
+      schema: {
+        querystring: noQueryParameters(),
+        body: { type: "object" },
+      },
+    }, async (request, reply) => {
+      const encodedByteLength = Buffer.byteLength(JSON.stringify(request.body), "utf8");
+      const receipt = await evidenceIngestionService.ingest({
+        envelope: request.body,
+        encodedByteLength,
+      });
+      return reply.code(202).send({ evidence: receipt });
+    });
+  }
 
   return api;
 }

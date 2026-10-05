@@ -46,6 +46,7 @@
     "evidence-sources:verify": "npm run test:evidence-sources && node scripts/verify-evidence-source-key-registry.mjs",
     "evidence-simulators:verify": "npm run test:evidence-simulators && node scripts/verify-deterministic-evidence-simulators.mjs",
     "evidence-simulators:generate": "node packages/evidence-simulators/src/cli.mjs",
+    "evidence-ingestion:verify": "npm run test:evidence && npm run test:api && node scripts/verify-evidence-ingestion.mjs",
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
     "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
     "profile-record-api:verify": "node scripts/verify-profile-record-api.mjs",
@@ -71,9 +72,10 @@
     "test:certificate-events": "npm test --workspace @tenant-trust/certificate-events",
     "test:evidence-sources": "npm test --workspace @tenant-trust/evidence-sources",
     "test:evidence-simulators": "npm test --workspace @tenant-trust/evidence-simulators",
+    "test:evidence": "npm test --workspace @tenant-trust/evidence",
     "test:gateway-identity": "npm test --workspace @tenant-trust/gateway-identity",
     "test:api": "npm test --workspace @tenant-trust/api",
-    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:evidence-sources && npm run test:evidence-simulators && npm run test:gateway-identity && npm run test:api && npm run test:review-demo"
+    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:evidence-sources && npm run test:evidence-simulators && npm run test:evidence && npm run test:gateway-identity && npm run test:api && npm run test:review-demo"
   },
   "engines": {
     "node": "24.20.0",

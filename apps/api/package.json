@@ -10,6 +10,7 @@
   "dependencies": {
     "@tenant-trust/authorization": "0.1.0",
     "@tenant-trust/certificate-status": "0.1.0",
+    "@tenant-trust/evidence": "0.1.0",
     "@tenant-trust/gateway-identity": "0.1.0",
     "@tenant-trust/tenant-context": "0.1.0",
     "fastify": "5.12.3",

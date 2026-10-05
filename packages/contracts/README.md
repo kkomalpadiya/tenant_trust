@@ -4,7 +4,7 @@ This package owns versioned JSON Schema contracts for security-relevant events a
 
 `schemas/event-registry.json` maps every supported event name to its validator schema. Producers and consumers use this registry rather than inferring a schema from string parsing.
 
-`schemas/evidence/signed-evidence-envelope.schema.json` defines the source-to-ingestion contract for raw evidence observations. It binds the tenant, subject, source, immutable event ID, observation and expiry times, source sequence, nonce, synthetic marker and evidence payload to an Ed25519 signature over deterministic canonical bytes. The ingestion outcome events continue to carry only an off-chain content hash and bounded metadata. See [Signed evidence envelope](../../docs/architecture/signed-evidence-envelope.md).
+`schemas/evidence/signed-evidence-envelope.schema.json` defines the source-to-ingestion contract for raw evidence observations. It binds the tenant, subject, source, immutable event ID, observation and expiry times, source sequence, nonce, synthetic marker and evidence payload to an Ed25519 signature over deterministic canonical bytes. The T5.4 endpoint validates this contract, resolves the exact active enrollment and verifies the canonical digest/signature before returning a bounded receipt. The ingestion outcome events continue to carry only an off-chain content hash and bounded metadata. See [Signed evidence envelope](../../docs/architecture/signed-evidence-envelope.md) and [Signed evidence ingestion](../../docs/architecture/evidence-ingestion.md).
 
 `schemas/pki/certificate-request.schema.json` defines the normalized certificate issue/renew request, and `schemas/pki/certificate-identity-profile.json` defines the X.509 fields the PKI service derives from trusted tenant and subject identity. The raw caller cannot choose the issuer, SAN, subject, key usage, serial or validity timestamps. See [Certificate identity profile and request contract](../../docs/architecture/certificate-identity-profile.md).
 
@@ -86,4 +86,4 @@ Run from the repository root:
 npm test
 ```
 
-The tests compile every schema, validate one representative event for each domain, reject malformed IDs and timestamps, enforce bounded scores and verify the sample causal chain. Passing schema tests does not authenticate an event; signature verification and trusted transport belong to the evidence and messaging tasks.
+The tests compile every schema, validate one representative event for each domain, reject malformed IDs and timestamps, enforce bounded scores and verify the sample causal chain. Schema validity alone does not authenticate an event; `@tenant-trust/evidence` performs the authoritative binding, digest and signature checks.
