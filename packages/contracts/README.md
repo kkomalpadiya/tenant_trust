@@ -4,6 +4,8 @@ This package owns versioned JSON Schema contracts for security-relevant events a
 
 `schemas/event-registry.json` maps every supported event name to its validator schema. Producers and consumers use this registry rather than inferring a schema from string parsing.
 
+`schemas/evidence/signed-evidence-envelope.schema.json` defines the source-to-ingestion contract for raw evidence observations. It binds the tenant, subject, source, immutable event ID, observation and expiry times, source sequence, nonce, synthetic marker and evidence payload to an Ed25519 signature over deterministic canonical bytes. The ingestion outcome events continue to carry only an off-chain content hash and bounded metadata. See [Signed evidence envelope](../../docs/architecture/signed-evidence-envelope.md).
+
 `schemas/pki/certificate-request.schema.json` defines the normalized certificate issue/renew request, and `schemas/pki/certificate-identity-profile.json` defines the X.509 fields the PKI service derives from trusted tenant and subject identity. The raw caller cannot choose the issuer, SAN, subject, key usage, serial or validity timestamps. See [Certificate identity profile and request contract](../../docs/architecture/certificate-identity-profile.md).
 
 `@tenant-trust/certificate-issuance` implements issue and renewal against these contracts. It derives trusted fields, authorizes the target subject, resolves the tenant issuer, verifies the signed leaf and enforces fresh-key renewal before `@tenant-trust/certificate-inventory` assigns durable certificate, correlation, renewal and supersession event identities.
@@ -39,7 +41,7 @@ The command/API boundary creates an `idempotencyKey` from stable operation input
 
 Every consumer records `(consumerName, eventId)` before applying an effect in the same durable transaction where possible. A repeated `eventId` with the same canonical payload is acknowledged without a second effect. The same `eventId` or scoped idempotency key with different canonical content is a conflict that must be rejected and audited. Delivery retries never create a new `eventId`.
 
-Canonical content and hashing rules will be finalized with the audit contract. Producers must not hash ordinary `JSON.stringify` output and assume cross-service stability.
+The signed-evidence boundary uses the `tenant-trust-evidence-json-v1` profile defined in [Signed evidence envelope](../../docs/architecture/signed-evidence-envelope.md): the unsigned envelope is serialized with RFC 8785, hashed with SHA-256 and signed with Ed25519. Other event domains must not assume that ordinary `JSON.stringify` output is a stable signing or audit representation.
 
 ## Time and ordering
 

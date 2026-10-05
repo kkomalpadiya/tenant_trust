@@ -42,6 +42,7 @@
     "pki:restore": "node scripts/pki-recovery.mjs restore",
     "pki-recovery:verify": "node scripts/verify-pki-recovery.mjs",
     "certificate-lifecycle:verify": "node scripts/verify-certificate-lifecycle.mjs",
+    "evidence-envelope:verify": "node --test packages/contracts/test/signed-evidence-envelope.test.mjs",
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
     "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
     "profile-record-api:verify": "node scripts/verify-profile-record-api.mjs",
