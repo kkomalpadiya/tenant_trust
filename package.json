@@ -51,6 +51,8 @@
     "request-outcomes:verify": "npm run test:api && node scripts/verify-api-request-audit.mjs && node scripts/verify-request-outcome-audit.mjs",
     "request-safeguards:verify": "npm run test:api && node scripts/verify-api-request-safeguards.mjs && node scripts/verify-request-safeguards.mjs",
     "protected-saas:verify": "node scripts/verify-protected-saas-baseline.mjs",
+    "demo:review": "node apps/review-demo/server.mjs",
+    "test:review-demo": "node --test apps/review-demo/test/*.test.mjs",
     "role-action-matrix:verify": "npm run test:authorization",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
@@ -65,7 +67,7 @@
     "test:certificate-events": "npm test --workspace @tenant-trust/certificate-events",
     "test:gateway-identity": "npm test --workspace @tenant-trust/gateway-identity",
     "test:api": "npm test --workspace @tenant-trust/api",
-    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:gateway-identity && npm run test:api"
+    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:gateway-identity && npm run test:api && npm run test:review-demo"
   },
   "engines": {
     "node": "24.20.0",

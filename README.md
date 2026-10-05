@@ -55,6 +55,10 @@ The repository contains the initial scope, repository design, selected technolog
 
 Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run tenant-isolation:verify` for the Phase 2 gate, `npm run certificate-lifecycle:verify` for the Phase 3 gate and `npm run protected-saas:verify` for the complete Phase 4 gate. The individual gateway, protected API, role/action, sensitive-operation, request-state, audit and safeguard commands remain available for diagnosis. Run `npm run foundation:check` for the complete foundation and `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
 
+## Review console
+
+Run `npm run demo:review` and open `http://127.0.0.1:4173` for a temporary, read-only presentation UI covering the implemented Phase 1-4 boundaries. The console uses deterministic synthetic tenants and calls the repository's real tenant-context and authorization modules for access decisions. Infrastructure-heavy mTLS, revocation and gateway checks are replayed as labelled review scenarios; the console never loads private keys or production credentials.
+
 ## Planned infrastructure
 
 The application uses TypeScript on Node.js 24 LTS, Fastify for the API and React with Vite for the dashboard. PostgreSQL holds durable application state, Redis holds short-lived runtime state, NATS delivers events, step-ca provides certificate services, OPA makes policy decisions and Hyperledger Fabric records audit commitments. Docker Desktop with WSL2 runs Linux services locally. See the technology stack document for version targets and component bootstrap boundaries.

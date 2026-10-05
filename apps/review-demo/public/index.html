@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Tenant Trust implementation review console">
+    <title>Tenant Trust · Review Console</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <a class="brand" href="#overview" aria-label="Tenant Trust overview">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 42 48" role="img">
+              <path d="M21 2 39 9v13c0 11-7.4 20.5-18 24C10.4 42.5 3 33 3 22V9L21 2Z" fill="currentColor" opacity=".18"/>
+              <path d="m13 24 5 5 11-12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>
+            <strong>Tenant Trust</strong>
+            <small>Review console</small>
+          </span>
+        </a>
+
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" data-view="overview">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"/></svg>
+            Overview
+          </button>
+          <button class="nav-item" type="button" data-view="records">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm1 4h12V6H6v2Zm0 4h5v-2H6v2Zm0 4h8v-2H6v2Z"/></svg>
+            Tenant data
+          </button>
+          <button class="nav-item" type="button" data-view="lab">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v2l-1 1v4.3l4.6 7.1A2.3 2.3 0 0 1 16.7 21H7.3a2.3 2.3 0 0 1-1.9-3.6l4.6-7.1V6L9 5V3Zm2.7 8.4-2.2 3.4h5l-2.2-3.4h-.6Z"/></svg>
+            Access lab
+          </button>
+          <button class="nav-item" type="button" data-view="audit">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v2h2a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2h2V3Zm2 4h6V5H9v2Zm-2 4v2h10v-2H7Zm0 4v2h7v-2H7Z"/></svg>
+            Audit trail
+            <span class="nav-count" id="audit-count">0</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-card">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          <div>
+            <strong>Phase 4 verified</strong>
+            <span>Protected SaaS baseline</span>
+          </div>
+        </div>
+
+        <div class="sidebar-foot">
+          <span>Local review build</span>
+          <span>Private keys never loaded</span>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="topbar-kicker">Implementation review</p>
+            <h1 id="page-title">Security overview</h1>
+          </div>
+          <div class="topbar-actions">
+            <div class="environment-badge"><span></span> Read-only review environment</div>
+            <label class="persona-select">
+              <span class="sr-only">Active review persona</span>
+              <span class="avatar" id="persona-avatar">AM</span>
+              <span class="persona-copy">
+                <strong id="persona-name">Alice Morgan</strong>
+                <small id="persona-role">Tenant member · Tenant Alpha</small>
+              </span>
+              <select id="persona-picker" aria-label="Switch review persona"></select>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5H7Z"/></svg>
+            </label>
+          </div>
+        </header>
+
+        <div class="content">
+          <section class="view active" id="view-overview" aria-labelledby="page-title">
+            <div class="intro-row">
+              <div>
+                <p class="eyebrow">Certificate-authenticated session</p>
+                <h2>Good morning, <span id="first-name">Alice</span>.</h2>
+                <p>Your identity is bound to <strong id="intro-tenant">Tenant Alpha</strong>. Every request is rechecked against current certificate, tenant and membership state.</p>
+              </div>
+              <button class="button button-primary" type="button" data-open-lab>
+                Run a boundary check
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 5 7 7-7 7-1.4-1.4 4.6-4.6H4v-2h12.2l-4.6-4.6L13 5Z"/></svg>
+              </button>
+            </div>
+
+            <div class="metric-grid" id="metric-grid"></div>
+
+            <div class="overview-grid">
+              <article class="card certificate-card">
+                <div class="card-head">
+                  <div>
+                    <p class="eyebrow">Active credential</p>
+                    <h3>Certificate identity</h3>
+                  </div>
+                  <span class="status-pill success"><span></span> Verified</span>
+                </div>
+                <div class="certificate-main">
+                  <div class="certificate-shield" aria-hidden="true">
+                    <svg viewBox="0 0 42 48"><path d="M21 2 39 9v13c0 11-7.4 20.5-18 24C10.4 42.5 3 33 3 22V9L21 2Z" fill="currentColor" opacity=".15"/><path d="m13 24 5 5 11-12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div>
+                    <strong id="certificate-subject">Alice Morgan</strong>
+                    <span id="certificate-issuer">Tenant Alpha Intermediate CA</span>
+                  </div>
+                </div>
+                <dl class="detail-grid">
+                  <div><dt>Serial</dt><dd id="certificate-serial">—</dd></div>
+                  <div><dt>Expires</dt><dd id="certificate-expiry">—</dd></div>
+                  <div><dt>Fingerprint</dt><dd id="certificate-fingerprint">—</dd></div>
+                  <div><dt>Auth source</dt><dd>mTLS certificate</dd></div>
+                </dl>
+                <div class="certificate-note">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 1 4 12.7V20l-4 2-4-2v-5.3A7 7 0 0 1 12 2Zm0 2a5 5 0 0 0-2.6 9.3l.6.3v5.2l2 1 2-1v-5.2l.6-.3A5 5 0 0 0 12 4Z"/></svg>
+                  Identity was resolved from the certificate, never from browser-controlled tenant headers.
+                </div>
+              </article>
+
+              <article class="card boundary-card">
+                <div class="card-head">
+                  <div>
+                    <p class="eyebrow">Request path</p>
+                    <h3>Trust boundary</h3>
+                  </div>
+                  <span class="plain-meta">Rechecked per request</span>
+                </div>
+                <div class="boundary-flow">
+                  <div class="flow-step complete">
+                    <span class="flow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.4 8 11 4.6-1.6 8-5.9 8-11V5l-8-3Zm-1 14-3.5-3.5 1.4-1.4 2.1 2.1 4.5-4.5 1.4 1.4L11 16Z"/></svg></span>
+                    <div><strong>mTLS gateway</strong><small>Chain, issuer and client usage verified</small></div>
+                    <span class="flow-status">01</span>
+                  </div>
+                  <div class="flow-line"></div>
+                  <div class="flow-step complete">
+                    <span class="flow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm-7 16a7 7 0 0 1 14 0v1H5v-1Z"/></svg></span>
+                    <div><strong>Tenant context</strong><small id="boundary-context">Membership and role versions are current</small></div>
+                    <span class="flow-status">02</span>
+                  </div>
+                  <div class="flow-line"></div>
+                  <div class="flow-step complete">
+                    <span class="flow-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5c0-1.7 3.6-3 8-3s8 1.3 8 3v14c0 1.7-3.6 3-8 3s-8-1.3-8-3V5Zm2 0c.4.5 2.5 1.2 6 1.2s5.6-.7 6-1.2c-.4-.5-2.5-1.2-6-1.2S6.4 4.5 6 5Zm0 4.4v3.1c1.4.7 3.5 1 6 1s4.6-.3 6-1V9.4c-1.6.6-3.7.8-6 .8s-4.4-.2-6-.8Zm0 7v2.5c.4.5 2.5 1.2 6 1.2s5.6-.7 6-1.2v-2.5c-1.6.6-3.7.8-6 .8s-4.4-.2-6-.8Z"/></svg></span>
+                    <div><strong>PostgreSQL RLS</strong><small>Tenant predicate and resource scope enforced</small></div>
+                    <span class="flow-status">03</span>
+                  </div>
+                </div>
+              </article>
+
+              <article class="card progress-card">
+                <div class="card-head">
+                  <div>
+                    <p class="eyebrow">Roadmap</p>
+                    <h3>Implementation progress</h3>
+                  </div>
+                  <strong class="progress-value">40%</strong>
+                </div>
+                <div class="progress-track"><span style="width:40%"></span></div>
+                <div class="phase-list">
+                  <div><span class="phase-number complete">1</span><span><strong>Foundation</strong><small>Repository + Docker</small></span><b>Complete</b></div>
+                  <div><span class="phase-number complete">2</span><span><strong>Tenant isolation</strong><small>Identity + data boundaries</small></span><b>Complete</b></div>
+                  <div><span class="phase-number complete">3</span><span><strong>PKI lifecycle</strong><small>Issue + renew + revoke</small></span><b>Complete</b></div>
+                  <div><span class="phase-number complete">4</span><span><strong>Protected SaaS API</strong><small>mTLS + RBAC + audit</small></span><b>Complete</b></div>
+                  <div><span class="phase-number next">5</span><span><strong>Signed evidence</strong><small>Next implementation phase</small></span><b class="next-label">Next</b></div>
+                </div>
+              </article>
+
+              <article class="card activity-card">
+                <div class="card-head">
+                  <div>
+                    <p class="eyebrow">Review activity</p>
+                    <h3>Recent decisions</h3>
+                  </div>
+                  <button class="text-button" type="button" data-view-link="audit">View audit trail</button>
+                </div>
+                <div class="activity-list" id="overview-activity"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="view" id="view-records" aria-labelledby="records-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Certificate-derived scope</p>
+                <h2 id="records-title">Tenant data</h2>
+                <p id="records-description">Only records permitted for the active identity are visible.</p>
+              </div>
+              <button class="button button-secondary" type="button" id="export-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10l3.5-3.5 1.4 1.4L12 16.8l-5.9-5.9 1.4-1.4L11 13V3ZM5 19h14v2H5v-2Z"/></svg>
+                Request export
+              </button>
+            </div>
+            <div class="scope-strip">
+              <div><span>Tenant</span><strong id="scope-tenant">Tenant Alpha</strong></div>
+              <div><span>Role</span><strong id="scope-role">Tenant member</strong></div>
+              <div><span>Effective record scope</span><strong id="scope-value">Owner</strong></div>
+              <div><span>Database control</span><strong>Forced RLS</strong></div>
+            </div>
+            <article class="card table-card">
+              <div class="table-toolbar">
+                <div>
+                  <h3>Permitted records</h3>
+                  <span id="record-count">0 records</span>
+                </div>
+                <label class="search-box">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3a7 7 0 1 1-4.9 12l-3.6 3.6 1.4 1.4 3.6-3.6A7 7 0 0 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg>
+                  <span class="sr-only">Search records</span>
+                  <input id="record-search" type="search" placeholder="Search records">
+                </label>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Record</th><th>Category</th><th>Classification</th><th>Updated</th><th>Scope check</th></tr></thead>
+                  <tbody id="record-rows"></tbody>
+                </table>
+              </div>
+            </article>
+            <div class="inline-callout">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.4 8 11 4.6-1.6 8-5.9 8-11V5l-8-3Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
+              <div><strong>Foreign identifiers remain invisible.</strong><span>Missing, unauthorized and other-tenant record IDs all return the same sanitized <code>ACCESS_DENIED</code> response.</span></div>
+              <button type="button" data-run-scenario="cross-tenant-record">Demonstrate</button>
+            </div>
+          </section>
+
+          <section class="view" id="view-lab" aria-labelledby="lab-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Interactive review</p>
+                <h2 id="lab-title">Access boundary lab</h2>
+                <p>Run a focused scenario and walk through the exact security boundaries involved.</p>
+              </div>
+              <span class="logic-badge"><span></span> Uses repository authorization logic</span>
+            </div>
+            <div class="lab-layout">
+              <div class="scenario-list" id="scenario-list"></div>
+              <article class="result-panel" id="result-panel" aria-live="polite">
+                <div class="result-empty">
+                  <div class="empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v2l-1 1v4.3l4.6 7.1A2.3 2.3 0 0 1 16.7 21H7.3a2.3 2.3 0 0 1-1.9-3.6l4.6-7.1V6L9 5V3Zm2.7 8.4-2.2 3.4h5l-2.2-3.4h-.6Z"/></svg></div>
+                  <h3>Select a security scenario</h3>
+                  <p>The request trace will show where identity, tenant, role and resource checks allow or stop the operation.</p>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="view" id="view-audit" aria-labelledby="audit-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Sanitized request outcomes</p>
+                <h2 id="audit-title">Audit trail</h2>
+                <p>Scenario results capture correlation, actor, tenant, action and decision without payloads or raw resource IDs.</p>
+              </div>
+              <button class="button button-secondary" type="button" data-open-lab>Generate event</button>
+            </div>
+            <div class="audit-summary">
+              <div><span>Total review events</span><strong id="audit-total">0</strong></div>
+              <div><span>Allowed</span><strong class="allow-text" id="audit-allowed">0</strong></div>
+              <div><span>Denied</span><strong class="deny-text" id="audit-denied">0</strong></div>
+              <div><span>Payload fields stored</span><strong>0</strong></div>
+            </div>
+            <article class="card audit-card">
+              <div class="audit-table-head">
+                <h3>Request outcomes</h3>
+                <span>Newest first</span>
+              </div>
+              <div id="audit-list" class="audit-list"></div>
+            </article>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
