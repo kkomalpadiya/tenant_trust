@@ -6,10 +6,12 @@ import test from "node:test";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import {
+  ADVERSARIAL_EVIDENCE_SCENARIO_IDS,
   canonicalizeEvidenceJson,
   createDeterministicEvidenceSimulator,
   DEMO_EVIDENCE_SOURCE_CATALOG,
   EvidenceSimulatorError,
+  generateAdversarialEvidenceFixtureSet,
   generateDeterministicDemoEvidenceSet,
   unsignedEvidenceEnvelope,
 } from "../src/index.mjs";
@@ -149,5 +151,117 @@ test("invalid source configuration and fixture selectors fail explicitly", () =>
       maximumAgeSeconds: 300,
     }),
     (error) => error instanceof EvidenceSimulatorError && error.reasonCode === "SIMULATOR_CONFIGURATION_INVALID",
+  );
+});
+
+function scenarioById(fixture, id) {
+  return fixture.scenarios.find((scenario) => scenario.id === id);
+}
+
+function verifiesWithEnrollment(envelope, enrollment) {
+  const content = Buffer.from(canonicalizeEvidenceJson(unsignedEvidenceEnvelope(envelope)), "utf8");
+  return verifyEd25519(
+    null,
+    content,
+    publicKeyFor(enrollment),
+    Buffer.from(envelope.signature.signatureBase64Url, "base64url"),
+  );
+}
+
+test("adversarial suite covers every required threat with explicit expected outcomes", () => {
+  const fixture = generateAdversarialEvidenceFixtureSet();
+  assert.deepEqual(fixture.scenarios.map(({ id }) => id), ADVERSARIAL_EVIDENCE_SCENARIO_IDS);
+  assert.equal(new Set(fixture.scenarios.map(({ attackClass }) => attackClass)).size, 6);
+  for (const scenario of fixture.scenarios) {
+    assert.ok(scenario.enrollments.length >= 1);
+    assert.ok(scenario.envelopes.length >= 1);
+  }
+  assert.deepEqual(scenarioById(fixture, "missing-signals").missingEvidenceTypes, ["behaviour", "compliance"]);
+  assert.equal(scenarioById(fixture, "event-flood").expectedSummary.sourceSuspended, true);
+});
+
+test("forged signature remains contract-valid but fails the registered source key", () => {
+  const scenario = scenarioById(generateAdversarialEvidenceFixtureSet(), "forged-signature");
+  assert.equal(validateEnvelope(scenario.envelopes[0]), true, ajv.errorsText(validateEnvelope.errors));
+  assert.equal(verifiesWithEnrollment(scenario.envelopes[0], scenario.enrollments[0]), false);
+  const content = Buffer.from(canonicalizeEvidenceJson(unsignedEvidenceEnvelope(scenario.envelopes[0])), "utf8");
+  assert.equal(
+    createHash("sha256").update(content).digest("hex"),
+    scenario.envelopes[0].signature.signedContentSha256,
+  );
+  assert.deepEqual(scenario.expectedOutcome, {
+    decision: "reject",
+    reasonCode: "EVIDENCE_SIGNATURE_INVALID",
+  });
+});
+
+test("revoked-source and mixed-tenant fixtures isolate authority failures from schema failures", () => {
+  const fixture = generateAdversarialEvidenceFixtureSet();
+  const revoked = scenarioById(fixture, "revoked-source");
+  const mixed = scenarioById(fixture, "mixed-tenants");
+  assert.equal(validateEnvelope(revoked.envelopes[0]), true, ajv.errorsText(validateEnvelope.errors));
+  assert.equal(verifiesWithEnrollment(revoked.envelopes[0], revoked.enrollments[0]), true);
+  assert.deepEqual(revoked.authority, { sourceState: "suspended", keyState: "revoked" });
+  assert.equal(validateEnvelope(mixed.envelopes[0]), true, ajv.errorsText(validateEnvelope.errors));
+  assert.equal(verifiesWithEnrollment(mixed.envelopes[0], mixed.enrollments[0]), true);
+  assert.notEqual(mixed.authority.registeredTenantId, mixed.authority.presentedTenantId);
+  assert.equal(mixed.envelopes[0].tenantId, mixed.authority.presentedTenantId);
+  assert.equal(mixed.enrollments[0].tenantId, mixed.authority.registeredTenantId);
+});
+
+test("missing-signal fixture is valid but omits the declared behaviour and compliance types", () => {
+  const scenario = scenarioById(generateAdversarialEvidenceFixtureSet(), "missing-signals");
+  assert.deepEqual(scenario.envelopes.map(({ evidenceType }) => evidenceType), ["identity", "device", "certificate"]);
+  assert.deepEqual(
+    scenario.requiredEvidenceTypes.filter((type) => !scenario.envelopes.some((envelope) => envelope.evidenceType === type)),
+    scenario.missingEvidenceTypes,
+  );
+  assert.equal(scenario.envelopes.every((envelope, index) => {
+    assert.equal(validateEnvelope(envelope), true, ajv.errorsText(validateEnvelope.errors));
+    return verifiesWithEnrollment(envelope, scenario.enrollments[index]);
+  }), true);
+  assert.deepEqual(scenario.expectedOutcome, {
+    decision: "withhold",
+    reasonCode: "REQUIRED_EVIDENCE_MISSING",
+  });
+});
+
+test("duplicate-ID fixture contains two independently valid signatures over conflicting events", () => {
+  const scenario = scenarioById(generateAdversarialEvidenceFixtureSet(), "duplicate-event-id");
+  const [first, second] = scenario.envelopes;
+  assert.equal(first.eventId, second.eventId);
+  assert.notEqual(first.nonce, second.nonce);
+  assert.notEqual(first.sourceSequence, second.sourceSequence);
+  assert.notEqual(first.signature.signedContentSha256, second.signature.signedContentSha256);
+  assert.equal(verifiesWithEnrollment(first, scenario.enrollments[0]), true);
+  assert.equal(verifiesWithEnrollment(second, scenario.enrollments[0]), true);
+  assert.deepEqual(scenario.expectedOutcomes.map(({ reasonCode }) => reasonCode), [null, "EVIDENCE_EVENT_REPLAYED"]);
+});
+
+test("event-flood fixture is ordered and carries its bounded safeguard oracle", () => {
+  const scenario = scenarioById(generateAdversarialEvidenceFixtureSet(), "event-flood");
+  assert.equal(scenario.envelopes.length, 7);
+  assert.deepEqual(scenario.envelopes.map(({ sourceSequence }) => sourceSequence), [200, 201, 202, 203, 204, 205, 206]);
+  assert.equal(new Set(scenario.envelopes.map(({ eventId }) => eventId)).size, 7);
+  assert.equal(scenario.envelopes.every((envelope) => verifiesWithEnrollment(envelope, scenario.enrollments[0])), true);
+  assert.deepEqual(scenario.expectedSummary, {
+    acceptedCount: 4,
+    rateLimitedCount: 2,
+    finalReasonCode: "VERIFICATION_CONTEXT_NOT_FOUND",
+    sourceSuspended: true,
+    maximumSourceInfluence: 0.2,
+  });
+});
+
+test("adversarial fixtures are deterministic, immutable and contain no private key material", () => {
+  const first = generateAdversarialEvidenceFixtureSet();
+  const second = generateAdversarialEvidenceFixtureSet();
+  assert.deepEqual(second, first);
+  assert.equal(Object.isFrozen(first), true);
+  assert.equal(Object.isFrozen(first.scenarios[0].envelopes[0]), true);
+  assert.doesNotMatch(JSON.stringify(first), /private|pkcs8|seed/i);
+  assert.throws(
+    () => generateAdversarialEvidenceFixtureSet({ floodEventCount: 6 }),
+    (error) => error instanceof EvidenceSimulatorError && error.reasonCode === "FLOOD_EVENT_COUNT_INVALID",
   );
 });

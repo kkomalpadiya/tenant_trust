@@ -15,6 +15,16 @@ const EVIDENCE_TYPE_SET = new Set(EVIDENCE_TYPES);
 const DEFAULT_OBSERVED_AT = "2026-10-05T08:00:00.000Z";
 const PKCS8_ED25519_SEED_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
 const GENERATOR = "tenant-trust-deterministic-demo-v1";
+const ADVERSARIAL_GENERATOR = "tenant-trust-deterministic-adversarial-v1";
+
+export const ADVERSARIAL_EVIDENCE_SCENARIO_IDS = Object.freeze([
+  "forged-signature",
+  "revoked-source",
+  "mixed-tenants",
+  "missing-signals",
+  "duplicate-event-id",
+  "event-flood",
+]);
 
 const CATALOG = Object.freeze({
   alpha: Object.freeze({
@@ -198,6 +208,48 @@ function validateSimulatorConfiguration({ tenantId, sourceId, evidenceType, maxi
   }
 }
 
+function signUnsignedEnvelope(unsigned, material) {
+  const content = Buffer.from(canonicalizeEvidenceJson(unsigned), "utf8");
+  const signedContentSha256 = createHash("sha256").update(content).digest("hex");
+  const signature = signEd25519(null, content, material.privateKey);
+  if (signature.length !== 64) fail("SIMULATOR_SIGNATURE_INVALID");
+  return deepFreeze({
+    ...unsigned,
+    signature: {
+      algorithm: "Ed25519",
+      canonicalization: "tenant-trust-evidence-json-v1",
+      keyId: material.keyId,
+      signedContentSha256,
+      signatureBase64Url: signature.toString("base64url"),
+    },
+  });
+}
+
+function sourceFor(tenantAlias, evidenceType) {
+  const tenant = CATALOG[tenantAlias];
+  if (!tenant) fail("TENANT_ALIAS_INVALID");
+  const source = tenant.sources.find((candidate) => candidate.evidenceType === evidenceType);
+  if (!source) fail("EVIDENCE_TYPE_INVALID");
+  return { tenant, source };
+}
+
+function simulatorFor(tenantAlias, evidenceType) {
+  const { tenant, source } = sourceFor(tenantAlias, evidenceType);
+  return createDeterministicEvidenceSimulator({ tenantId: tenant.tenantId, ...source });
+}
+
+function addMilliseconds(utc, milliseconds) {
+  const date = requireUtc(utc);
+  const result = new Date(date.getTime() + milliseconds);
+  if (!Number.isFinite(result.getTime())) fail("OBSERVATION_TIME_INVALID");
+  return result.toISOString();
+}
+
+function resignEnvelope(envelope, material, overrides = {}) {
+  const unsigned = { ...unsignedEvidenceEnvelope(envelope), ...overrides };
+  return signUnsignedEnvelope(unsigned, material);
+}
+
 export function unsignedEvidenceEnvelope(envelope) {
   if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) fail("EVIDENCE_ENVELOPE_INVALID");
   const { signature, ...unsigned } = envelope;
@@ -258,20 +310,7 @@ export function createDeterministicEvidenceSimulator(configuration = {}) {
         synthetic: true,
         payload,
       };
-      const content = Buffer.from(canonicalizeEvidenceJson(unsigned), "utf8");
-      const signedContentSha256 = createHash("sha256").update(content).digest("hex");
-      const signature = signEd25519(null, content, material.privateKey);
-      if (signature.length !== 64) fail("SIMULATOR_SIGNATURE_INVALID");
-      return deepFreeze({
-        ...unsigned,
-        signature: {
-          algorithm: "Ed25519",
-          canonicalization: "tenant-trust-evidence-json-v1",
-          keyId: material.keyId,
-          signedContentSha256,
-          signatureBase64Url: signature.toString("base64url"),
-        },
-      });
+      return signUnsignedEnvelope(unsigned, material);
     },
   });
 }
@@ -307,5 +346,166 @@ export function generateDeterministicDemoEvidenceSet({
       sourceSequence,
       observedAt,
     })),
+  });
+}
+
+export function generateAdversarialEvidenceFixtureSet({
+  tenantAlias = "alpha",
+  subjectId,
+  observedAt = DEFAULT_OBSERVED_AT,
+  sourceSequence = 100,
+  floodEventCount = 7,
+} = {}) {
+  const tenant = CATALOG[tenantAlias];
+  if (!tenant) fail("TENANT_ALIAS_INVALID");
+  const selectedSubjectId = subjectId ?? tenant.defaultSubjectId;
+  if (!SUBJECT_ID.test(selectedSubjectId ?? "")) fail("SUBJECT_ID_INVALID");
+  requireUtc(observedAt);
+  requireSequence(sourceSequence);
+  if (sourceSequence > 9_007_199_254_739_000) fail("SOURCE_SEQUENCE_INVALID");
+  if (!Number.isSafeInteger(floodEventCount) || floodEventCount < 7 || floodEventCount > 1_000) {
+    fail("FLOOD_EVENT_COUNT_INVALID");
+  }
+
+  const otherAlias = tenantAlias === "alpha" ? "beta" : "alpha";
+  const otherTenant = CATALOG[otherAlias];
+  const identity = simulatorFor(tenantAlias, "identity");
+  const device = simulatorFor(tenantAlias, "device");
+  const behaviour = simulatorFor(tenantAlias, "behaviour");
+  const certificate = simulatorFor(tenantAlias, "certificate");
+  const compliance = simulatorFor(tenantAlias, "compliance");
+
+  const forgedBase = identity.generate({
+    subjectId: selectedSubjectId,
+    sourceSequence,
+    observedAt,
+  });
+  const foreignIdentitySource = sourceFor(otherAlias, "identity").source;
+  const foreignMaterial = keyMaterial(otherTenant.tenantId, foreignIdentitySource.sourceId);
+  const forgedContent = Buffer.from(canonicalizeEvidenceJson(unsignedEvidenceEnvelope(forgedBase)), "utf8");
+  const forgedSignature = signEd25519(null, forgedContent, foreignMaterial.privateKey).toString("base64url");
+  const forgedEnvelope = deepFreeze({
+    ...forgedBase,
+    signature: { ...forgedBase.signature, signatureBase64Url: forgedSignature },
+  });
+
+  const revokedEnvelope = device.generate({
+    subjectId: selectedSubjectId,
+    sourceSequence: sourceSequence + 1,
+    observedAt: addMilliseconds(observedAt, 1),
+  });
+
+  const mixedBase = behaviour.generate({
+    subjectId: selectedSubjectId,
+    sourceSequence: sourceSequence + 2,
+    observedAt: addMilliseconds(observedAt, 2),
+  });
+  const behaviourMaterial = keyMaterial(tenant.tenantId, behaviour.enrollment.sourceId);
+  const mixedEnvelope = resignEnvelope(mixedBase, behaviourMaterial, {
+    tenantId: otherTenant.tenantId,
+    subjectId: otherTenant.defaultSubjectId,
+    eventId: `evt_${uuidFromDigest(hashParts("tenant-trust-adversarial-mixed-event-v1", tenantAlias, observedAt))}`,
+    nonce: hashParts("tenant-trust-adversarial-mixed-nonce-v1", tenantAlias, observedAt).subarray(0, 18).toString("base64url"),
+  });
+
+  const missingSignalEnvelopes = [identity, device, certificate].map((simulator, index) => simulator.generate({
+    subjectId: selectedSubjectId,
+    sourceSequence: sourceSequence + 10 + index,
+    observedAt: addMilliseconds(observedAt, 10 + index),
+  }));
+  const missingSignalEnrollments = [identity.enrollment, device.enrollment, certificate.enrollment];
+
+  const duplicateFirst = compliance.generate({
+    subjectId: selectedSubjectId,
+    sourceSequence: sourceSequence + 20,
+    observedAt: addMilliseconds(observedAt, 20),
+  });
+  const duplicateOriginalSecond = compliance.generate({
+    subjectId: selectedSubjectId,
+    sourceSequence: sourceSequence + 21,
+    observedAt: addMilliseconds(observedAt, 21),
+  });
+  const complianceMaterial = keyMaterial(tenant.tenantId, compliance.enrollment.sourceId);
+  const duplicateSecond = resignEnvelope(duplicateOriginalSecond, complianceMaterial, {
+    eventId: duplicateFirst.eventId,
+  });
+
+  const floodEnvelopes = Array.from({ length: floodEventCount }, (_, index) => behaviour.generate({
+    subjectId: selectedSubjectId,
+    sourceSequence: sourceSequence + 100 + index,
+    observedAt: addMilliseconds(observedAt, 100 + index),
+  }));
+
+  return deepFreeze({
+    fixtureVersion: "1.0.0",
+    generator: ADVERSARIAL_GENERATOR,
+    tenantAlias,
+    tenantId: tenant.tenantId,
+    subjectId: selectedSubjectId,
+    observedAt,
+    scenarios: [
+      {
+        id: "forged-signature",
+        attackClass: "source-authentication",
+        enrollments: [identity.enrollment],
+        envelopes: [forgedEnvelope],
+        expectedOutcome: { decision: "reject", reasonCode: "EVIDENCE_SIGNATURE_INVALID" },
+      },
+      {
+        id: "revoked-source",
+        attackClass: "revoked-authority",
+        enrollments: [device.enrollment],
+        envelopes: [revokedEnvelope],
+        authority: { sourceState: "suspended", keyState: "revoked" },
+        expectedOutcome: { decision: "reject", reasonCode: "VERIFICATION_CONTEXT_NOT_FOUND" },
+      },
+      {
+        id: "mixed-tenants",
+        attackClass: "tenant-binding",
+        enrollments: [behaviour.enrollment],
+        envelopes: [mixedEnvelope],
+        authority: { registeredTenantId: tenant.tenantId, presentedTenantId: otherTenant.tenantId },
+        expectedOutcome: { decision: "reject", reasonCode: "VERIFICATION_CONTEXT_NOT_FOUND" },
+      },
+      {
+        id: "missing-signals",
+        attackClass: "evidence-completeness",
+        enrollments: missingSignalEnrollments,
+        envelopes: missingSignalEnvelopes,
+        requiredEvidenceTypes: [...EVIDENCE_TYPES],
+        missingEvidenceTypes: ["behaviour", "compliance"],
+        expectedOutcome: { decision: "withhold", reasonCode: "REQUIRED_EVIDENCE_MISSING" },
+      },
+      {
+        id: "duplicate-event-id",
+        attackClass: "replay",
+        enrollments: [compliance.enrollment],
+        envelopes: [duplicateFirst, duplicateSecond],
+        expectedOutcomes: [
+          { decision: "accept", reasonCode: null },
+          { decision: "reject", reasonCode: "EVIDENCE_EVENT_REPLAYED" },
+        ],
+      },
+      {
+        id: "event-flood",
+        attackClass: "source-flood",
+        enrollments: [behaviour.enrollment],
+        envelopes: floodEnvelopes,
+        safeguards: {
+          rateLimitWindowSeconds: 60,
+          rateLimitMaxEvents: 4,
+          rateLimitSuspensionThreshold: 2,
+          maximumInfluence: 0.4,
+          tenantMaximumSourceInfluence: 0.2,
+        },
+        expectedSummary: {
+          acceptedCount: 4,
+          rateLimitedCount: 2,
+          finalReasonCode: "VERIFICATION_CONTEXT_NOT_FOUND",
+          sourceSuspended: true,
+          maximumSourceInfluence: 0.2,
+        },
+      },
+    ],
   });
 }
