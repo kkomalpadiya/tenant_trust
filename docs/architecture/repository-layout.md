@@ -18,6 +18,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `packages/certificate-events/` | Canonical certificate-event construction, Ed25519 source authentication, acknowledged publication and transactional-outbox adapter |
 | `packages/evidence-sources/` | Tenant-admin-governed evidence-source enrollment plus append-only Ed25519 key rotation and revocation history |
 | `packages/evidence-simulators/` | Deterministic synthetic identity, device, behaviour, certificate and compliance envelopes with reproducible Ed25519 signatures |
+| `packages/trust-model/` | Canonical normalized trust components, initial weights and fail-closed configuration validation |
 | `packages/gateway-identity/` | Gateway-authenticated client-certificate parsing, exact tenant-issuer verification and application authentication identity |
 | `packages/messaging/` | Context-bound NATS subject construction, JetStream stream defaults and tenant-filtered durable consumer defaults |
 | `infra/nats/` | NATS server configuration and tenant-specific demonstration permissions |
