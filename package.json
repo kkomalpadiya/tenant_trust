@@ -49,6 +49,7 @@
     "evidence-ingestion:verify": "npm run test:evidence && npm run test:api && node scripts/verify-evidence-ingestion.mjs",
     "evidence-replay:verify": "npm run test:evidence && npm run test:api && node scripts/verify-evidence-replay.mjs",
     "evidence-storage:verify": "npm run test:evidence && npm run test:api && node scripts/verify-evidence-storage.mjs",
+    "evidence-safeguards:verify": "npm run test:evidence-sources && npm run test:evidence && node scripts/verify-evidence-source-safeguards.mjs",
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
     "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
     "profile-record-api:verify": "node scripts/verify-profile-record-api.mjs",

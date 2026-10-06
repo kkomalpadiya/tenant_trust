@@ -50,7 +50,8 @@ The ingestion service added in later Phase 5 tasks must enforce all of the follo
 - `observedAt < expiresAt`, the observation is within allowed clock skew and it has not expired;
 - the event ID, nonce and sequence do not replay, conflict or move the source backwards;
 - the payload matches the selected evidence-type schema and its byte size is within policy;
-- tenant/source rate limits and influence controls permit the observation.
+- the tenant-scoped source quota permits the observation; repeated excess traffic suspends only that source;
+- the accepted receipt snapshots the lesser of the source-specific and active tenant-wide influence caps.
 
 A valid signature proves possession of an enrolled key. It does not establish that the source's claim is true. Trust calculation therefore remains separate and will use corroboration, source influence limits and explicit synthetic markers.
 
@@ -62,4 +63,4 @@ Raw payloads stay off-chain and are not published on the ordinary event stream. 
 
 Run `npm run evidence-envelope:verify`. The tests compile the schema, accept all supported evidence types and reject missing identity, freshness, ordering or signature fields; malformed identifiers and timestamps; weak or ambiguous signature metadata; invalid sequence/nonce values; empty payloads; unknown fields and unsupported evidence types.
 
-T5.1 defines the envelope. T5.2 implements source enrollment and key history. T5.3 provides deterministic signed synthetic fixtures for all five evidence types. T5.4 implements the size-bounded endpoint, exact active tenant/source/key/subject resolution, canonical digest reconstruction and Ed25519 verification. T5.5 will add freshness, replay and ordering checks. See [Signed evidence ingestion](evidence-ingestion.md).
+T5.1 defines the envelope. T5.2 implements source enrollment and key history. T5.3 provides deterministic signed synthetic fixtures for all five evidence types. T5.4 implements the size-bounded endpoint, exact active tenant/source/key/subject resolution, canonical digest reconstruction and Ed25519 verification. T5.5 adds freshness, replay and ordering checks, T5.6 stores encrypted canonical evidence off-chain, and T5.7 adds source quotas, influence caps and suspension controls. See [Signed evidence ingestion](evidence-ingestion.md).

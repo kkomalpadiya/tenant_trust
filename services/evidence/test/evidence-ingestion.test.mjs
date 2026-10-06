@@ -400,6 +400,44 @@ test("replay guard rejects duplicate IDs, nonces, sequences and older observatio
   assert.match(snapshot.records[0].eventIdSha256, /^[0-9a-f]{64}$/u);
 });
 
+test("per-source flood controls cap influence and automatically suspend a noisy source", async () => {
+  const guard = createInMemoryEvidenceReplayGuard({
+    clock: () => new Date("2026-10-05T08:05:00.000Z"),
+    safeguards: {
+      rateLimitWindowSeconds: 60,
+      rateLimitMaxEvents: 2,
+      rateLimitSuspensionThreshold: 2,
+      maximumInfluence: 0.4,
+      tenantMaximumSourceInfluence: 0.2,
+    },
+  });
+  const candidates = [
+    ["e0", 1, "AAAAAAAAAAAAAAAAAAAAAA"],
+    ["e1", 2, "BBBBBBBBBBBBBBBBBBBBBB"],
+    ["e2", 3, "CCCCCCCCCCCCCCCCCCCCCC"],
+    ["e3", 4, "DDDDDDDDDDDDDDDDDDDDDD"],
+    ["e4", 5, "EEEEEEEEEEEEEEEEEEEEEE"],
+  ].map(([suffix, sourceSequence, nonce]) => replayCandidate({
+    eventId: `evt_018f1234-5678-7abc-8def-0123456789${suffix}`,
+    sourceSequence,
+    nonce,
+    observedAt: "2026-10-05T08:04:55.000Z",
+    expiresAt: "2026-10-05T08:09:55.000Z",
+  }));
+
+  assert.equal((await guard(candidates[0])).accepted, true);
+  assert.equal((await guard(candidates[1])).accepted, true);
+  assert.equal((await guard(candidates[2])).reasonCode, "EVIDENCE_RATE_LIMITED");
+  assert.equal((await guard(candidates[3])).reasonCode, "EVIDENCE_RATE_LIMITED");
+  assert.equal((await guard(candidates[4])).reasonCode, "VERIFICATION_CONTEXT_NOT_FOUND");
+
+  const sourceControl = guard.snapshot().sourceControls[0];
+  assert.equal(sourceControl.acceptedCount, 2);
+  assert.equal(sourceControl.rateLimitedCount, 2);
+  assert.equal(sourceControl.suspended, true);
+  assert.equal(sourceControl.maximumSourceInfluence, 0.2);
+});
+
 test("ingestion rejects a replay after signature verification", async () => {
   const guard = replayGuard();
   const service = createEvidenceIngestionService({

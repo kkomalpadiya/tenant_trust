@@ -63,6 +63,20 @@ function serviceWith(overrides = {}) {
       sourceState: "suspended",
       sourceVersion: 3,
     }),
+    configureSafeguards: async (record) => ({
+      sourceId: record.sourceId,
+      sourceState: "active",
+      sourceVersion: 3,
+      rateLimitWindowSeconds: record.rateLimitWindowSeconds,
+      rateLimitMaxEvents: record.rateLimitMaxEvents,
+      rateLimitSuspensionThreshold: record.rateLimitSuspensionThreshold,
+      maximumInfluence: record.maximumInfluence,
+    }),
+    setSuspension: async (record) => ({
+      sourceId: record.sourceId,
+      sourceState: record.suspended ? "suspended" : "active",
+      sourceVersion: 4,
+    }),
     ...overrides,
   });
 }
@@ -111,10 +125,82 @@ test("ordinary members cannot enroll, rotate or revoke keys", async () => {
     () => registry.enroll({ context: memberContext, request: { sourceId: ids.source, publicKeyBase64Url: publicKey } }),
     () => registry.rotate({ context: memberContext, request: { sourceId: ids.source, publicKeyBase64Url: rotatedPublicKey } }),
     () => registry.revoke({ context: memberContext, request: { sourceId: ids.source, keyId: ids.key, reasonCode: "KEY_COMPROMISED" } }),
+    () => registry.configureSafeguards({ context: memberContext, request: {
+      sourceId: ids.source,
+      rateLimitWindowSeconds: 60,
+      rateLimitMaxEvents: 100,
+      rateLimitSuspensionThreshold: 5,
+      maximumInfluence: 0.1,
+    } }),
+    () => registry.suspend({ context: memberContext, request: { sourceId: ids.source, reasonCode: "NOISY_SOURCE" } }),
   ]) {
     await assert.rejects(operation, (error) => error instanceof EvidenceSourceRegistryError
       && error.reasonCode === "TENANT_ADMIN_REQUIRED");
   }
+});
+
+test("tenant administrators configure bounded safeguards and control source suspension", async () => {
+  const writes = [];
+  const registry = serviceWith({
+    configureSafeguards: async (record) => {
+      writes.push(record);
+      return {
+        sourceId: record.sourceId,
+        sourceState: "active",
+        sourceVersion: 3,
+        rateLimitWindowSeconds: record.rateLimitWindowSeconds,
+        rateLimitMaxEvents: record.rateLimitMaxEvents,
+        rateLimitSuspensionThreshold: record.rateLimitSuspensionThreshold,
+        maximumInfluence: record.maximumInfluence,
+      };
+    },
+    setSuspension: async (record) => {
+      writes.push(record);
+      return {
+        sourceId: record.sourceId,
+        sourceState: record.suspended ? "suspended" : "active",
+        sourceVersion: record.suspended ? 4 : 5,
+      };
+    },
+  });
+  const configured = await registry.configureSafeguards({
+    context: context(),
+    request: {
+      sourceId: ids.source,
+      rateLimitWindowSeconds: 30,
+      rateLimitMaxEvents: 20,
+      rateLimitSuspensionThreshold: 3,
+      maximumInfluence: 0.125,
+    },
+  });
+  assert.equal(configured.maximumInfluence, 0.125);
+  assert.equal(writes[0].tenantId, ids.alpha);
+  assert.equal(writes[0].actorSubjectId, ids.admin);
+  assert.equal((await registry.suspend({
+    context: context(), request: { sourceId: ids.source, reasonCode: "NOISY_SOURCE" },
+  })).sourceState, "suspended");
+  assert.equal((await registry.resume({
+    context: context(), request: { sourceId: ids.source, reasonCode: "SOURCE_REVIEWED" },
+  })).sourceState, "active");
+  assert.equal(writes[1].suspended, true);
+  assert.equal(writes[2].suspended, false);
+});
+
+test("safeguard values and lifecycle requests fail closed", async () => {
+  const registry = serviceWith();
+  for (const request of [
+    { sourceId: ids.source, rateLimitWindowSeconds: 0, rateLimitMaxEvents: 1, rateLimitSuspensionThreshold: 1, maximumInfluence: 0.1 },
+    { sourceId: ids.source, rateLimitWindowSeconds: 60, rateLimitMaxEvents: 0, rateLimitSuspensionThreshold: 1, maximumInfluence: 0.1 },
+    { sourceId: ids.source, rateLimitWindowSeconds: 60, rateLimitMaxEvents: 1, rateLimitSuspensionThreshold: 0, maximumInfluence: 0.1 },
+    { sourceId: ids.source, rateLimitWindowSeconds: 60, rateLimitMaxEvents: 1, rateLimitSuspensionThreshold: 1, maximumInfluence: 0 },
+  ]) {
+    await assert.rejects(registry.configureSafeguards({ context: context(), request }), EvidenceSourceRegistryError);
+  }
+  await assert.rejects(
+    registry.suspend({ context: context(), request: { sourceId: ids.source, reasonCode: "bad-reason" } }),
+    (error) => error instanceof EvidenceSourceRegistryError
+      && error.reasonCode === "SUSPENSION_REASON_INVALID",
+  );
 });
 
 test("requests cannot select tenant, actor, fingerprint or lifecycle state", async () => {
@@ -230,6 +316,24 @@ test("the PostgreSQL adapter uses parameterized registry functions and maps one 
           rotated_source_version: "3",
         }] };
       }
+      if (sql.includes("configure_evidence_source_safeguards")) {
+        return { rows: [{
+          configured_source_id: ids.source,
+          configured_source_state: "active",
+          configured_source_version: "4",
+          rate_limit_window_seconds: "30",
+          rate_limit_max_events: "20",
+          rate_limit_suspension_threshold: "3",
+          maximum_influence: "0.1250",
+        }] };
+      }
+      if (sql.includes("set_evidence_source_suspension")) {
+        return { rows: [{
+          controlled_source_id: ids.source,
+          controlled_source_state: "suspended",
+          controlled_source_version: "5",
+        }] };
+      }
       return { rows: [{
         revoked_source_id: ids.source,
         revoked_key_id: ids.key,
@@ -250,7 +354,19 @@ test("the PostgreSQL adapter uses parameterized registry functions and maps one 
   assert.equal((await repository.enrollSource(record)).keyVersion, 1);
   assert.equal((await repository.rotateKey(record)).sourceVersion, 3);
   assert.equal((await repository.revokeKey(record)).keyState, "revoked");
-  assert.equal(calls.length, 3);
+  assert.equal((await repository.configureSafeguards({
+    ...record,
+    rateLimitWindowSeconds: 30,
+    rateLimitMaxEvents: 20,
+    rateLimitSuspensionThreshold: 3,
+    maximumInfluence: 0.125,
+  })).maximumInfluence, 0.125);
+  assert.equal((await repository.setSuspension({
+    ...record, suspended: true,
+  })).sourceState, "suspended");
+  assert.equal(calls.length, 5);
   assert.deepEqual(calls[0].values, [ids.source, ids.key, publicKey, record.occurredAt]);
   assert.deepEqual(calls[2].values, [ids.source, ids.key, "KEY_COMPROMISED", record.occurredAt]);
+  assert.deepEqual(calls[3].values, [ids.source, 30, 20, 3, 0.125, record.occurredAt]);
+  assert.deepEqual(calls[4].values, [ids.source, true, "KEY_COMPROMISED", record.occurredAt]);
 });

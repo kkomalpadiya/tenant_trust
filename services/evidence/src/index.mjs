@@ -49,6 +49,7 @@ const REPLAY_GUARD_DENIAL_REASONS = new Set([
   "EVIDENCE_SEQUENCE_REPLAYED",
   "EVIDENCE_SEQUENCE_REORDERED",
   "EVIDENCE_OBSERVATION_REORDERED",
+  "EVIDENCE_RATE_LIMITED",
 ]);
 const evidenceIngestionServiceBrand = new WeakSet();
 const RESOLUTION_SQL = `
@@ -416,10 +417,39 @@ function frozenReplayDecision(accepted, reasonCode, acceptedAt, highestSourceSeq
   return Object.freeze({ accepted, reasonCode, acceptedAt, highestSourceSequence });
 }
 
-export function createInMemoryEvidenceReplayGuard({ clock = () => new Date() } = {}) {
+export function createInMemoryEvidenceReplayGuard({
+  clock = () => new Date(),
+  safeguards = Object.freeze({
+    rateLimitWindowSeconds: 60,
+    rateLimitMaxEvents: 120,
+    rateLimitSuspensionThreshold: 10,
+    maximumInfluence: 0.25,
+    tenantMaximumSourceInfluence: 0.25,
+  }),
+} = {}) {
   if (typeof clock !== "function") throw new TypeError("A trusted replay-guard clock is required.");
+  if (!safeguards
+    || !Number.isSafeInteger(safeguards.rateLimitWindowSeconds)
+    || safeguards.rateLimitWindowSeconds < 1
+    || safeguards.rateLimitWindowSeconds > 3_600
+    || !Number.isSafeInteger(safeguards.rateLimitMaxEvents)
+    || safeguards.rateLimitMaxEvents < 1
+    || safeguards.rateLimitMaxEvents > 100_000
+    || !Number.isSafeInteger(safeguards.rateLimitSuspensionThreshold)
+    || safeguards.rateLimitSuspensionThreshold < 1
+    || safeguards.rateLimitSuspensionThreshold > 1_000
+    || typeof safeguards.maximumInfluence !== "number"
+    || safeguards.maximumInfluence < 0.0001
+    || safeguards.maximumInfluence > 1
+    || typeof safeguards.tenantMaximumSourceInfluence !== "number"
+    || safeguards.tenantMaximumSourceInfluence < 0.0001
+    || safeguards.tenantMaximumSourceInfluence > 1) {
+    throw new TypeError("Valid evidence source safeguards are required.");
+  }
   const acceptedEventIds = new Set();
   const epochs = new Map();
+  const sourceRates = new Map();
+  const suspendedSources = new Set();
   const rejections = [];
   const storedEvidence = new Map();
 
@@ -447,11 +477,26 @@ export function createInMemoryEvidenceReplayGuard({ clock = () => new Date() } =
     }
     const maximumAgeMilliseconds = candidate.maximumAgeSeconds * 1_000;
     const epochId = `${candidate.tenantId}:${candidate.sourceId}:${candidate.keyId}`;
+    const sourceScope = `${candidate.tenantId}:${candidate.sourceId}`;
     const eventId = `${candidate.tenantId}:${candidate.eventId}`;
     const state = epochs.get(epochId);
+    let rateState = sourceRates.get(sourceScope);
+    if (!rateState || now.getTime() >= rateState.windowStartedAt.getTime()
+      + safeguards.rateLimitWindowSeconds * 1_000) {
+      rateState = { windowStartedAt: now, acceptedCount: 0, rateLimitedCount: 0 };
+      sourceRates.set(sourceScope, rateState);
+    }
 
     let reasonCode = null;
-    if (observedAt.getTime() >= expiresAt.getTime()) {
+    if (suspendedSources.has(sourceScope)) {
+      reasonCode = "VERIFICATION_CONTEXT_NOT_FOUND";
+    } else if (rateState.acceptedCount >= safeguards.rateLimitMaxEvents) {
+      rateState.rateLimitedCount += 1;
+      reasonCode = "EVIDENCE_RATE_LIMITED";
+      if (rateState.rateLimitedCount >= safeguards.rateLimitSuspensionThreshold) {
+        suspendedSources.add(sourceScope);
+      }
+    } else if (observedAt.getTime() >= expiresAt.getTime()) {
       reasonCode = "EVIDENCE_TIME_WINDOW_INVALID";
     } else if (observedAt.getTime() > now.getTime()
       + EVIDENCE_INGESTION_POLICY.maximumFutureClockSkewSeconds * 1_000) {
@@ -507,6 +552,7 @@ export function createInMemoryEvidenceReplayGuard({ clock = () => new Date() } =
       latestObservedAt: observedAt,
       nonceHashes,
     });
+    rateState.acceptedCount += 1;
     return frozenReplayDecision(
       true,
       null,
@@ -525,6 +571,17 @@ export function createInMemoryEvidenceReplayGuard({ clock = () => new Date() } =
         totalRejections: rejections.length,
         byReason: Object.freeze(byReason),
         records: Object.freeze([...rejections]),
+        sourceControls: Object.freeze(Array.from(sourceRates, ([sourceScope, rateState]) => Object.freeze({
+          sourceScope,
+          windowStartedAt: rateState.windowStartedAt.toISOString(),
+          acceptedCount: rateState.acceptedCount,
+          rateLimitedCount: rateState.rateLimitedCount,
+          suspended: suspendedSources.has(sourceScope),
+          maximumSourceInfluence: Math.min(
+            safeguards.maximumInfluence,
+            safeguards.tenantMaximumSourceInfluence,
+          ),
+        }))),
       });
     },
   });
