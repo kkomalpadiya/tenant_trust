@@ -56,6 +56,7 @@
     "trust-model:verify": "npm run test:trust-model && node scripts/verify-trust-model-definition.mjs",
     "trust-state:verify": "npm run test:trust && node scripts/verify-trust-state-storage.mjs",
     "trust-score:verify": "npm run test:trust && node scripts/verify-weighted-trust-score.mjs",
+    "trust-smoothing:verify": "npm run test:trust && node scripts/verify-temporal-trust-smoothing.mjs",
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
     "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
     "profile-record-api:verify": "node scripts/verify-profile-record-api.mjs",

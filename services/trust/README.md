@@ -6,7 +6,10 @@ The database validates every evidence reference against the accepted-evidence ou
 
 T6.3 also owns the deterministic weighted arithmetic mean over the five already-normalized component values. The calculation validates the complete component vector and model configuration, uses exact decimal products, rounds the final sum once to two places and returns immutable per-component contributions plus the normalization and rounding rules.
 
-This service does not normalize raw claims, smooth observations, consume JetStream events or expose policy-ready freshness decisions. Those responsibilities belong to later Phase 6 tasks.
+T6.4 applies a configured exponentially weighted average to complete observation scores. Cold start uses the tenant initial score; missing observations hold only within the freshness window; stale observations are withheld; and expired state decays toward a conservative baseline without improving a below-baseline score. The temporal anchor is retained so repeated evaluations do not compound decay.
+
+This service does not normalize raw claims, consume JetStream events, apply hysteresis or expose policy-ready freshness decisions. Those responsibilities belong to later Phase 6 tasks.
 
 Run `npm run trust-state:verify` from the repository root. The focused gate runs unit tests and a rolled-back PostgreSQL scenario.
 Run `npm run trust-score:verify` for weighted-score unit tests and independent hand-calculated examples.
+Run `npm run trust-smoothing:verify` for EWA, cold-start, missing, stale and decay examples.
