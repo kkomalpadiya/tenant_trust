@@ -22,7 +22,7 @@ Sequence gaps are allowed, but sequence and observation time must move forward. 
 
 Migration `016_evidence_replay_and_ordering.sql` adds an execute-only `trust.apply_evidence_replay_guard` function. It locks the source key epoch's state row before checking the nonce, sequence and observation high-water marks. A transaction-scoped advisory lock serializes the same tenant/event ID even when different sources submit it concurrently. Acceptance inserts an append-only metadata receipt and advances the epoch state together, so a failed or concurrent request cannot partially advance the trust input stream.
 
-The acceptance receipt table contains identifiers, hashes, timestamps and ordering metadata only. It does not contain the signed envelope or payload; encrypted raw evidence remains the T5.6 boundary.
+The acceptance receipt table contains identifiers, hashes, timestamps and ordering metadata only. It does not contain the signed envelope or payload. Migration 017 stores the application-encrypted canonical envelope in a separate access-controlled table and requires both records to commit together.
 
 ## Observable rejections
 

@@ -3,9 +3,13 @@ import test from "node:test";
 import { generateDeterministicDemoEvidenceSet } from "@tenant-trust/evidence-simulators";
 import {
   EVIDENCE_INGESTION_POLICY,
+  EVIDENCE_STORAGE_POLICY,
   EvidenceIngestionUnavailableError,
   EvidenceRejectedError,
+  canonicalizeEvidenceJson,
+  createEvidenceProtector,
   createEvidenceIngestionService,
+  createEvidenceStorageService,
   createInMemoryEvidenceReplayGuard,
   createPostgresEvidenceReplayGuard,
   createPostgresEvidenceVerificationResolver,
@@ -13,6 +17,14 @@ import {
 
 const fixture = generateDeterministicDemoEvidenceSet();
 const FIXTURE_CLOCK = () => new Date("2026-10-05T08:00:30.000Z");
+const MASTER_KEY = Buffer.alloc(32, 7).toString("base64url");
+
+function protector() {
+  return createEvidenceProtector({
+    masterKeyBase64Url: MASTER_KEY,
+    generateIv: () => Buffer.alloc(12, 9),
+  });
+}
 
 function replayGuard(clock = FIXTURE_CLOCK) {
   return createInMemoryEvidenceReplayGuard({ clock });
@@ -73,7 +85,7 @@ test("ingestion policy fixes the endpoint, size and cryptographic boundary", () 
     maximumFutureClockSkewSeconds: 30,
     replayStateScope: "tenant-source-key-epoch",
     rejectionAuditIdentifiers: "sha256",
-    rawPayloadPersistence: false,
+    rawPayloadPersistence: "application-encrypted-off-chain",
   });
   assert.throws(
     () => createEvidenceIngestionService({ async resolveVerificationContext() {} }),
@@ -84,6 +96,7 @@ test("ingestion policy fixes the endpoint, size and cryptographic boundary", () 
 test("all five deterministic evidence types verify and return bounded receipts", async () => {
   const lookups = [];
   const service = createEvidenceIngestionService({
+    protectEvidence: protector().protect,
     applyReplayGuard: replayGuard(),
     async resolveVerificationContext(binding) {
       lookups.push(binding);
@@ -123,9 +136,120 @@ test("all five deterministic evidence types verify and return bounded receipts",
   });
 });
 
+test("canonical evidence is encrypted, tenant scoped, retrievable and deletable", async () => {
+  assert.deepEqual(EVIDENCE_STORAGE_POLICY, {
+    formatVersion: 1,
+    cipher: "AES-256-GCM",
+    keyDerivation: "HKDF-SHA-256",
+    ivBytes: 12,
+    authenticationTagBytes: 16,
+    retentionDays: 30,
+    maximumCanonicalBytes: 65_536,
+    accessRule: "subject-owner-or-tenant-admin",
+    deletionRule: "tenant-admin",
+  });
+  const guard = replayGuard();
+  const evidenceProtector = protector();
+  const service = createEvidenceIngestionService({
+    protectEvidence: evidenceProtector.protect,
+    applyReplayGuard: guard,
+    async resolveVerificationContext() { return contextFor(); },
+  });
+  await service.ingest({ envelope: fixture.envelopes[0] });
+
+  const rawRecord = await guard.storage.retrieve({
+    tenantId: fixture.tenantId,
+    actorSubjectId: fixture.subjectId,
+    eventId: fixture.envelopes[0].eventId,
+  });
+  assert.equal(rawRecord.ciphertextBase64Url.includes("identityState"), false);
+  assert.equal(rawRecord.cipher, "AES-256-GCM");
+  assert.equal(rawRecord.retainedUntil, "2026-11-04T08:00:30.000Z");
+  const tamperedCiphertext = Buffer.from(rawRecord.ciphertextBase64Url, "base64url");
+  tamperedCiphertext[0] ^= 1;
+  assert.throws(
+    () => evidenceProtector.unprotect({
+      ...rawRecord,
+      ciphertextBase64Url: tamperedCiphertext.toString("base64url"),
+    }),
+    EvidenceIngestionUnavailableError,
+  );
+
+  const storage = createEvidenceStorageService({ repository: guard.storage, protector: evidenceProtector });
+  const ownEvidence = await storage.retrieve({
+    tenantId: fixture.tenantId,
+    actorSubjectId: fixture.subjectId,
+    eventId: fixture.envelopes[0].eventId,
+  });
+  assert.equal(
+    ownEvidence.canonicalBytes.toString("utf8"),
+    canonicalizeEvidenceJson(fixture.envelopes[0]),
+  );
+  assert.deepEqual(ownEvidence.envelope, fixture.envelopes[0]);
+
+  const otherMember = await storage.retrieve({
+    tenantId: fixture.tenantId,
+    actorSubjectId: "sub_018f1234-5678-7abc-8def-0123456789ad",
+    eventId: fixture.envelopes[0].eventId,
+  });
+  assert.equal(otherMember, null);
+  const adminEvidence = await storage.retrieve({
+    tenantId: fixture.tenantId,
+    actorSubjectId: "sub_018f1234-5678-7abc-8def-0123456789ac",
+    actorIsTenantAdmin: true,
+    eventId: fixture.envelopes[0].eventId,
+  });
+  assert.deepEqual(adminEvidence.envelope, fixture.envelopes[0]);
+
+  assert.equal(await storage.delete({
+    tenantId: fixture.tenantId,
+    actorSubjectId: fixture.subjectId,
+    actorIsTenantAdmin: false,
+    eventId: fixture.envelopes[0].eventId,
+    reason: "requested cleanup",
+  }), false);
+  assert.equal(await storage.delete({
+    tenantId: fixture.tenantId,
+    actorSubjectId: "sub_018f1234-5678-7abc-8def-0123456789ac",
+    actorIsTenantAdmin: true,
+    eventId: fixture.envelopes[0].eventId,
+    reason: "requested cleanup",
+  }), true);
+  assert.equal(await storage.retrieve({
+    tenantId: fixture.tenantId,
+    actorSubjectId: fixture.subjectId,
+    eventId: fixture.envelopes[0].eventId,
+  }), null);
+});
+
+test("retention expiry makes ciphertext unavailable and purge creates a tombstone", async () => {
+  let now = new Date("2026-10-05T08:00:30.000Z");
+  const guard = replayGuard(() => new Date(now));
+  const evidenceProtector = protector();
+  const service = createEvidenceIngestionService({
+    protectEvidence: evidenceProtector.protect,
+    applyReplayGuard: guard,
+    async resolveVerificationContext() { return contextFor(); },
+  });
+  await service.ingest({ envelope: fixture.envelopes[0] });
+  now = new Date("2026-11-04T08:00:30.000Z");
+  const storage = createEvidenceStorageService({ repository: guard.storage, protector: evidenceProtector });
+  assert.equal(await storage.retrieve({
+    tenantId: fixture.tenantId,
+    actorSubjectId: fixture.subjectId,
+    eventId: fixture.envelopes[0].eventId,
+  }), null);
+  assert.equal(await storage.purgeExpired({
+    tenantId: fixture.tenantId,
+    actorSubjectId: "sub_018f1234-5678-7abc-8def-0123456789ac",
+    actorIsTenantAdmin: true,
+  }), 1);
+});
+
 test("schema and size failures are rejected before authoritative lookup", async () => {
   let lookups = 0;
   const service = createEvidenceIngestionService({
+    protectEvidence: protector().protect,
     applyReplayGuard: replayGuard(),
     async resolveVerificationContext() {
       lookups += 1;
@@ -161,6 +285,7 @@ test("missing, inactive and cross-bound verification tuples fail closed", async 
     contextFor(0, { sourceSynthetic: false }),
   ]) {
     const service = createEvidenceIngestionService({
+      protectEvidence: protector().protect,
       applyReplayGuard: replayGuard(),
       async resolveVerificationContext() { return resolved; },
     });
@@ -170,6 +295,7 @@ test("missing, inactive and cross-bound verification tuples fail closed", async 
 
 test("tampering, digest replacement and a different source key cannot authenticate", async () => {
   const service = createEvidenceIngestionService({
+    protectEvidence: protector().protect,
     applyReplayGuard: replayGuard(),
     async resolveVerificationContext() { return contextFor(); },
   });
@@ -187,6 +313,7 @@ test("tampering, digest replacement and a different source key cannot authentica
 
   const beta = generateDeterministicDemoEvidenceSet({ tenantAlias: "beta" });
   const wrongKeyService = createEvidenceIngestionService({
+    protectEvidence: protector().protect,
     applyReplayGuard: replayGuard(),
     async resolveVerificationContext() {
       return contextFor(0, {
@@ -276,6 +403,7 @@ test("replay guard rejects duplicate IDs, nonces, sequences and older observatio
 test("ingestion rejects a replay after signature verification", async () => {
   const guard = replayGuard();
   const service = createEvidenceIngestionService({
+    protectEvidence: protector().protect,
     applyReplayGuard: guard,
     async resolveVerificationContext() { return contextFor(); },
   });
@@ -392,6 +520,9 @@ test("PostgreSQL replay guard commits one atomic decision with bounded metadata"
                 }],
               };
             }
+            if (input.text.includes("store_encrypted_evidence")) {
+              return { rowCount: 1, rows: [{ retained_until: new Date("2026-11-04T08:00:30.000Z") }] };
+            }
             return { rowCount: null, rows: [] };
           },
           release() { released = true; },
@@ -399,7 +530,12 @@ test("PostgreSQL replay guard commits one atomic decision with bounded metadata"
       },
     },
   });
-  const candidate = replayCandidate();
+  const candidate = replayCandidate({
+    protectedEvidence: protector().protect({
+      envelope: fixture.envelopes[0],
+      contentHashSha256: fixture.envelopes[0].signature.signedContentSha256,
+    }),
+  });
   const decision = await guard(candidate);
   const guarded = calls.find(({ text }) => text.includes("apply_evidence_replay_guard"));
   assert.deepEqual(guarded.values, [
@@ -422,6 +558,11 @@ test("PostgreSQL replay guard commits one atomic decision with bounded metadata"
     acceptedAt: "2026-10-05T08:00:30.000Z",
     highestSourceSequence: 1,
   });
+  const stored = calls.find(({ text }) => text.includes("store_encrypted_evidence"));
+  assert.equal(stored.values[0], candidate.tenantId);
+  assert.equal(stored.values[1], candidate.eventId);
+  assert.equal(Buffer.isBuffer(stored.values[4]), true);
+  assert.equal(Buffer.isBuffer(stored.values[6]), true);
   assert.equal(calls.at(-1).text, "COMMIT");
   assert.equal(released, true);
 });

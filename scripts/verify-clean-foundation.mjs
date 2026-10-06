@@ -70,7 +70,13 @@ const settings = Object.fromEntries(
       const separator = line.indexOf("=");
       const key = line.slice(0, separator);
       const value = line.slice(separator + 1);
-      return [key, value === "replace-with-a-generated-local-secret" ? randomBytes(36).toString("base64url") : value];
+      if (value === "replace-with-a-generated-local-secret") {
+        return [key, randomBytes(36).toString("base64url")];
+      }
+      if (value === "replace-with-a-generated-32-byte-base64url-key") {
+        return [key, randomBytes(32).toString("base64url")];
+      }
+      return [key, value];
     }),
 );
 

@@ -10,8 +10,14 @@ const stepCaPasswordPath = resolve(runtimeSecretDirectory, "step-ca-password.txt
 const template = await readFile(examplePath, "utf8");
 const force = process.argv.includes("--force");
 const secretPlaceholder = "replace-with-a-generated-local-secret";
+const evidenceKeyPlaceholder = "replace-with-a-generated-32-byte-base64url-key";
 const generateSecret = () => randomBytes(36).toString("base64url");
-const resolveTemplateValue = (value) => value === secretPlaceholder ? generateSecret() : value;
+const generateEvidenceKey = () => randomBytes(32).toString("base64url");
+const resolveTemplateValue = (value) => {
+  if (value === secretPlaceholder) return generateSecret();
+  if (value === evidenceKeyPlaceholder) return generateEvidenceKey();
+  return value;
+};
 
 let existing = null;
 try {
@@ -24,7 +30,9 @@ let environment;
 let message;
 let writeEnvironment = true;
 if (existing === null || force) {
-  environment = template.replaceAll(secretPlaceholder, generateSecret);
+  environment = template
+    .replaceAll(secretPlaceholder, generateSecret)
+    .replaceAll(evidenceKeyPlaceholder, generateEvidenceKey);
   message = force
     ? "Recreated .env and rotated all local service secrets."
     : "Created .env with generated local service secrets.";

@@ -3,6 +3,7 @@ import test from "node:test";
 import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
 import {
   EVIDENCE_INGESTION_POLICY,
+  createEvidenceProtector,
   createEvidenceIngestionService,
   createInMemoryEvidenceReplayGuard,
 } from "@tenant-trust/evidence";
@@ -16,6 +17,10 @@ import {
 
 const authorizationMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 const fixture = generateDeterministicDemoEvidenceSet();
+const protector = createEvidenceProtector({
+  masterKeyBase64Url: Buffer.alloc(32, 7).toString("base64url"),
+  generateIv: () => Buffer.alloc(12, 9),
+});
 
 function replayGuard() {
   return createInMemoryEvidenceReplayGuard({
@@ -68,6 +73,7 @@ function createApi(evidenceIngestionService) {
 
 test("evidence endpoint accepts a verified source envelope without transport identity headers", async (t) => {
   const service = createEvidenceIngestionService({
+    protectEvidence: protector.protect,
     applyReplayGuard: replayGuard(),
     async resolveVerificationContext() { return verificationContext(); },
   });
@@ -88,6 +94,7 @@ test("evidence endpoint accepts a verified source envelope without transport ide
 
 test("schema failures, verification denials and query controls have bounded responses", async (t) => {
   const service = createEvidenceIngestionService({
+    protectEvidence: protector.protect,
     applyReplayGuard: replayGuard(),
     async resolveVerificationContext() { return verificationContext(); },
   });
@@ -109,6 +116,7 @@ test("schema failures, verification denials and query controls have bounded resp
   assert.deepEqual(rejected.json(), { error: { code: "EVIDENCE_REJECTED" } });
 
   const missingContextApi = createApi(createEvidenceIngestionService({
+    protectEvidence: protector.protect,
     applyReplayGuard: replayGuard(),
     async resolveVerificationContext() { return null; },
   }));
@@ -133,6 +141,7 @@ test("schema failures, verification denials and query controls have bounded resp
 test("raw envelopes over the fixed route limit are rejected before ingestion", async (t) => {
   let touched = false;
   const api = createApi(createEvidenceIngestionService({
+    protectEvidence: protector.protect,
     applyReplayGuard: replayGuard(),
     async resolveVerificationContext() {
       touched = true;
@@ -152,6 +161,7 @@ test("raw envelopes over the fixed route limit are rejected before ingestion", a
 
 test("replayed evidence receives the same bounded rejection as other verification denials", async (t) => {
   const service = createEvidenceIngestionService({
+    protectEvidence: protector.protect,
     applyReplayGuard: replayGuard(),
     async resolveVerificationContext() { return verificationContext(); },
   });

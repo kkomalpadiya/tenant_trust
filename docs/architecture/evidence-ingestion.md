@@ -37,6 +37,6 @@ Internal reason codes are retained only inside the service for focused verificat
 
 ## Task boundary and verification
 
-T5.4 authenticates the source and validates schema, size and tenant/subject binding. T5.5 adds the required atomic freshness, replay and ordering guard described in `evidence-replay-and-ordering.md`. Raw evidence persistence remains excluded from this boundary; T5.6 owns encrypted off-chain persistence.
+T5.4 authenticates the source and validates schema, size and tenant/subject binding. T5.5 adds the atomic freshness, replay and ordering guard described in `evidence-replay-and-ordering.md`. T5.6 extends the same acceptance transaction with application-encrypted off-chain persistence described in `encrypted-evidence-storage.md`.
 
 Run `npm run evidence-ingestion:verify`. The gate executes the service and Fastify route tests, then runs a rolled-back PostgreSQL scenario proving exact resolution, cross-tenant/subject/key invisibility and revoked-key denial.
