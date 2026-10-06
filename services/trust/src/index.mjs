@@ -18,6 +18,13 @@ export {
   defineTemporalTrustConfiguration,
 } from "./temporal-smoothing.mjs";
 
+export {
+  VALIDATED_EVIDENCE_CONSUMPTION_POLICY,
+  ValidatedEvidenceConsumptionError,
+  createPostgresValidatedEvidenceRepository,
+  createValidatedEvidenceTrustConsumer,
+} from "./validated-evidence-consumer.mjs";
+
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SUBJECT_ID = /^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const EVIDENCE_ID = /^evd_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;

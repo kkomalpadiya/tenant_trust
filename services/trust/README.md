@@ -8,8 +8,11 @@ T6.3 also owns the deterministic weighted arithmetic mean over the five already-
 
 T6.4 applies a configured exponentially weighted average to complete observation scores. Cold start uses the tenant initial score; missing observations hold only within the freshness window; stale observations are withheld; and expired state decays toward a conservative baseline without improving a below-baseline score. The temporal anchor is retained so repeated evaluations do not compound decay.
 
-This service does not normalize raw claims, consume JetStream events, apply hysteresis or expose policy-ready freshness decisions. Those responsibilities belong to later Phase 6 tasks.
+T6.5 consumes producer-authenticated `evidence.accepted.v1` deliveries through the existing verification boundary. A trusted resolver converts the exact accepted raw envelope into one normalized component score; the metadata-only event never carries raw evidence. PostgreSQL records the consume-once receipt, locks the tenant-and-subject aggregate, stages only a newer component observation and appends a complete five-component state version in one transaction. Redelivery is a no-op, older evidence cannot roll state backward, and concurrent subject updates cannot overwrite one another.
+
+This service does not define raw-claim normalization rules, apply hysteresis or expose policy-ready freshness decisions. Those responsibilities belong to later Phase 6 tasks.
 
 Run `npm run trust-state:verify` from the repository root. The focused gate runs unit tests and a rolled-back PostgreSQL scenario.
 Run `npm run trust-score:verify` for weighted-score unit tests and independent hand-calculated examples.
 Run `npm run trust-smoothing:verify` for EWA, cold-start, missing, stale and decay examples.
+Run `npm run trust-evidence-consumer:verify` for verified delivery, durable idempotency, subject ordering, version advancement and tenant-isolation checks.
