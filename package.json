@@ -47,6 +47,7 @@
     "evidence-simulators:verify": "npm run test:evidence-simulators && node scripts/verify-deterministic-evidence-simulators.mjs",
     "evidence-simulators:generate": "node packages/evidence-simulators/src/cli.mjs",
     "evidence-ingestion:verify": "npm run test:evidence && npm run test:api && node scripts/verify-evidence-ingestion.mjs",
+    "evidence-replay:verify": "npm run test:evidence && npm run test:api && node scripts/verify-evidence-replay.mjs",
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
     "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
     "profile-record-api:verify": "node scripts/verify-profile-record-api.mjs",

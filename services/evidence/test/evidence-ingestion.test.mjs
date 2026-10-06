@@ -6,10 +6,17 @@ import {
   EvidenceIngestionUnavailableError,
   EvidenceRejectedError,
   createEvidenceIngestionService,
+  createInMemoryEvidenceReplayGuard,
+  createPostgresEvidenceReplayGuard,
   createPostgresEvidenceVerificationResolver,
 } from "../src/index.mjs";
 
 const fixture = generateDeterministicDemoEvidenceSet();
+const FIXTURE_CLOCK = () => new Date("2026-10-05T08:00:30.000Z");
+
+function replayGuard(clock = FIXTURE_CLOCK) {
+  return createInMemoryEvidenceReplayGuard({ clock });
+}
 
 function contextFor(index = 0, overrides = {}) {
   const envelope = fixture.envelopes[index];
@@ -33,6 +40,26 @@ function contextFor(index = 0, overrides = {}) {
   };
 }
 
+function replayCandidate(overrides = {}) {
+  const envelope = fixture.envelopes[0];
+  return {
+    tenantId: envelope.tenantId,
+    subjectId: envelope.subjectId,
+    sourceId: envelope.sourceId,
+    keyId: envelope.signature.keyId,
+    evidenceType: envelope.evidenceType,
+    eventId: envelope.eventId,
+    sourceSequence: envelope.sourceSequence,
+    nonce: envelope.nonce,
+    observedAt: envelope.observedAt,
+    expiresAt: envelope.expiresAt,
+    contentHashSha256: envelope.signature.signedContentSha256,
+    synthetic: envelope.synthetic,
+    maximumAgeSeconds: 300,
+    ...overrides,
+  };
+}
+
 test("ingestion policy fixes the endpoint, size and cryptographic boundary", () => {
   assert.deepEqual(EVIDENCE_INGESTION_POLICY, {
     schemaVersion: "1.0.0",
@@ -43,13 +70,21 @@ test("ingestion policy fixes the endpoint, size and cryptographic boundary", () 
     canonicalizationProfile: "tenant-trust-evidence-json-v1",
     acceptedSourceState: "active",
     acceptedKeyState: "active",
+    maximumFutureClockSkewSeconds: 30,
+    replayStateScope: "tenant-source-key-epoch",
+    rejectionAuditIdentifiers: "sha256",
     rawPayloadPersistence: false,
   });
+  assert.throws(
+    () => createEvidenceIngestionService({ async resolveVerificationContext() {} }),
+    /atomic evidence replay guard/u,
+  );
 });
 
 test("all five deterministic evidence types verify and return bounded receipts", async () => {
   const lookups = [];
   const service = createEvidenceIngestionService({
+    applyReplayGuard: replayGuard(),
     async resolveVerificationContext(binding) {
       lookups.push(binding);
       return contextFor(fixture.envelopes.findIndex((item) => item.sourceId === binding.sourceId));
@@ -91,6 +126,7 @@ test("all five deterministic evidence types verify and return bounded receipts",
 test("schema and size failures are rejected before authoritative lookup", async () => {
   let lookups = 0;
   const service = createEvidenceIngestionService({
+    applyReplayGuard: replayGuard(),
     async resolveVerificationContext() {
       lookups += 1;
       return contextFor();
@@ -125,6 +161,7 @@ test("missing, inactive and cross-bound verification tuples fail closed", async 
     contextFor(0, { sourceSynthetic: false }),
   ]) {
     const service = createEvidenceIngestionService({
+      applyReplayGuard: replayGuard(),
       async resolveVerificationContext() { return resolved; },
     });
     await assert.rejects(service.ingest({ envelope: fixture.envelopes[0] }), EvidenceRejectedError);
@@ -133,6 +170,7 @@ test("missing, inactive and cross-bound verification tuples fail closed", async 
 
 test("tampering, digest replacement and a different source key cannot authenticate", async () => {
   const service = createEvidenceIngestionService({
+    applyReplayGuard: replayGuard(),
     async resolveVerificationContext() { return contextFor(); },
   });
   const tampered = structuredClone(fixture.envelopes[0]);
@@ -149,6 +187,7 @@ test("tampering, digest replacement and a different source key cannot authentica
 
   const beta = generateDeterministicDemoEvidenceSet({ tenantAlias: "beta" });
   const wrongKeyService = createEvidenceIngestionService({
+    applyReplayGuard: replayGuard(),
     async resolveVerificationContext() {
       return contextFor(0, {
         publicKeyBase64Url: beta.enrollments[0].publicKeyBase64Url,
@@ -161,6 +200,92 @@ test("tampering, digest replacement and a different source key cannot authentica
     (error) => error instanceof EvidenceRejectedError
       && error.reasonCode === "EVIDENCE_SIGNATURE_INVALID",
   );
+});
+
+test("freshness guard enforces clock skew, expiry and the source TTL", async () => {
+  const guard = replayGuard(() => new Date("2026-10-05T08:05:00.000Z"));
+  const cases = [
+    [{ observedAt: "2026-10-05T08:05:31.000Z", expiresAt: "2026-10-05T08:06:00.000Z" }, "EVIDENCE_OBSERVED_IN_FUTURE"],
+    [{ observedAt: "2026-10-05T07:59:59.000Z", expiresAt: "2026-10-05T08:05:30.000Z" }, "EVIDENCE_STALE"],
+    [{ observedAt: "2026-10-05T08:03:00.000Z", expiresAt: "2026-10-05T08:04:59.999Z" }, "EVIDENCE_EXPIRED"],
+    [{ observedAt: "2026-10-05T08:05:00.000Z", expiresAt: "2026-10-05T08:10:01.000Z" }, "EVIDENCE_TTL_EXCEEDED"],
+    [{ observedAt: "2026-10-05T08:05:00.000Z", expiresAt: "2026-10-05T08:05:00.000Z" }, "EVIDENCE_TIME_WINDOW_INVALID"],
+  ];
+  for (const [overrides, reasonCode] of cases) {
+    const decision = await guard(replayCandidate(overrides));
+    assert.equal(decision.accepted, false);
+    assert.equal(decision.reasonCode, reasonCode);
+  }
+
+  const boundary = await replayGuard(() => new Date("2026-10-05T08:05:00.000Z"))(
+    replayCandidate({
+      observedAt: "2026-10-05T08:05:30.000Z",
+      expiresAt: "2026-10-05T08:06:00.000Z",
+    }),
+  );
+  assert.equal(boundary.accepted, true);
+});
+
+test("replay guard rejects duplicate IDs, nonces, sequences and older observations", async () => {
+  const guard = replayGuard(() => new Date("2026-10-05T08:05:00.000Z"));
+  const accepted = replayCandidate({
+    eventId: "evt_018f1234-5678-7abc-8def-0123456789e0",
+    sourceSequence: 10,
+    nonce: "AAAAAAAAAAAAAAAAAAAAAA",
+    observedAt: "2026-10-05T08:05:00.000Z",
+    expiresAt: "2026-10-05T08:10:00.000Z",
+  });
+  assert.equal((await guard(accepted)).accepted, true);
+
+  const scenarios = [
+    [accepted, "EVIDENCE_EVENT_REPLAYED"],
+    [{ ...accepted, eventId: "evt_018f1234-5678-7abc-8def-0123456789e1", sourceSequence: 11 }, "EVIDENCE_NONCE_REPLAYED"],
+    [{ ...accepted, eventId: "evt_018f1234-5678-7abc-8def-0123456789e2", nonce: "BBBBBBBBBBBBBBBBBBBBBB" }, "EVIDENCE_SEQUENCE_REPLAYED"],
+    [{ ...accepted, eventId: "evt_018f1234-5678-7abc-8def-0123456789e3", nonce: "CCCCCCCCCCCCCCCCCCCCCC", sourceSequence: 9 }, "EVIDENCE_SEQUENCE_REORDERED"],
+    [{ ...accepted, eventId: "evt_018f1234-5678-7abc-8def-0123456789e4", nonce: "DDDDDDDDDDDDDDDDDDDDDD", sourceSequence: 11, observedAt: "2026-10-05T08:04:59.999Z", expiresAt: "2026-10-05T08:09:59.999Z" }, "EVIDENCE_OBSERVATION_REORDERED"],
+  ];
+  for (const [candidate, reasonCode] of scenarios) {
+    const decision = await guard(candidate);
+    assert.equal(decision.accepted, false);
+    assert.equal(decision.reasonCode, reasonCode);
+    assert.equal(decision.highestSourceSequence, 10);
+  }
+
+  const newKeyEpoch = await guard({
+    ...accepted,
+    keyId: "key_018f1234-5678-7abc-8def-0123456789e5",
+    eventId: "evt_018f1234-5678-7abc-8def-0123456789e5",
+    sourceSequence: 0,
+  });
+  assert.equal(newKeyEpoch.accepted, true);
+
+  const snapshot = guard.snapshot();
+  assert.equal(snapshot.totalRejections, 5);
+  assert.deepEqual(snapshot.byReason, {
+    EVIDENCE_EVENT_REPLAYED: 1,
+    EVIDENCE_NONCE_REPLAYED: 1,
+    EVIDENCE_SEQUENCE_REPLAYED: 1,
+    EVIDENCE_SEQUENCE_REORDERED: 1,
+    EVIDENCE_OBSERVATION_REORDERED: 1,
+  });
+  assert.equal(JSON.stringify(snapshot.records).includes(accepted.eventId), false);
+  assert.equal(JSON.stringify(snapshot.records).includes(accepted.nonce), false);
+  assert.match(snapshot.records[0].eventIdSha256, /^[0-9a-f]{64}$/u);
+});
+
+test("ingestion rejects a replay after signature verification", async () => {
+  const guard = replayGuard();
+  const service = createEvidenceIngestionService({
+    applyReplayGuard: guard,
+    async resolveVerificationContext() { return contextFor(); },
+  });
+  await service.ingest({ envelope: fixture.envelopes[0] });
+  await assert.rejects(
+    service.ingest({ envelope: fixture.envelopes[0] }),
+    (error) => error instanceof EvidenceRejectedError
+      && error.reasonCode === "EVIDENCE_EVENT_REPLAYED",
+  );
+  assert.equal(guard.snapshot().byReason.EVIDENCE_EVENT_REPLAYED, 1);
 });
 
 test("PostgreSQL resolver parameterizes the exact tuple without binding claimed actor authority", async () => {
@@ -244,5 +369,59 @@ test("PostgreSQL resolver rolls back and exposes only an availability failure", 
     keyId: fixture.enrollments[0].keyId,
   }), EvidenceIngestionUnavailableError);
   assert.equal(calls.at(-1), "ROLLBACK");
+  assert.equal(released, true);
+});
+
+test("PostgreSQL replay guard commits one atomic decision with bounded metadata", async () => {
+  const calls = [];
+  let released = false;
+  const guard = createPostgresEvidenceReplayGuard({
+    pool: {
+      async connect() {
+        return {
+          async query(input) {
+            calls.push(input);
+            if (input.text.includes("apply_evidence_replay_guard")) {
+              return {
+                rowCount: 1,
+                rows: [{
+                  accepted: true,
+                  reason_code: null,
+                  accepted_at: new Date("2026-10-05T08:00:30.000Z"),
+                  highest_source_sequence: "1",
+                }],
+              };
+            }
+            return { rowCount: null, rows: [] };
+          },
+          release() { released = true; },
+        };
+      },
+    },
+  });
+  const candidate = replayCandidate();
+  const decision = await guard(candidate);
+  const guarded = calls.find(({ text }) => text.includes("apply_evidence_replay_guard"));
+  assert.deepEqual(guarded.values, [
+    candidate.tenantId,
+    candidate.subjectId,
+    candidate.sourceId,
+    candidate.keyId,
+    candidate.evidenceType,
+    candidate.eventId,
+    candidate.sourceSequence,
+    candidate.nonce,
+    candidate.observedAt,
+    candidate.expiresAt,
+    candidate.contentHashSha256,
+    candidate.synthetic,
+  ]);
+  assert.deepEqual(decision, {
+    accepted: true,
+    reasonCode: null,
+    acceptedAt: "2026-10-05T08:00:30.000Z",
+    highestSourceSequence: 1,
+  });
+  assert.equal(calls.at(-1).text, "COMMIT");
   assert.equal(released, true);
 });
