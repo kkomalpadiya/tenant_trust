@@ -7,7 +7,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `apps/api/` | SaaS API, tenant and subject management, protected resources, request enforcement, stateless-session/deadline/replay safeguards, sanitized request-outcome capture and internal service adapters |
 | `apps/web/` | Tenant dashboard, certificate controls, trust explanations and audit views |
 | `services/evidence/` | Source enrollment, signature and freshness validation, accepted evidence delivery |
-| `services/trust/` | Score calculation, temporal smoothing, state transitions and explanations |
+| `services/trust/` | Tenant-scoped trust-state version storage, score calculation, temporal smoothing, state transitions and explanations |
 | `services/orchestrator/` | Security action state machine, certificate actions and governed recovery |
 | `services/audit/` | Durable audit delivery, Fabric integration, reconciliation and verification |
 | `packages/contracts/` | Versioned request, event and decision schemas plus certificate profiles shared by producers and consumers |
