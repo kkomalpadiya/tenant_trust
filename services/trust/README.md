@@ -10,9 +10,12 @@ T6.4 applies a configured exponentially weighted average to complete observation
 
 T6.5 consumes producer-authenticated `evidence.accepted.v1` deliveries through the existing verification boundary. A trusted resolver converts the exact accepted raw envelope into one normalized component score; the metadata-only event never carries raw evidence. PostgreSQL records the consume-once receipt, locks the tenant-and-subject aggregate, stages only a newer component observation and appends a complete five-component state version in one transaction. Redelivery is a no-op, older evidence cannot roll state backward, and concurrent subject updates cannot overwrite one another.
 
-This service does not define raw-claim normalization rules, apply hysteresis or expose policy-ready freshness decisions. Those responsibilities belong to later Phase 6 tasks.
+T6.6 applies explicit transition controls after weighting and temporal smoothing. Low, medium and high bands use five-point hysteresis gaps. Deterioration is immediate; recovery needs two consecutive qualifying evaluations from at least two distinct sources and advances only one band at a time. An accepted receipt's source-influence fraction bounds the absolute score delta from ordinary evidence. A closed critical-evidence rule set may bypass that cap only to reduce trust and never restores trust automatically.
+
+This service does not define raw-claim normalization rules or expose policy-ready freshness decisions. Those responsibilities belong to later Phase 6 tasks.
 
 Run `npm run trust-state:verify` from the repository root. The focused gate runs unit tests and a rolled-back PostgreSQL scenario.
 Run `npm run trust-score:verify` for weighted-score unit tests and independent hand-calculated examples.
 Run `npm run trust-smoothing:verify` for EWA, cold-start, missing, stale and decay examples.
 Run `npm run trust-evidence-consumer:verify` for verified delivery, durable idempotency, subject ordering, version advancement and tenant-isolation checks.
+Run `npm run trust-controls:verify` for band boundaries, hysteresis, source influence, corroborated recovery and critical overrides.

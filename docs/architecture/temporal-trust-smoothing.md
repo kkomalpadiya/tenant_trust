@@ -26,6 +26,6 @@ The anchor is the smoothed score produced by the last fresh observation. It is r
 
 Before any complete fresh observation exists, the result is the configured initial score and the last-fresh timestamp remains absent. A missing or already-stale first observation cannot establish or refresh trust.
 
-The result identifies whether it was initialized, updated, held, decayed or remained at cold start. Its temporal state retains both the last fresh observation and last evaluation timestamps, so callers cannot move the calculation backward in time. It also exposes the observation status, configuration and calculation terms. Hysteresis, critical-evidence overrides and bounded source influence remain T6.6 responsibilities.
+The result identifies whether it was initialized, updated, held, decayed or remained at cold start. Its temporal state retains both the last fresh observation and last evaluation timestamps, so callers cannot move the calculation backward in time. It also exposes the observation status, configuration and calculation terms. T6.6 applies the separate [trust transition controls](trust-transition-controls.md) after this calculation.
 
 Run `npm run trust-smoothing:verify` for temporal unit tests and independent sequential calculations.

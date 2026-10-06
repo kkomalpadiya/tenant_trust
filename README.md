@@ -59,6 +59,7 @@ The repository contains the initial scope, repository design, selected technolog
 - [Deterministic weighted trust score](docs/architecture/deterministic-weighted-trust-score.md)
 - [Temporal trust smoothing and cold start](docs/architecture/temporal-trust-smoothing.md)
 - [Concurrency-safe validated evidence consumption](docs/architecture/validated-evidence-trust-consumption.md)
+- [Trust transition controls](docs/architecture/trust-transition-controls.md)
 
 Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run tenant-isolation:verify` for the Phase 2 gate, `npm run certificate-lifecycle:verify` for the Phase 3 gate and `npm run protected-saas:verify` for the complete Phase 4 gate. The individual gateway, protected API, role/action, sensitive-operation, request-state, audit and safeguard commands remain available for diagnosis. Run `npm run foundation:check` for the complete foundation and `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
 
