@@ -4,6 +4,13 @@ import {
   defineNormalizedComponents,
 } from "@tenant-trust/trust-model";
 
+export {
+  WEIGHTED_SCORE_METHOD,
+  WEIGHTED_SCORE_NORMALIZATION,
+  WEIGHTED_SCORE_ROUNDING,
+  calculateWeightedTrustScore,
+} from "./weighted-score.mjs";
+
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SUBJECT_ID = /^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const EVIDENCE_ID = /^evd_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
