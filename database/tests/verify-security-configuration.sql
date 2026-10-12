@@ -12,13 +12,14 @@ BEGIN
     ('identity', 'tenant_issuer_mappings'),
     ('trust', 'evidence_sources'),
     ('trust', 'trust_configurations'),
+    ('trust', 'trust_configuration_events'),
     ('trust', 'policy_versions')
   )
     AND relation.relrowsecurity
     AND relation.relforcerowsecurity;
 
-  IF secured_table_count <> 4 THEN
-    RAISE EXCEPTION 'expected four forced-RLS security configuration tables, found %', secured_table_count;
+  IF secured_table_count <> 5 THEN
+    RAISE EXCEPTION 'expected five forced-RLS security configuration tables, found %', secured_table_count;
   END IF;
 
   SELECT count(*) INTO policy_count
@@ -36,6 +37,7 @@ BEGIN
     ('trust', 'trust_configurations', 'trust_configurations_tenant_admin_insert'),
     ('trust', 'trust_configurations', 'trust_configurations_tenant_admin_update'),
     ('trust', 'trust_configurations', 'trust_configurations_tenant_admin_delete'),
+    ('trust', 'trust_configuration_events', 'trust_configuration_events_current_actor_select'),
     ('trust', 'policy_versions', 'policy_versions_current_actor_select'),
     ('trust', 'policy_versions', 'policy_versions_tenant_admin_insert'),
     ('trust', 'policy_versions', 'policy_versions_tenant_admin_update'),
@@ -43,8 +45,8 @@ BEGIN
   )
     AND 'tenant_trust_app' = ANY(roles);
 
-  IF policy_count <> 16 THEN
-    RAISE EXCEPTION 'expected sixteen actor-aware security configuration policies, found %', policy_count;
+  IF policy_count <> 17 THEN
+    RAISE EXCEPTION 'expected seventeen actor-aware security configuration policies, found %', policy_count;
   END IF;
 
   IF NOT EXISTS (
@@ -133,15 +135,10 @@ SELECT identity.set_tenant_actor_context(
   'sub_018f1234-5678-7abc-8def-0123456789ac'
 );
 
-INSERT INTO trust.trust_configurations (
-  tenant_id, configuration_version, model_version, state, initial_score,
-  smoothing_alpha, maximum_source_influence, stale_after_seconds,
-  identity_weight, device_weight, behaviour_weight, certificate_weight,
-  compliance_weight, created_by_subject_id
-) VALUES (
-  'tnt_018f1234-5678-7abc-8def-0123456789ab', 2, '1.1.0', 'draft', 62,
-  0.35, 0.20, 2700, 0.20, 0.25, 0.25, 0.15, 0.15,
-  'sub_018f1234-5678-7abc-8def-0123456789ac'
+SELECT * FROM trust.create_trust_configuration_draft(
+  '1.1.0', 62, 0.35, 0.20, 2700,
+  0.20, 0.25, 0.25, 0.15, 0.15,
+  'SECURITY_CONFIGURATION_TEST', clock_timestamp()
 );
 
 DO $verify_alpha_admin_security_configuration$
@@ -195,11 +192,10 @@ BEGIN
   END;
 
   BEGIN
-    UPDATE trust.trust_configurations
-    SET state = 'active', activated_at = clock_timestamp(), updated_at = clock_timestamp()
+    UPDATE trust.trust_configurations SET state = 'active'
     WHERE configuration_version = 2;
-    RAISE EXCEPTION 'a second active trust configuration was accepted';
-  EXCEPTION WHEN unique_violation THEN
+    RAISE EXCEPTION 'administrator bypassed the trust configuration lifecycle functions';
+  EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
 END

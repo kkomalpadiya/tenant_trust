@@ -12,6 +12,8 @@ T6.5 consumes producer-authenticated `evidence.accepted.v1` deliveries through t
 
 T6.6 applies explicit transition controls after weighting and temporal smoothing. Low, medium and high bands use five-point hysteresis gaps. Deterioration is immediate; recovery needs two consecutive qualifying evaluations from at least two distinct sources and advances only one band at a time. An accepted receipt's source-influence fraction bounds the absolute score delta from ordinary evidence. A closed critical-evidence rule set may bypass that cap only to reduce trust and never restores trust automatically.
 
+T6.7 exposes trust-configuration changes only through an administrator service and constrained PostgreSQL lifecycle functions. Draft creation validates every range and the five-weight total, activation atomically replaces the active version, and rollback copies historical values into a new active version. Configuration rows and lifecycle events remain append-only, while durable confirmations are checked before the service reports success.
+
 This service does not define raw-claim normalization rules or expose policy-ready freshness decisions. Those responsibilities belong to later Phase 6 tasks.
 
 Run `npm run trust-state:verify` from the repository root. The focused gate runs unit tests and a rolled-back PostgreSQL scenario.
@@ -19,3 +21,4 @@ Run `npm run trust-score:verify` for weighted-score unit tests and independent h
 Run `npm run trust-smoothing:verify` for EWA, cold-start, missing, stale and decay examples.
 Run `npm run trust-evidence-consumer:verify` for verified delivery, durable idempotency, subject ordering, version advancement and tenant-isolation checks.
 Run `npm run trust-controls:verify` for band boundaries, hysteresis, source influence, corroborated recovery and critical overrides.
+Run `npm run trust-configuration:verify` for authorization, validation, atomic activation, immutable history, copy-forward rollback and tenant isolation.

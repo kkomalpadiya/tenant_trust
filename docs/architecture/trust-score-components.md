@@ -23,7 +23,7 @@ The weights are the slide 13 starting values and sum to 1. They are design defau
 - All five components are required exactly once. Missing evidence remains missing; callers cannot silently replace it with zero or a safe default.
 - Every normalized component must be a finite number from 0 through 100. Strings, `NaN`, infinities and extra component names are invalid.
 - Every weight must be a finite number from 0 through 1, all five weights must be present, and their total must be 1.
-- A tenant-tuned configuration receives its own semantic model version and produces a new immutable value. It never mutates the initial defaults. Activation, history and rollback are implemented by the later versioned-configuration task using the existing tenant-scoped `trust.trust_configurations` storage boundary.
+- A tenant-tuned configuration receives its own semantic model version and produces a new immutable value. It never mutates the initial defaults. The [versioned trust configuration lifecycle](versioned-trust-configuration.md) provides administrator-only draft creation, activation, history and copy-forward rollback on the tenant-scoped `trust.trust_configurations` boundary.
 - Certificate score is explanatory trust input only. An invalid, expired, revoked, unknown or foreign-tenant certificate still denies authentication regardless of any component or aggregate score.
 
 ## Executable contract

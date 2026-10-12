@@ -15,7 +15,7 @@ Issuer and source mappings have stable identities. Trust settings and policy bun
 
 ## Runtime authorization
 
-All four tables enable and force PostgreSQL row-level security for `tenant_trust_app`. An active member can read only the configuration for the actor-bound tenant. Only an active `tenant-admin` can insert, update or delete rows, and every write must retain the transaction's trusted tenant ID. A missing actor context returns no configuration rows. A guessed identifier from another tenant is invisible and cannot become write authority.
+All configuration tables enable and force PostgreSQL row-level security for `tenant_trust_app`. An active member can read only the configuration for the actor-bound tenant. Issuer, evidence-source and policy writes require an active `tenant-admin` and must retain the transaction's trusted tenant ID. Direct trust-configuration writes are revoked: administrators use the constrained draft, activation and rollback functions described in the [versioned trust configuration lifecycle](versioned-trust-configuration.md). A missing actor context returns no configuration rows. A guessed identifier from another tenant is invisible and cannot become write authority.
 
 Database operations follow the existing transaction contract:
 
@@ -38,4 +38,4 @@ Irreversible tenant teardown retires issuer mappings and evidence sources, super
 
 ## Verification
 
-Run `npm run security-configuration:verify` after applying migrations and provisioning demo data. The verifier proves forced RLS and actor-aware policies, member read-only access, tenant-admin writes, cross-tenant identifier denial, tenant-qualified issuer references, immutable version content, one-active-version rules and empty access when the same connection is reused without context. All test writes roll back.
+Run `npm run security-configuration:verify` after applying migrations and provisioning demo data. The verifier proves forced RLS and actor-aware policies, member read-only access, tenant-admin administration, cross-tenant identifier denial, tenant-qualified issuer references, immutable version content, one-active-version rules and empty access when the same connection is reused without context. Run `npm run trust-configuration:verify` for the complete versioned trust lifecycle. All test writes roll back.

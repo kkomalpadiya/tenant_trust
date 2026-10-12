@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@tenant-trust/evidence-events": "0.1.0",
+    "@tenant-trust/tenant-context": "0.1.0",
     "@tenant-trust/trust-model": "0.1.0"
   }
 }
