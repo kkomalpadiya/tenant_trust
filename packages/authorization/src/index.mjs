@@ -7,6 +7,7 @@ export const TENANT_ROLES = Object.freeze([
 
 export const AUTHORIZATION_MODE_IDS = Object.freeze({
   PKI_RBAC_BASELINE: "pki-rbac-baseline-v1",
+  ADAPTIVE_TRUST_OPA: "adaptive-trust-opa-v1",
 });
 
 export const ACTIONS = Object.freeze([
@@ -109,11 +110,20 @@ const PKI_RBAC_BASELINE_MODE = Object.freeze({
 });
 AUTHORIZATION_MODES.add(PKI_RBAC_BASELINE_MODE);
 
+const ADAPTIVE_TRUST_OPA_MODE = Object.freeze({
+  modeId: AUTHORIZATION_MODE_IDS.ADAPTIVE_TRUST_OPA,
+  certificatePolicy: "tenant-scoped-x509",
+  rolePolicy: "role-action-matrix-v1",
+  policyDecisionContract: "opa-decision-input-v1/opa-decision-output-v1",
+  policyDecisionPath: "tenant_trust/authorization/decision",
+  adaptiveTrustUsed: true,
+});
+AUTHORIZATION_MODES.add(ADAPTIVE_TRUST_OPA_MODE);
+
 export function selectAuthorizationMode(modeId) {
-  if (modeId !== AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE) {
-    throw new AuthorizationError("AUTHORIZATION_MODE_UNSUPPORTED");
-  }
-  return PKI_RBAC_BASELINE_MODE;
+  if (modeId === AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE) return PKI_RBAC_BASELINE_MODE;
+  if (modeId === AUTHORIZATION_MODE_IDS.ADAPTIVE_TRUST_OPA) return ADAPTIVE_TRUST_OPA_MODE;
+  throw new AuthorizationError("AUTHORIZATION_MODE_UNSUPPORTED");
 }
 
 export function assertAuthorizationMode(mode) {
@@ -142,6 +152,18 @@ export function evaluateAuthorizationMode(mode, context, action) {
     throw new AuthorizationError("CERTIFICATE_AUTHENTICATION_REQUIRED");
   }
   const eligibility = resolveRoleAction(trustedContext, action);
+  if (selectedMode === ADAPTIVE_TRUST_OPA_MODE) {
+    return Object.freeze({
+      modeId: selectedMode.modeId,
+      certificatePolicy: selectedMode.certificatePolicy,
+      rolePolicy: selectedMode.rolePolicy,
+      policyDecisionContract: selectedMode.policyDecisionContract,
+      policyDecisionPath: selectedMode.policyDecisionPath,
+      adaptiveTrustUsed: true,
+      outcome: eligibility.disposition === "deny" ? "deny" : "policy-required",
+      eligibility,
+    });
+  }
   return Object.freeze({
     modeId: selectedMode.modeId,
     certificatePolicy: selectedMode.certificatePolicy,

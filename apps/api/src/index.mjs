@@ -4,6 +4,15 @@ export {
   createPostgresTenantRepository,
 } from "./repository.mjs";
 export {
+  POLICY_ENFORCEMENT_POLICY,
+  PolicyDecisionUnavailableError,
+  assertOpaPolicyDecisionClient,
+  assertPolicyEnforcementService,
+  createOpaPolicyDecisionClient,
+  createPolicyEnforcementService,
+  hashPolicyInput,
+} from "./policy-enforcement.mjs";
+export {
   CertificateNotAcceptedError,
   REQUEST_STATE_POLICY,
   RequestStateUnavailableError,

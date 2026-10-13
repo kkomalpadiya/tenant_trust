@@ -42,6 +42,7 @@ function contextFor(roles, source = "mtls-certificate") {
 const member = contextFor(["tenant-member"]);
 const admin = contextFor(["tenant-admin"]);
 const baselineMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
+const adaptiveMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.ADAPTIVE_TRUST_OPA);
 
 test("selects one immutable PKI plus RBAC baseline by exact internal mode ID", () => {
   assert.deepEqual(baselineMode, {
@@ -62,6 +63,28 @@ test("selects one immutable PKI plus RBAC baseline by exact internal mode ID", (
     (error) => error instanceof AuthorizationError
       && error.reasonCode === "AUTHORIZATION_MODE_INVALID",
   );
+});
+
+test("selects one branded adaptive OPA mode without treating policy-required as an allow", () => {
+  assert.deepEqual(adaptiveMode, {
+    modeId: "adaptive-trust-opa-v1",
+    certificatePolicy: "tenant-scoped-x509",
+    rolePolicy: "role-action-matrix-v1",
+    policyDecisionContract: "opa-decision-input-v1/opa-decision-output-v1",
+    policyDecisionPath: "tenant_trust/authorization/decision",
+    adaptiveTrustUsed: true,
+  });
+  assert.ok(Object.isFrozen(adaptiveMode));
+  assert.equal(assertAuthorizationMode(adaptiveMode), adaptiveMode);
+
+  const eligible = evaluateAuthorizationMode(adaptiveMode, member, "profile:read");
+  assert.equal(eligible.outcome, "policy-required");
+  assert.equal(eligible.eligibility.disposition, "allow");
+  assert.equal(eligible.adaptiveTrustUsed, true);
+
+  const denied = evaluateAuthorizationMode(adaptiveMode, member, "record:export");
+  assert.equal(denied.outcome, "deny");
+  assert.equal(denied.eligibility.reason, "role-not-eligible");
 });
 
 test("baseline decisions use only tenant-scoped certificate identity and the role matrix", () => {

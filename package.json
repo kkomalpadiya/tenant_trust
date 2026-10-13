@@ -73,6 +73,7 @@
     "request-safeguards:verify": "npm run test:api && node scripts/verify-api-request-safeguards.mjs && node scripts/verify-request-safeguards.mjs",
     "protected-saas:verify": "node scripts/verify-protected-saas-baseline.mjs",
     "policy-contract:verify": "node --test packages/contracts/test/opa-decision-contract.test.mjs",
+    "policy-enforcement:verify": "node --test apps/api/test/policy-enforcement.test.mjs apps/api/test/adaptive-repository.test.mjs",
     "demo:review": "node apps/review-demo/server.mjs",
     "test:review-demo": "node --test apps/review-demo/test/*.test.mjs",
     "role-action-matrix:verify": "npm run test:authorization",

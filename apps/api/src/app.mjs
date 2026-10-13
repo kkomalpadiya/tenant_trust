@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import Fastify, { LogController } from "fastify";
-import { AuthorizationError, assertAuthorizationMode } from "@tenant-trust/authorization";
+import {
+  AUTHORIZATION_MODE_IDS,
+  AuthorizationError,
+  assertAuthorizationMode,
+} from "@tenant-trust/authorization";
 import {
   EVIDENCE_INGESTION_POLICY,
   EvidenceIngestionUnavailableError,
@@ -10,6 +14,10 @@ import {
 import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
 import { TenantContextError } from "@tenant-trust/tenant-context";
 import { AccessDeniedError } from "./repository.mjs";
+import {
+  POLICY_ENFORCEMENT_POLICY,
+  PolicyDecisionUnavailableError,
+} from "./policy-enforcement.mjs";
 import {
   RequestAuditUnavailableError,
   assertRequestAuditRecorder,
@@ -81,6 +89,9 @@ function failureDecision(error) {
   if (error instanceof RequestTimeoutError) {
     return Object.freeze({ statusCode: 503, reasonCode: "REQUEST_TIMEOUT" });
   }
+  if (error instanceof PolicyDecisionUnavailableError) {
+    return Object.freeze({ statusCode: 503, reasonCode: error.reasonCode });
+  }
   return Object.freeze({ statusCode: 503, reasonCode: "INTERNAL_FAILURE" });
 }
 
@@ -148,6 +159,10 @@ export function createTenantTrustApi({
   if (repository.requestSafeguardPolicy !== REQUEST_SAFEGUARD_POLICY) {
     throw new TypeError("The tenant API repository must declare the fixed request safeguard policy.");
   }
+  if (repository.authorizationMode.modeId === AUTHORIZATION_MODE_IDS.ADAPTIVE_TRUST_OPA
+    && repository.policyEnforcementPolicy !== POLICY_ENFORCEMENT_POLICY) {
+    throw new TypeError("The adaptive tenant API repository must declare OPA policy enforcement.");
+  }
   assertRequestAuditRecorder(requestAuditRecorder);
   if (typeof requestIdFactory !== "function" || typeof correlationIdFactory !== "function") {
     throw new TypeError("Server-side request and correlation ID factories are required.");
@@ -175,7 +190,11 @@ export function createTenantTrustApi({
     if (!REQUEST_ID.test(requestId ?? "") || !CORRELATION_ID.test(correlationId ?? "")) {
       throw new RequestAuditUnavailableError();
     }
-    request[requestAuditContext] = Object.freeze({ requestId, correlationId });
+    request[requestAuditContext] = Object.freeze({
+      requestId,
+      correlationId,
+      requestedAt: occurredAt(clock),
+    });
     reply.header("x-request-id", requestId);
     reply.header("x-correlation-id", correlationId);
     reply.header("cache-control", "no-store");
@@ -209,6 +228,9 @@ export function createTenantTrustApi({
       return reply.code(409).send(IDEMPOTENCY_CONFLICT);
     }
     if (error instanceof RequestStateUnavailableError || error instanceof RequestAuditUnavailableError) {
+      return reply.code(503).send(SERVICE_UNAVAILABLE);
+    }
+    if (error instanceof PolicyDecisionUnavailableError) {
       return reply.code(503).send(SERVICE_UNAVAILABLE);
     }
     if (error instanceof RequestTimeoutError) return reply.code(503).send(SERVICE_UNAVAILABLE);
@@ -258,6 +280,19 @@ export function createTenantTrustApi({
       }
 
       const resourceIdHashSha256 = hashAuditResourceIdentifier(resourceIdentifier(request, authentication));
+      const policyRequest = Object.freeze({
+        requestId: correlation.requestId,
+        correlationId: correlation.correlationId,
+        requestedAt: correlation.requestedAt,
+        method: request.method,
+        routeTemplate: routeTemplate.replace(
+          /:([A-Za-z][A-Za-z0-9_]*)/gu,
+          (_match, parameter) => `{${parameter.toLowerCase()}}`,
+        ),
+        sourceNetworkZone: "unknown",
+        resourceIdHashSha256,
+        ownerSubjectId: null,
+      });
       await requestAuditRecorder.record({
         schemaVersion: "1.0.0",
         eventKind: "authentication",
@@ -282,7 +317,7 @@ export function createTenantTrustApi({
       let result;
       try {
         result = await runWithRequestTimeout(
-          (signal) => execute(authentication, request, signal),
+          (signal) => execute(authentication, request, signal, policyRequest),
           requestTimeoutMilliseconds,
         );
       } catch (error) {
@@ -342,8 +377,8 @@ export function createTenantTrustApi({
     resourceType: "tenant-profile",
     routeTemplate: "/v1/profile",
     resourceIdentifier: (_request, authentication) => authentication.subjectId,
-    execute: async (authentication, _request, signal) => ({
-      profile: await repository.getProfile(authentication, { signal }),
+    execute: async (authentication, _request, signal, policyRequest) => ({
+      profile: await repository.getProfile(authentication, { policyRequest, signal }),
     }),
   }));
 
@@ -354,8 +389,8 @@ export function createTenantTrustApi({
     resourceType: "tenant-records",
     routeTemplate: "/v1/tenant-records",
     resourceIdentifier: (_request, authentication) => authentication.tenantId,
-    execute: async (authentication, _request, signal) => ({
-      records: await repository.listRecords(authentication, { signal }),
+    execute: async (authentication, _request, signal, policyRequest) => ({
+      records: await repository.listRecords(authentication, { policyRequest, signal }),
     }),
   }));
 
@@ -376,8 +411,8 @@ export function createTenantTrustApi({
     resourceType: "tenant-record",
     routeTemplate: "/v1/tenant-records/:recordId",
     resourceIdentifier: (request) => request.params.recordId,
-    execute: async (authentication, request, signal) => ({
-      record: await repository.getRecord(authentication, request.params.recordId, { signal }),
+    execute: async (authentication, request, signal, policyRequest) => ({
+      record: await repository.getRecord(authentication, request.params.recordId, { policyRequest, signal }),
     }),
   }));
 
@@ -409,10 +444,10 @@ export function createTenantTrustApi({
     resourceType: "tenant-record-export",
     routeTemplate: "/v1/tenant-records/export",
     resourceIdentifier: (request) => [...request.body.recordIds].sort().join(","),
-    execute: async (authentication, request, signal) => repository.exportRecords(
+    execute: async (authentication, request, signal, policyRequest) => repository.exportRecords(
       authentication,
       request.body.recordIds,
-      { idempotencyKey: request.headers["idempotency-key"], signal },
+      { idempotencyKey: request.headers["idempotency-key"], policyRequest, signal },
     ),
   }));
 
@@ -438,10 +473,10 @@ export function createTenantTrustApi({
     resourceType: "tenant-membership",
     routeTemplate: "/v1/admin/membership-reviews",
     resourceIdentifier: (request) => request.body.subjectId,
-    execute: async (authentication, request, signal) => repository.reviewMembership(
+    execute: async (authentication, request, signal, policyRequest) => repository.reviewMembership(
       authentication,
       request.body.subjectId,
-      { idempotencyKey: request.headers["idempotency-key"], signal },
+      { idempotencyKey: request.headers["idempotency-key"], policyRequest, signal },
     ),
   }));
 

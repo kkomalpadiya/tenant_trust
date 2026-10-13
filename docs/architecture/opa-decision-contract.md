@@ -2,7 +2,7 @@
 
 ## Boundary
 
-T7.1 defines the versioned data exchanged between the API policy enforcement point and OPA. It does not implement access policy, load tenant bundles, issue step-up challenges, enforce quarantine or connect protected routes to OPA. Those behaviors belong to later Phase 7 tasks.
+T7.1 defines the versioned data exchanged between the API policy enforcement point and OPA. T7.2 connects protected routes to that contract. Policy bundles and thresholds, step-up challenges and quarantine execution remain later Phase 7 tasks.
 
 The canonical JSON Schemas are:
 
@@ -61,4 +61,4 @@ Run:
 npm run policy-contract:verify
 ```
 
-The focused tests compile both schemas, accept complete representative input, exercise fresh/stale/missing trust, prove invalid certificate state cannot masquerade as valid, reject incomplete and attacker-shaped fields, validate all four outcomes, enforce outcome-specific obligations and require decision provenance. These are contract tests only; live OPA and protected-route enforcement are intentionally outside T7.1.
+The focused contract tests compile both schemas, accept complete representative input, exercise fresh/stale/missing trust, prove invalid certificate state cannot masquerade as valid, reject incomplete and attacker-shaped fields, validate all four outcomes, enforce outcome-specific obligations and require decision provenance. Protected-route enforcement is described separately in [OPA policy enforcement](opa-policy-enforcement.md).

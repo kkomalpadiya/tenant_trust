@@ -1,0 +1,285 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { AUTHORIZATION_MODE_IDS, selectAuthorizationMode } from "@tenant-trust/authorization";
+import {
+  AccessDeniedError,
+  CertificateNotAcceptedError,
+  createOpaPolicyDecisionClient,
+  createPolicyEnforcementService,
+  createPostgresTenantRepository,
+  hashPolicyInput,
+} from "../src/index.mjs";
+
+const ids = Object.freeze({
+  tenant: "tnt_018f1234-5678-7abc-8def-0123456789ab",
+  subject: "sub_018f1234-5678-7abc-8def-0123456789ab",
+  targetSubject: "sub_018f1234-5678-7abc-8def-0123456789ac",
+  certificate: "crt_018f1234-5678-7abc-8def-0123456789ab",
+  issuer: "iss_018f1234-5678-7abc-8def-0123456789ab",
+  transition: "trn_018f1234-5678-7abc-8def-0123456789ab",
+  policy: "pol_018f1234-5678-7abc-8def-0123456789ab",
+  decision: "dec_018f1234-5678-7abc-8def-0123456789ab",
+  record: "res_018f1234-5678-7abc-8def-0123456789b0",
+  foreignRecord: "res_018f1234-5678-7abc-8def-0123456789b1",
+  operation: "op_018f1234-5678-7abc-8def-0123456789ab",
+});
+const hash = "ab".repeat(32);
+const authentication = Object.freeze({
+  source: "mtls-certificate",
+  authenticationId: `sha256:${hash}`,
+  tenantId: ids.tenant,
+  subjectId: ids.subject,
+  certificate: Object.freeze({
+    profileId: "tenant-client-auth-v1",
+    issuerId: ids.issuer,
+    serialNumber: "01AF".padEnd(32, "0"),
+    fingerprintSha256: hash,
+    publicKeySha256: "cd".repeat(32),
+    notBefore: "2026-10-13T08:00:00.000Z",
+    notAfter: "2026-10-13T11:00:00.000Z",
+  }),
+});
+const mode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.ADAPTIVE_TRUST_OPA);
+
+function trustState() {
+  return {
+    tenantId: ids.tenant,
+    subjectId: ids.subject,
+    state: "fresh",
+    usableForPolicy: true,
+    requiredOutcome: null,
+    reasonCode: null,
+    policyScore: 100,
+    policyBand: "high",
+    lastKnownScore: 100,
+    lastKnownBand: "high",
+    ageSeconds: 1,
+    staleAfterSeconds: 300,
+    transitionId: ids.transition,
+    updateVersion: 12,
+    modelVersion: "1.0.0",
+    configurationVersion: 3,
+    observedAt: "2026-10-13T08:59:30.000Z",
+    evaluatedAt: "2026-10-13T08:59:31.000Z",
+    recordedAt: "2026-10-13T08:59:31.100Z",
+    explanationHashSha256: hash,
+  };
+}
+
+function policyRequest(index, method = "GET", routeTemplate = "/v1/profile") {
+  const suffix = index.toString(16).padStart(12, "0");
+  return {
+    requestId: `req_018f1234-5678-7abc-8def-${suffix}`,
+    correlationId: `cor_018f1234-5678-7abc-8def-${suffix}`,
+    requestedAt: "2026-10-13T09:00:00.000Z",
+    method,
+    routeTemplate,
+    sourceNetworkZone: "unknown",
+    resourceIdHashSha256: hash,
+    ownerSubjectId: null,
+  };
+}
+
+function outputFor(input, outcome = "ALLOW") {
+  return {
+    schemaVersion: "1.0.0",
+    contractId: "opa-decision-output-v1",
+    decisionId: ids.decision,
+    requestId: input.requestContext.requestId,
+    correlationId: input.requestContext.correlationId,
+    tenantId: input.tenantContext.tenantId,
+    subjectId: input.tenantContext.subjectId,
+    outcome,
+    reasonCodes: [outcome === "ALLOW" ? "ACCESS_ALLOWED" : "ACCESS_DENIED"],
+    evaluatedAt: "2026-10-13T09:00:00.050Z",
+    input: { contractId: input.contractId, hashSha256: hashPolicyInput(input) },
+    policy: {
+      policyVersionId: ids.policy,
+      bundleVersion: 1,
+      bundleHashSha256: hash,
+      decisionPath: "tenant_trust/authorization/decision",
+    },
+    state: {
+      certificateStatusVersion: input.identity.statusVersion,
+      tenantVersion: input.tenantContext.versions.tenant,
+      subjectVersion: input.tenantContext.versions.subject,
+      membershipVersion: input.tenantContext.versions.membership,
+      trustTransitionId: input.trust.transitionId,
+      trustUpdateVersion: input.trust.updateVersion,
+      trustConfigurationVersion: input.trust.configurationVersion,
+    },
+    obligations: { stepUp: null, quarantine: null },
+  };
+}
+
+function createPolicyService(decisions, outcome = "ALLOW") {
+  const decisionClient = createOpaPolicyDecisionClient({
+    baseUrl: "http://opa.internal:8181",
+    fetchImpl: async (_url, options) => {
+      const { input } = JSON.parse(options.body);
+      decisions.push(input);
+      return { ok: true, json: async () => ({ result: outputFor(input, outcome) }) };
+    },
+  });
+  return createPolicyEnforcementService({
+    trustScoreLookupService: { lookup: async () => trustState() },
+    decisionClient,
+  });
+}
+
+function createPool({ certificateState = "active" } = {}) {
+  const calls = [];
+  const recordRow = (recordId) => ({
+    resource_id: recordId,
+    owner_subject_id: ids.subject,
+    resource_name: "Tenant record",
+    version: 1,
+    created_at: "2026-10-13T08:00:00.000Z",
+    updated_at: "2026-10-13T08:30:00.000Z",
+  });
+  const client = {
+    async query(input, parameters) {
+      const text = typeof input === "string" ? input : input.text;
+      const values = typeof input === "string" ? parameters : input.values;
+      calls.push({ text, parameters: values });
+      if (text.includes("tenant.tenant_id::text,") && text.includes("array_agg")) {
+        return { rowCount: 1, rows: [{
+          tenant_id: ids.tenant,
+          tenant_state: "active",
+          tenant_version: 4,
+          subject_id: ids.subject,
+          subject_state: "active",
+          subject_version: 5,
+          membership_state: "active",
+          membership_version: 6,
+          roles: ["tenant-admin"],
+        }] };
+      }
+      if (text.includes("transaction_timestamp() AS status_observed_at")) {
+        return { rowCount: 1, rows: [{
+          tenant_id: ids.tenant,
+          certificate_id: ids.certificate,
+          subject_id: ids.subject,
+          issuer_id: ids.issuer,
+          serial_number: authentication.certificate.serialNumber,
+          fingerprint_sha256: hash,
+          state: certificateState,
+          not_before: authentication.certificate.notBefore,
+          not_after: authentication.certificate.notAfter,
+          version: certificateState === "active" ? 7 : 8,
+          status_observed_at: "2026-10-13T09:00:00.000Z",
+        }] };
+      }
+      if (text.includes("FROM identity.certificates")) {
+        return { rowCount: 1, rows: [{ certificate_id: ids.certificate }] };
+      }
+      if (text.includes("reserve_api_sensitive_operation")) {
+        return { rowCount: 1, rows: [{ operation_id: ids.operation, replayed: false }] };
+      }
+      if (text.includes("tenant.display_name AS tenant_display_name")) {
+        return { rowCount: 1, rows: [{
+          tenant_display_name: "Tenant Alpha",
+          display_name: "Administrator",
+          subject_kind: "human",
+          member_since: "2026-01-01T00:00:00.000Z",
+        }] };
+      }
+      if (text.includes("FROM app.resources")) {
+        const requested = Array.isArray(values[1]) ? values[1] : values[1] ? [values[1]] : [ids.record];
+        if (requested.includes(ids.foreignRecord)) return { rowCount: 0, rows: [] };
+        const rows = requested.map(recordRow);
+        return { rowCount: rows.length, rows };
+      }
+      if (text.includes("subject.display_name") && text.includes("array_agg")) {
+        return { rowCount: 1, rows: [{
+          subject_id: ids.targetSubject,
+          display_name: "Reviewed user",
+          subject_state: "active",
+          subject_version: 2,
+          membership_state: "active",
+          membership_version: 3,
+          roles: ["tenant-member"],
+        }] };
+      }
+      return { rowCount: null, rows: [] };
+    },
+    release() {},
+  };
+  return { calls, async connect() { return client; } };
+}
+
+function repositoryWith(pool, decisions, outcome = "ALLOW") {
+  return createPostgresTenantRepository({
+    pool,
+    authorizationMode: mode,
+    policyEnforcementService: createPolicyService(decisions, outcome),
+    operationIdFactory: () => ids.operation,
+    clock: () => new Date("2026-10-13T09:00:01.000Z"),
+  });
+}
+
+test("every protected repository operation requires an OPA ALLOW decision", async () => {
+  const decisions = [];
+  const repository = repositoryWith(createPool(), decisions);
+
+  await repository.getProfile(authentication, { policyRequest: policyRequest(1) });
+  await repository.listRecords(authentication, { policyRequest: policyRequest(2, "GET", "/v1/tenant-records") });
+  await repository.getRecord(authentication, ids.record, {
+    policyRequest: policyRequest(3, "GET", "/v1/tenant-records/{recordid}"),
+  });
+  await repository.exportRecords(authentication, [ids.record], {
+    idempotencyKey: "idem_018f1234-5678-7abc-8def-0123456789a1",
+    policyRequest: policyRequest(4, "POST", "/v1/tenant-records/export"),
+  });
+  await repository.reviewMembership(authentication, ids.targetSubject, {
+    idempotencyKey: "idem_018f1234-5678-7abc-8def-0123456789a2",
+    policyRequest: policyRequest(5, "POST", "/v1/admin/membership-reviews"),
+  });
+
+  assert.deepEqual(decisions.map(({ action }) => action), [
+    "profile:read",
+    "record:read",
+    "record:read",
+    "record:export",
+    "tenant:admin",
+  ]);
+});
+
+test("a revoked certificate cannot reach OPA even with a maximum trust score", async () => {
+  const decisions = [];
+  const repository = repositoryWith(createPool({ certificateState: "revoked" }), decisions);
+
+  await assert.rejects(
+    repository.getProfile(authentication, { policyRequest: policyRequest(6) }),
+    CertificateNotAcceptedError,
+  );
+  assert.equal(decisions.length, 0);
+});
+
+test("an OPA ALLOW cannot expose a cross-tenant record hidden by tenant scope", async () => {
+  const decisions = [];
+  const repository = repositoryWith(createPool(), decisions);
+
+  await assert.rejects(
+    repository.getRecord(authentication, ids.foreignRecord, {
+      policyRequest: policyRequest(7, "GET", "/v1/tenant-records/{recordid}"),
+    }),
+    AccessDeniedError,
+  );
+  assert.equal(decisions.length, 1);
+  assert.equal(decisions[0].trust.policyScore, 100);
+});
+
+test("DENY remains non-allow and blocks protected data queries", async () => {
+  const decisions = [];
+  const pool = createPool();
+  const repository = repositoryWith(pool, decisions, "DENY");
+
+  await assert.rejects(
+    repository.listRecords(authentication, {
+      policyRequest: policyRequest(8, "GET", "/v1/tenant-records"),
+    }),
+    AccessDeniedError,
+  );
+  assert.equal(pool.calls.some(({ text }) => text.includes("FROM app.resources")), false);
+});

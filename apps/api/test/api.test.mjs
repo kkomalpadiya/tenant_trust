@@ -5,6 +5,7 @@ import { GatewayIdentityError } from "@tenant-trust/gateway-identity";
 import {
   AccessDeniedError,
   CertificateNotAcceptedError,
+  POLICY_ENFORCEMENT_POLICY,
   REQUEST_SAFEGUARD_POLICY,
   REQUEST_STATE_POLICY,
   RequestStateUnavailableError,
@@ -78,6 +79,87 @@ test("API construction requires the fixed request safeguard policy", () => {
     }),
     /fixed request safeguard policy/u,
   );
+});
+
+test("every protected route supplies one immutable policy request to adaptive enforcement", async (t) => {
+  const adaptiveMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.ADAPTIVE_TRUST_OPA);
+  const observed = [];
+  const capture = (name, options) => {
+    observed.push({ name, policyRequest: options.policyRequest });
+  };
+  const repository = createRepository({
+    authorizationMode: adaptiveMode,
+    policyEnforcementPolicy: POLICY_ENFORCEMENT_POLICY,
+    async getProfile(authentication, options) {
+      capture("profile", options);
+      return { tenantId: authentication.tenantId, subjectId: authentication.subjectId };
+    },
+    async listRecords(_authentication, options) {
+      capture("records", options);
+      return [];
+    },
+    async getRecord(authentication, recordId, options) {
+      capture("record", options);
+      return { recordId, ownerSubjectId: authentication.subjectId };
+    },
+    async exportRecords(_authentication, _recordIds, options) {
+      capture("export", options);
+      return { operation: { operationId: "op_018f1234-5678-7abc-8def-0123456789ab" }, records: [] };
+    },
+    async reviewMembership(_authentication, subjectId, options) {
+      capture("review", options);
+      return {
+        operation: { operationId: "op_018f1234-5678-7abc-8def-0123456789ab" },
+        membership: { subjectId },
+      };
+    },
+  });
+  const api = createTenantTrustApi({
+    identityResolver: createIdentityResolver(),
+    repository,
+    clock: () => new Date("2026-10-13T09:00:00.000Z"),
+  });
+  t.after(() => api.close());
+
+  const recordId = "res_018f1234-5678-7abc-8def-0123456789b0";
+  const subjectId = "sub_018f1234-5678-7abc-8def-0123456789ac";
+  const requests = [
+    { method: "GET", url: "/v1/profile" },
+    { method: "GET", url: "/v1/tenant-records" },
+    { method: "GET", url: `/v1/tenant-records/${recordId}` },
+    {
+      method: "POST",
+      url: "/v1/tenant-records/export",
+      headers: { "idempotency-key": "idem_018f1234-5678-7abc-8def-0123456789a1" },
+      payload: { recordIds: [recordId] },
+    },
+    {
+      method: "POST",
+      url: "/v1/admin/membership-reviews",
+      headers: { "idempotency-key": "idem_018f1234-5678-7abc-8def-0123456789a2" },
+      payload: { subjectId },
+    },
+  ];
+  for (const request of requests) {
+    const response = await api.inject(request);
+    assert.equal(response.statusCode, 200, `${request.method} ${request.url}: ${response.body}`);
+  }
+
+  assert.deepEqual(observed.map(({ name }) => name), ["profile", "records", "record", "export", "review"]);
+  assert.deepEqual(observed.map(({ policyRequest }) => policyRequest.routeTemplate), [
+    "/v1/profile",
+    "/v1/tenant-records",
+    "/v1/tenant-records/{recordid}",
+    "/v1/tenant-records/export",
+    "/v1/admin/membership-reviews",
+  ]);
+  for (const { policyRequest } of observed) {
+    assert.match(policyRequest.requestId, /^req_/u);
+    assert.match(policyRequest.correlationId, /^cor_/u);
+    assert.match(policyRequest.resourceIdHashSha256, /^[0-9a-f]{64}$/u);
+    assert.equal(policyRequest.requestedAt, "2026-10-13T09:00:00.000Z");
+    assert.ok(Object.isFrozen(policyRequest));
+  }
 });
 
 test("callers cannot select an authorization mode through query input", async (t) => {

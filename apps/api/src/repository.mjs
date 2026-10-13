@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  AUTHORIZATION_MODE_IDS,
   AuthorizationError,
   assertAuthorizationMode,
   evaluateAuthorizationMode,
@@ -18,6 +19,10 @@ import {
   hashSensitiveRequest,
   normalizeSensitiveIdempotencyKey,
 } from "./request-safeguards.mjs";
+import {
+  POLICY_ENFORCEMENT_POLICY,
+  assertPolicyEnforcementService,
+} from "./policy-enforcement.mjs";
 
 const RESOURCE_ID = /^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -151,6 +156,7 @@ function isTimeoutError(error, signal) {
 export function createPostgresTenantRepository({
   pool,
   authorizationMode,
+  policyEnforcementService,
   contextResolver = resolveTenantContext,
   sensitiveOperationAuthorizer = defaultSensitiveOperationAuthorizer,
   operationIdFactory = defaultOperationIdFactory,
@@ -163,6 +169,12 @@ export function createPostgresTenantRepository({
   } catch (error) {
     if (!(error instanceof AuthorizationError)) throw error;
     throw new TypeError("An explicit supported authorization mode is required.");
+  }
+  const policyModeSelected = selectedAuthorizationMode.modeId === AUTHORIZATION_MODE_IDS.ADAPTIVE_TRUST_OPA;
+  if (policyModeSelected) {
+    assertPolicyEnforcementService(policyEnforcementService);
+  } else if (policyEnforcementService !== undefined) {
+    throw new TypeError("Policy enforcement is only valid in adaptive authorization mode.");
   }
   if (typeof contextResolver !== "function") throw new TypeError("A tenant context resolver is required.");
   if (typeof sensitiveOperationAuthorizer !== "function") {
@@ -206,6 +218,42 @@ export function createPostgresTenantRepository({
       signal,
     }));
     if (authorized !== true) throw new AccessDeniedError();
+  }
+
+  async function authorizeProtectedOperation({
+    authentication,
+    context,
+    requestState,
+    action,
+    policyRequest,
+    operationId = null,
+    attributes = {},
+    sensitive = false,
+    signal,
+  }) {
+    if (!policyModeSelected) {
+      if (sensitive) {
+        await authorizeSensitiveOperation(context, action, operationId, attributes, signal);
+        return;
+      }
+      authorizeBaselineOperation(context, action);
+      return;
+    }
+
+    const authorization = evaluateOperation(context, action);
+    if (authorization.outcome !== "policy-required") throw new AccessDeniedError();
+    const evaluation = await policyEnforcementService.decide({
+      authentication,
+      context,
+      requestState,
+      authorization,
+      action,
+      policyRequest,
+      signal,
+    });
+    if (evaluation.decision.outcome !== POLICY_ENFORCEMENT_POLICY.onlyAllowingOutcome) {
+      throw new AccessDeniedError();
+    }
   }
 
   async function withTenantContext(authentication, operation, { signal } = {}) {
@@ -288,7 +336,7 @@ export function createPostgresTenantRepository({
         requestStateRevalidator.assertFresh(requestState);
         return query(text, parameters);
       };
-      const result = await operation(queryProtected, context, signal);
+      const result = await operation(queryProtected, context, requestState, signal);
       throwIfAborted(signal);
       await query("COMMIT");
       return result;
@@ -308,12 +356,20 @@ export function createPostgresTenantRepository({
 
   return Object.freeze({
     authorizationMode: selectedAuthorizationMode,
+    policyEnforcementPolicy: policyModeSelected ? POLICY_ENFORCEMENT_POLICY : null,
     requestStatePolicy: REQUEST_STATE_POLICY,
     requestSafeguardPolicy: REQUEST_SAFEGUARD_POLICY,
 
-    async getProfile(authentication, { signal } = {}) {
-      return withTenantContext(authentication, async (query, context) => {
-        authorizeBaselineOperation(context, "profile:read");
+    async getProfile(authentication, { policyRequest, signal } = {}) {
+      return withTenantContext(authentication, async (query, context, requestState) => {
+        await authorizeProtectedOperation({
+          authentication,
+          context,
+          requestState,
+          action: "profile:read",
+          policyRequest,
+          signal,
+        });
         const result = await query(
           `SELECT
              tenant.tenant_id::text,
@@ -346,9 +402,16 @@ export function createPostgresTenantRepository({
       }, { signal });
     },
 
-    async listRecords(authentication, { signal } = {}) {
-      return withTenantContext(authentication, async (query, context) => {
-        authorizeBaselineOperation(context, "record:read");
+    async listRecords(authentication, { policyRequest, signal } = {}) {
+      return withTenantContext(authentication, async (query, context, requestState) => {
+        await authorizeProtectedOperation({
+          authentication,
+          context,
+          requestState,
+          action: "record:read",
+          policyRequest,
+          signal,
+        });
         const result = await query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
            FROM app.resources
@@ -361,10 +424,17 @@ export function createPostgresTenantRepository({
       }, { signal });
     },
 
-    async getRecord(authentication, recordId, { signal } = {}) {
+    async getRecord(authentication, recordId, { policyRequest, signal } = {}) {
       if (!RESOURCE_ID.test(recordId ?? "")) throw new TypeError("A valid record ID is required.");
-      return withTenantContext(authentication, async (query, context) => {
-        authorizeBaselineOperation(context, "record:read");
+      return withTenantContext(authentication, async (query, context, requestState) => {
+        await authorizeProtectedOperation({
+          authentication,
+          context,
+          requestState,
+          action: "record:read",
+          policyRequest,
+          signal,
+        });
         const result = await query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
            FROM app.resources
@@ -377,12 +447,12 @@ export function createPostgresTenantRepository({
       }, { signal });
     },
 
-    async exportRecords(authentication, recordIds, { idempotencyKey, signal } = {}) {
+    async exportRecords(authentication, recordIds, { idempotencyKey, policyRequest, signal } = {}) {
       const requestedRecordIds = normalizeRecordIds(recordIds);
       const normalizedIdempotencyKey = normalizeSensitiveIdempotencyKey(idempotencyKey);
       const keyHash = hashSensitiveIdempotencyKey(normalizedIdempotencyKey);
       const requestHash = hashSensitiveRequest("record:export", requestedRecordIds);
-      return withTenantContext(authentication, async (query, context, operationSignal) => {
+      return withTenantContext(authentication, async (query, context, requestState, operationSignal) => {
         const candidateOperationId = createOperationId(operationIdFactory);
         const reservation = await query(
           `SELECT operation_id, replayed
@@ -394,9 +464,17 @@ export function createPostgresTenantRepository({
           throw new TypeError("The sensitive-operation receipt was invalid.");
         }
         const operationId = reservation.rows[0].operation_id;
-        await authorizeSensitiveOperation(context, "record:export", operationId, {
-          requestedRecordCount: requestedRecordIds.length,
-        }, operationSignal);
+        await authorizeProtectedOperation({
+          authentication,
+          context,
+          requestState,
+          action: "record:export",
+          policyRequest,
+          operationId,
+          attributes: { requestedRecordCount: requestedRecordIds.length },
+          sensitive: true,
+          signal: operationSignal,
+        });
 
         const result = await query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
@@ -418,12 +496,12 @@ export function createPostgresTenantRepository({
       }, { signal });
     },
 
-    async reviewMembership(authentication, subjectId, { idempotencyKey, signal } = {}) {
+    async reviewMembership(authentication, subjectId, { idempotencyKey, policyRequest, signal } = {}) {
       if (!SUBJECT_ID.test(subjectId ?? "")) throw new TypeError("A valid subject ID is required.");
       const normalizedIdempotencyKey = normalizeSensitiveIdempotencyKey(idempotencyKey);
       const keyHash = hashSensitiveIdempotencyKey(normalizedIdempotencyKey);
       const requestHash = hashSensitiveRequest("tenant:admin", [subjectId]);
-      return withTenantContext(authentication, async (query, context, operationSignal) => {
+      return withTenantContext(authentication, async (query, context, requestState, operationSignal) => {
         const candidateOperationId = createOperationId(operationIdFactory);
         const reservation = await query(
           `SELECT operation_id, replayed
@@ -435,9 +513,17 @@ export function createPostgresTenantRepository({
           throw new TypeError("The sensitive-operation receipt was invalid.");
         }
         const operationId = reservation.rows[0].operation_id;
-        await authorizeSensitiveOperation(context, "tenant:admin", operationId, {
-          targetSubjectId: subjectId,
-        }, operationSignal);
+        await authorizeProtectedOperation({
+          authentication,
+          context,
+          requestState,
+          action: "tenant:admin",
+          policyRequest,
+          operationId,
+          attributes: { targetSubjectId: subjectId },
+          sensitive: true,
+          signal: operationSignal,
+        });
 
         const result = await query(
           `SELECT
