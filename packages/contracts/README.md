@@ -18,6 +18,8 @@ Certificate lifecycle events require `sourceAuthentication` with Ed25519, the `t
 
 `trust.updated.v1` identifies one immutable transition, carries prior/new transport bands, the exact model/configuration versions, all contributing evidence IDs and the SHA-256 digest of the canonical durable explanation. The trust service validates the generated envelope against this schema before the event crosses a messaging boundary. See [Durable trust transition explanations](../../docs/architecture/trust-transition-explanations.md).
 
+`schemas/policy/opa-decision-input.schema.json` and `opa-decision-output.schema.json` define the complete Phase 7 policy boundary. The input carries server-derived identity and certificate validity, tenant authority and roles, canonical action, tenant-scoped resource metadata, freshness-safe trust state and bounded request/step-up context. The output is one of `ALLOW`, `STEP_UP`, `DENY` or `QUARANTINE` and binds the result to the input digest, exact policy bundle and state versions. See [OPA decision contract](../../docs/architecture/opa-decision-contract.md).
+
 ## Identifier rules
 
 Identifiers are opaque lowercase UUIDs with a type prefix. Generate the UUID once when the entity or event is created. Never derive an identifier from a name, email address, certificate subject or other personal data.
@@ -88,4 +90,4 @@ Run from the repository root:
 npm test
 ```
 
-The tests compile every schema, validate one representative event for each domain, reject malformed IDs and timestamps, enforce bounded scores and verify the sample causal chain. Schema validity alone does not authenticate an event; `@tenant-trust/evidence` performs the authoritative binding, digest and signature checks.
+The tests compile every schema, validate one representative event for each domain, reject malformed IDs and timestamps, enforce bounded scores and verify the sample causal chain. The OPA contract tests also cover complete decision input, trust freshness states, the four outcomes, outcome-specific obligations and required provenance. Schema validity alone does not authenticate an event or authorize a request; trusted input assembly, OPA evaluation and enforcement remain separate boundaries.

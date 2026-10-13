@@ -22,6 +22,22 @@
     "idempotencyKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:/-]{7,159}$" },
     "rfc3339Utc": { "type": "string", "format": "date-time", "pattern": "Z$" },
     "score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "policyAction": {
+      "enum": [
+        "profile:read",
+        "record:read",
+        "record:write",
+        "record:export",
+        "tenant:admin",
+        "member:manage",
+        "certificate:manage",
+        "admin-key:rotate"
+      ]
+    },
+    "resourceType": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$" },
+    "tenantRole": { "enum": ["tenant-member", "tenant-admin"] },
+    "resourceSensitivity": { "enum": ["confidential", "sensitive", "critical"] },
+    "trustBand": { "enum": ["low", "medium", "high"] },
     "reasonCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$" },
     "producer": {
       "type": "object",

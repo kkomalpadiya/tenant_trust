@@ -1,0 +1,485 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/policy/opa-decision-input.schema.json",
+  "title": "OPA authorization decision input",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "contractId": { "const": "opa-decision-input-v1" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "tenantContext": { "$ref": "#/$defs/tenantContext" },
+    "action": { "$ref": "../common.schema.json#/$defs/policyAction" },
+    "resource": { "$ref": "#/$defs/resource" },
+    "trust": { "$ref": "#/$defs/trust" },
+    "requestContext": { "$ref": "#/$defs/requestContext" }
+  },
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "identity",
+    "tenantContext",
+    "action",
+    "resource",
+    "trust",
+    "requestContext"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identity": {
+      "type": "object",
+      "properties": {
+        "source": { "const": "mtls-certificate" },
+        "authenticationId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "tenantId": { "$ref": "../common.schema.json#/$defs/tenantId" },
+        "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "certificateId": { "$ref": "../common.schema.json#/$defs/certificateId" },
+        "issuerId": { "$ref": "../common.schema.json#/$defs/issuerId" },
+        "serialNumber": { "$ref": "../common.schema.json#/$defs/x509SerialNumber" },
+        "fingerprintSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
+        "valid": { "type": "boolean" },
+        "certificateState": { "enum": ["active", "revoked", "expired", "superseded", "unknown"] },
+        "statusSource": { "enum": ["authoritative", "unknown", "stale", "invalid", "unavailable", "not-queried"] },
+        "statusVersion": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        },
+        "statusObservedAt": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            { "type": "null" }
+          ]
+        },
+        "checkedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+        "validUntil": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "authenticationId",
+        "tenantId",
+        "subjectId",
+        "certificateId",
+        "issuerId",
+        "serialNumber",
+        "fingerprintSha256",
+        "valid",
+        "certificateState",
+        "statusSource",
+        "statusVersion",
+        "statusObservedAt",
+        "checkedAt",
+        "validUntil"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "valid": { "const": true } }, "required": ["valid"] },
+          "then": {
+            "type": "object",
+            "properties": {
+              "certificateState": { "const": "active" },
+              "statusSource": { "const": "authoritative" },
+              "statusVersion": { "type": "integer", "minimum": 1 },
+              "statusObservedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+              "validUntil": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }
+            }
+          }
+        }
+      ]
+    },
+    "tenantContext": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "$ref": "../common.schema.json#/$defs/tenantId" },
+        "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "roles": {
+          "type": "array",
+          "items": { "$ref": "../common.schema.json#/$defs/tenantRole" },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "tenantState": { "enum": ["active", "suspended"] },
+        "subjectState": { "enum": ["active", "suspended"] },
+        "membershipState": { "enum": ["active", "suspended"] },
+        "versions": {
+          "type": "object",
+          "properties": {
+            "tenant": { "type": "integer", "minimum": 1 },
+            "subject": { "type": "integer", "minimum": 1 },
+            "membership": { "type": "integer", "minimum": 1 }
+          },
+          "required": ["tenant", "subject", "membership"],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "tenantId",
+        "subjectId",
+        "roles",
+        "tenantState",
+        "subjectState",
+        "membershipState",
+        "versions"
+      ],
+      "additionalProperties": false
+    },
+    "resource": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "$ref": "../common.schema.json#/$defs/tenantId" },
+        "resourceType": { "$ref": "../common.schema.json#/$defs/resourceType" },
+        "resourceIdHashSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
+        "sensitivity": { "$ref": "../common.schema.json#/$defs/resourceSensitivity" },
+        "scope": { "enum": ["self", "owner", "tenant", "none"] },
+        "ownerSubjectId": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/subjectId" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": [
+        "tenantId",
+        "resourceType",
+        "resourceIdHashSha256",
+        "sensitivity",
+        "scope",
+        "ownerSubjectId"
+      ],
+      "additionalProperties": false
+    },
+    "trustState": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "$ref": "../common.schema.json#/$defs/tenantId" },
+        "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+        "state": { "enum": ["fresh", "stale", "missing"] },
+        "usableForPolicy": { "type": "boolean" },
+        "requiredOutcome": {
+          "oneOf": [
+            { "const": "DENY" },
+            { "type": "null" }
+          ]
+        },
+        "reasonCode": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/reasonCode" },
+            { "type": "null" }
+          ]
+        },
+        "policyScore": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/score" },
+            { "type": "null" }
+          ]
+        },
+        "policyBand": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/trustBand" },
+            { "type": "null" }
+          ]
+        },
+        "lastKnownScore": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/score" },
+            { "type": "null" }
+          ]
+        },
+        "lastKnownBand": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/trustBand" },
+            { "type": "null" }
+          ]
+        },
+        "ageSeconds": {
+          "oneOf": [
+            { "type": "number", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "staleAfterSeconds": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        },
+        "transitionId": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/trustTransitionId" },
+            { "type": "null" }
+          ]
+        },
+        "updateVersion": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        },
+        "modelVersion": {
+          "oneOf": [
+            { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+            { "type": "null" }
+          ]
+        },
+        "configurationVersion": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        },
+        "observedAt": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            { "type": "null" }
+          ]
+        },
+        "evaluatedAt": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            { "type": "null" }
+          ]
+        },
+        "recordedAt": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            { "type": "null" }
+          ]
+        },
+        "explanationHashSha256": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": [
+        "tenantId",
+        "subjectId",
+        "state",
+        "usableForPolicy",
+        "requiredOutcome",
+        "reasonCode",
+        "policyScore",
+        "policyBand",
+        "lastKnownScore",
+        "lastKnownBand",
+        "ageSeconds",
+        "staleAfterSeconds",
+        "transitionId",
+        "updateVersion",
+        "modelVersion",
+        "configurationVersion",
+        "observedAt",
+        "evaluatedAt",
+        "recordedAt",
+        "explanationHashSha256"
+      ],
+      "additionalProperties": false
+    },
+    "trust": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/trustState" },
+            {
+              "type": "object",
+              "properties": {
+                "state": { "const": "fresh" },
+                "usableForPolicy": { "const": true },
+                "requiredOutcome": { "type": "null" },
+                "reasonCode": { "type": "null" },
+                "policyScore": { "$ref": "../common.schema.json#/$defs/score" },
+                "policyBand": { "$ref": "../common.schema.json#/$defs/trustBand" },
+                "lastKnownScore": { "$ref": "../common.schema.json#/$defs/score" },
+                "lastKnownBand": { "$ref": "../common.schema.json#/$defs/trustBand" },
+                "ageSeconds": { "type": "number", "minimum": 0 },
+                "staleAfterSeconds": { "type": "integer", "minimum": 1 },
+                "transitionId": { "$ref": "../common.schema.json#/$defs/trustTransitionId" },
+                "updateVersion": { "type": "integer", "minimum": 1 },
+                "modelVersion": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+                "configurationVersion": { "type": "integer", "minimum": 1 },
+                "observedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+                "evaluatedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+                "recordedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+                "explanationHashSha256": { "$ref": "../common.schema.json#/$defs/sha256" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/trustState" },
+            {
+              "type": "object",
+              "properties": {
+                "state": { "const": "stale" },
+                "usableForPolicy": { "const": false },
+                "requiredOutcome": { "const": "DENY" },
+                "reasonCode": { "const": "TRUST_STATE_STALE" },
+                "policyScore": { "type": "null" },
+                "policyBand": { "type": "null" },
+                "lastKnownScore": { "$ref": "../common.schema.json#/$defs/score" },
+                "lastKnownBand": { "$ref": "../common.schema.json#/$defs/trustBand" },
+                "ageSeconds": { "type": "number", "minimum": 0 },
+                "staleAfterSeconds": { "type": "integer", "minimum": 1 },
+                "transitionId": { "$ref": "../common.schema.json#/$defs/trustTransitionId" },
+                "updateVersion": { "type": "integer", "minimum": 1 },
+                "modelVersion": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+                "configurationVersion": { "type": "integer", "minimum": 1 },
+                "observedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+                "evaluatedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+                "recordedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+                "explanationHashSha256": { "$ref": "../common.schema.json#/$defs/sha256" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/trustState" },
+            {
+              "type": "object",
+              "properties": {
+                "state": { "const": "missing" },
+                "usableForPolicy": { "const": false },
+                "requiredOutcome": { "const": "DENY" },
+                "reasonCode": { "const": "TRUST_STATE_MISSING" },
+                "policyScore": { "type": "null" },
+                "policyBand": { "type": "null" },
+                "lastKnownScore": { "type": "null" },
+                "lastKnownBand": { "type": "null" },
+                "ageSeconds": { "type": "null" },
+                "staleAfterSeconds": { "type": "null" },
+                "transitionId": { "type": "null" },
+                "updateVersion": { "type": "null" },
+                "modelVersion": { "type": "null" },
+                "configurationVersion": { "type": "null" },
+                "observedAt": { "type": "null" },
+                "evaluatedAt": { "type": "null" },
+                "recordedAt": { "type": "null" },
+                "explanationHashSha256": { "type": "null" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "stepUpContext": {
+      "type": "object",
+      "properties": {
+        "status": { "enum": ["absent", "valid", "expired", "consumed", "invalid"] },
+        "proofIdHashSha256": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "tenantId": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/tenantId" },
+            { "type": "null" }
+          ]
+        },
+        "subjectId": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/subjectId" },
+            { "type": "null" }
+          ]
+        },
+        "action": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/policyAction" },
+            { "type": "null" }
+          ]
+        },
+        "sessionIdHashSha256": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "verifiedAt": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            { "type": "null" }
+          ]
+        },
+        "expiresAt": {
+          "oneOf": [
+            { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "proofIdHashSha256",
+        "tenantId",
+        "subjectId",
+        "action",
+        "sessionIdHashSha256",
+        "verifiedAt",
+        "expiresAt"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "absent" } }, "required": ["status"] },
+          "then": {
+            "type": "object",
+            "properties": {
+              "proofIdHashSha256": { "type": "null" },
+              "tenantId": { "type": "null" },
+              "subjectId": { "type": "null" },
+              "action": { "type": "null" },
+              "sessionIdHashSha256": { "type": "null" },
+              "verifiedAt": { "type": "null" },
+              "expiresAt": { "type": "null" }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": {
+              "proofIdHashSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
+              "tenantId": { "$ref": "../common.schema.json#/$defs/tenantId" },
+              "subjectId": { "$ref": "../common.schema.json#/$defs/subjectId" },
+              "action": { "$ref": "../common.schema.json#/$defs/policyAction" },
+              "sessionIdHashSha256": { "$ref": "../common.schema.json#/$defs/sha256" },
+              "verifiedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+              "expiresAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" }
+            }
+          }
+        }
+      ]
+    },
+    "requestContext": {
+      "type": "object",
+      "properties": {
+        "requestId": { "$ref": "../common.schema.json#/$defs/requestId" },
+        "correlationId": { "$ref": "../common.schema.json#/$defs/correlationId" },
+        "requestedAt": { "$ref": "../common.schema.json#/$defs/rfc3339Utc" },
+        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+        "routeTemplate": { "type": "string", "pattern": "^/[a-z0-9{}_/.-]{1,254}$" },
+        "sourceNetworkZone": { "enum": ["external", "tenant-network", "administrative", "unknown"] },
+        "stepUp": { "$ref": "#/$defs/stepUpContext" }
+      },
+      "required": [
+        "requestId",
+        "correlationId",
+        "requestedAt",
+        "method",
+        "routeTemplate",
+        "sourceNetworkZone",
+        "stepUp"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
