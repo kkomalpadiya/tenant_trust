@@ -16,6 +16,8 @@ This package owns versioned JSON Schema contracts for security-relevant events a
 
 Certificate lifecycle events require `sourceAuthentication` with Ed25519, the `tenant-trust-json-v1` canonicalization identifier, a tenant- and producer-bound key ID, the signed-content SHA-256 digest and an unpadded base64url signature. Issuance begins with null causation; renewal, supersession, revocation and expiry require an immediate lifecycle cause. Revocation also retains its issuer confirmation, and expiry uses `CERTIFICATE_EXPIRED`. See [Signed certificate lifecycle events](../../docs/architecture/signed-certificate-events.md).
 
+`trust.updated.v1` identifies one immutable transition, carries prior/new transport bands, the exact model/configuration versions, all contributing evidence IDs and the SHA-256 digest of the canonical durable explanation. The trust service validates the generated envelope against this schema before the event crosses a messaging boundary. See [Durable trust transition explanations](../../docs/architecture/trust-transition-explanations.md).
+
 ## Identifier rules
 
 Identifiers are opaque lowercase UUIDs with a type prefix. Generate the UUID once when the entity or event is created. Never derive an identifier from a name, email address, certificate subject or other personal data.

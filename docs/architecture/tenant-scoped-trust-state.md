@@ -10,7 +10,7 @@ T6.2 adds a persistence boundary for the complete normalized component vector de
 | `trust.subject_trust_state_evidence` | Exactly one accepted evidence reference for each identity, device, behaviour, certificate and compliance component in a snapshot. |
 | `trust.subject_trust_current` | A small pointer to the latest durable version for each tenant and subject. It contains no duplicated component values. |
 
-The storage function writes the version, five evidence links and current pointer atomically. The first version expects previous version zero; every later write must name the current version. A stale expected version fails instead of overwriting state. T6.5 composes this writer with durable event idempotency and per-subject ordering; see [Concurrency-safe validated evidence consumption](validated-evidence-trust-consumption.md).
+The storage function writes the version, five evidence links and current pointer atomically. The first version expects previous version zero; every later write must name the current version. A stale expected version fails instead of overwriting state. T6.5 composes this writer with durable event idempotency and per-subject ordering; see [Concurrency-safe validated evidence consumption](validated-evidence-trust-consumption.md). T6.8 then binds a current version and its five evidence links to an append-only [trust transition explanation](trust-transition-explanations.md).
 
 ## Tenant and evidence binding
 

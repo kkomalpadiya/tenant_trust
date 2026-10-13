@@ -60,6 +60,7 @@
     "trust-controls:verify": "npm run test:trust && node scripts/verify-trust-transition-controls.mjs",
     "trust-configuration:verify": "npm run test:trust && node scripts/verify-trust-configuration-lifecycle.mjs",
     "trust-evidence-consumer:verify": "npm run test:trust && node scripts/verify-validated-evidence-trust-consumption.mjs",
+    "trust-explanations:verify": "npm run test:trust && node scripts/verify-trust-transition-explanations.mjs",
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
     "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
     "profile-record-api:verify": "node scripts/verify-profile-record-api.mjs",

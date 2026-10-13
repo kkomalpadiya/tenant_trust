@@ -38,6 +38,6 @@ Critical overrides use a closed rule set. Callers cannot supply a score ceiling 
 
 A matching critical signal may bypass the ordinary source cap only to reduce the score. The result is the lowest of the previous score, candidate score and configured ceiling, so an override can never improve trust. Clearing the critical condition does not restore the prior band. Later recovery still follows the source cap, corroboration, consecutive-evaluation and one-band rules. Certificate validity remains an independent authorization prerequisite even when the trust score is already zero.
 
-The result records the applied cap, requested and applied deltas, recovery qualification, streak, transition reason and any critical rule. T6.8 will include these terms in the durable transition explanation.
+The result records the applied cap, requested and applied deltas, recovery qualification, streak, transition reason and any critical rule. The [durable transition explanation](trust-transition-explanations.md) binds those terms to prior/new state, evidence references and immutable model/configuration versions.
 
 Run `npm run trust-controls:verify` for boundary, anti-oscillation, source-farming and critical-override checks.

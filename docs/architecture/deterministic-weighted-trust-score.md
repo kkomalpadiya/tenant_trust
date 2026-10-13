@@ -8,7 +8,7 @@ Every component must be a finite number from 0 through 100. The calculation appl
 
 The implementation converts the JavaScript decimal representations to integer-and-scale pairs before multiplication and addition. This avoids intermediate binary floating-point drift. It rounds each displayed contribution to six decimal places and rounds the final sum once to two decimal places using half-up rounding. It does not sum the displayed contributions, so contribution display rounding cannot change the score.
 
-The result includes the model version, normalized inputs, weights, per-component weighted contributions, normalization rule, score range and rounding rule. This is a calculation explanation, not a trust transition record. T6.8 will combine contributions with prior/new state, evidence references and configuration versions when transition events are implemented.
+The result includes the model version, normalized inputs, weights, per-component weighted contributions, normalization rule, score range and rounding rule. This calculation is incorporated into the [durable transition explanation](trust-transition-explanations.md), which binds its contributions to prior/new state, evidence references and configuration versions.
 
 The calculation deliberately does not define missing-signal substitution, temporal smoothing, cold-start behavior, confidence, trust bands, hysteresis or critical-evidence overrides. Those policies are separate Phase 6 tasks and must not be hidden inside the deterministic weighted mean.
 

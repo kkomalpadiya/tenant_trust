@@ -82,6 +82,7 @@ npm run evidence-envelope:verify
 npm run evidence-sources:verify
 npm run evidence-simulators:verify
 npm run evidence-ingestion:verify
+npm run trust-explanations:verify
 npm run mtls-gateway:verify
 npm run gateway-spoofing:verify
 npm run profile-record-api:verify
@@ -114,6 +115,8 @@ Tenant-scoped database code must start a transaction and call `identity.set_tena
 Platform tenant lifecycle operations use the separate `tenant_trust_platform_admin` privilege set and transaction-local `identity.set_platform_actor_context` binding. `npm run tenant-lifecycle:verify` proves that suspension immediately blocks existing and new database activity, reactivation is audited, and irreversible soft teardown removes tenant roles while retaining referenced identities, memberships, resources, configuration and append-only audit history. See [Tenant suspension and teardown controls](architecture/tenant-lifecycle-controls.md).
 
 `npm run demo:provision` applies every ordered SQL seed under `database/seeds`. It creates the deterministic Tenant Alpha and Tenant Beta subjects, memberships, role assignments, synthetic resources, planned issuer mappings, planned synthetic evidence sources, active trust settings and published policy metadata used by the prototype scenarios. It is safe to rerun and does not reactivate suspended rows or overwrite changed lifecycle versions. It fails when a deterministic identity, ownership or configuration identifier conflicts with different data. `npm run demo:verify` checks the mapping and exercises lifecycle persistence in a transaction that is rolled back.
+
+`npm run trust-explanations:verify` validates the generated `trust.updated.v1` event and runs the T6.8 transition ledger against PostgreSQL inside a rolled-back transaction. Apply migration `023_trust_transition_explanations.sql` with `npm run infra:migrate` before running it in an environment that has not yet been migrated.
 
 `npm run tenant-isolation:verify` is the Phase 2 completion gate. It reprovisions the deterministic Alpha/Beta scenario, then runs the identity, database-query, resource, membership, security-configuration, cross-tenant tampering, Redis cache, NATS event and tenant-suspension checks in a fixed fail-fast order. Run the individual commands while diagnosing a boundary, then rerun this complete gate before treating tenant isolation as verified. See [Tenant isolation phase verification](architecture/tenant-isolation-verification.md).
 

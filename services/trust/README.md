@@ -14,6 +14,8 @@ T6.6 applies explicit transition controls after weighting and temporal smoothing
 
 T6.7 exposes trust-configuration changes only through an administrator service and constrained PostgreSQL lifecycle functions. Draft creation validates every range and the five-weight total, activation atomically replaces the active version, and rollback copies historical values into a new active version. Configuration rows and lifecycle events remain append-only, while durable confirmations are checked before the service reports success.
 
+T6.8 assembles the weighted, temporal and transition-control results into one immutable explanation for every state change. It binds prior/new state, five component contributions, accepted-evidence references and model/configuration versions, then hashes canonical explanation bytes and creates the existing `trust.updated.v1` event. PostgreSQL verifies those bindings and atomically stores the append-only explanation, contributions, event and current transition pointer.
+
 This service does not define raw-claim normalization rules or expose policy-ready freshness decisions. Those responsibilities belong to later Phase 6 tasks.
 
 Run `npm run trust-state:verify` from the repository root. The focused gate runs unit tests and a rolled-back PostgreSQL scenario.
@@ -22,3 +24,4 @@ Run `npm run trust-smoothing:verify` for EWA, cold-start, missing, stale and dec
 Run `npm run trust-evidence-consumer:verify` for verified delivery, durable idempotency, subject ordering, version advancement and tenant-isolation checks.
 Run `npm run trust-controls:verify` for band boundaries, hysteresis, source influence, corroborated recovery and critical overrides.
 Run `npm run trust-configuration:verify` for authorization, validation, atomic activation, immutable history, copy-forward rollback and tenant isolation.
+Run `npm run trust-explanations:verify` for contract-valid events, canonical digests, exact component/evidence binding, atomic transition storage, idempotency and append-only history.
