@@ -64,6 +64,7 @@ The repository contains the initial scope, repository design, selected technolog
 - [Durable trust transition explanations](docs/architecture/trust-transition-explanations.md)
 - [Internal trust-score lookup and freshness contract](docs/architecture/internal-trust-score-lookup.md)
 - [Adaptive trust-engine verification and calibration fixtures](docs/architecture/trust-engine-verification.md)
+- [Phase 6 adaptive trust-engine implementation report](docs/reports/phase-6-adaptive-trust-engine-report.md)
 
 Bootstrap the core services with `npm run infra:init`, `npm run pki:init`, `npm run policy:test`, `npm run infra:up`, `npm run infra:migrate` and `npm run demo:provision`, then run `npm run tenant-isolation:verify` for the Phase 2 gate, `npm run certificate-lifecycle:verify` for the Phase 3 gate, `npm run protected-saas:verify` for the complete Phase 4 gate and `npm run trust-engine:verify` for the complete Phase 6 gate. The individual boundary commands remain available for diagnosis. Run `npm run foundation:check` for the complete foundation and `npm run foundation:clean` to verify a disposable first start without touching normal development data. Full commands, local ports, safe shutdown and deliberate reset steps are in the development guide.
 
