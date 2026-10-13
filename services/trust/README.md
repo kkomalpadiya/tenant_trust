@@ -18,6 +18,8 @@ T6.8 assembles the weighted, temporal and transition-control results into one im
 
 T6.9 exposes that current transition through a context-bound internal lookup. PostgreSQL computes age from its own statement time and the transition's exact configuration. Fresh state returns a policy score plus age and versions; stale state withholds the policy score but retains the last-known value for audit; missing or stale state requires `DENY`. The application role can execute only the zero-argument lookup function and cannot read the underlying trust tables.
 
+T6.10 adds a versioned deterministic calibration-fixture catalog and the Phase 6 completion gate. The fixtures exercise normalized and band boundaries, exact freshness, missing/stale behavior, corroborated recovery, replay, flood suspension and tenant scoping. They are machine-labelled as unvalidated regression data and make no claim about real-world accuracy or optimal weights and thresholds.
+
 This service does not define raw-claim normalization rules or make the final authorization decision. Those responsibilities belong to the trusted evidence resolvers and policy layer.
 
 Run `npm run trust-state:verify` from the repository root. The focused gate runs unit tests and a rolled-back PostgreSQL scenario.
@@ -28,3 +30,4 @@ Run `npm run trust-controls:verify` for band boundaries, hysteresis, source infl
 Run `npm run trust-configuration:verify` for authorization, validation, atomic activation, immutable history, copy-forward rollback and tenant isolation.
 Run `npm run trust-explanations:verify` for contract-valid events, canonical digests, exact component/evidence binding, atomic transition storage, idempotency and append-only history.
 Run `npm run trust-score-lookup:verify` for actor binding, fresh score/version output, exact freshness-boundary behavior, stale score withholding and conservative missing/stale denial.
+Run `npm run trust-engine:verify` for the complete Phase 6 test and database gate. Local infrastructure must be running and current migrations applied.

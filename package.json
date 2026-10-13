@@ -62,6 +62,7 @@
     "trust-evidence-consumer:verify": "npm run test:trust && node scripts/verify-validated-evidence-trust-consumption.mjs",
     "trust-explanations:verify": "npm run test:trust && node scripts/verify-trust-transition-explanations.mjs",
     "trust-score-lookup:verify": "npm run test:trust && node scripts/verify-internal-trust-score-lookup.mjs",
+    "trust-engine:verify": "node scripts/verify-trust-engine-phase.mjs",
     "mtls-gateway:verify": "node scripts/verify-mtls-gateway.mjs",
     "gateway-spoofing:verify": "node scripts/verify-mtls-gateway.mjs",
     "profile-record-api:verify": "node scripts/verify-profile-record-api.mjs",
@@ -92,9 +93,10 @@
     "test:evidence-pipeline": "node --test test/evidence-pipeline-end-to-end.test.mjs",
     "test:trust-model": "npm test --workspace @tenant-trust/trust-model",
     "test:trust": "npm test --workspace @tenant-trust/trust",
+    "test:trust-calibration": "node --test test/trust-engine-calibration.test.mjs",
     "test:gateway-identity": "npm test --workspace @tenant-trust/gateway-identity",
     "test:api": "npm test --workspace @tenant-trust/api",
-    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:evidence-sources && npm run test:evidence-simulators && npm run test:evidence && npm run test:evidence-events && npm run test:evidence-pipeline && npm run test:trust-model && npm run test:trust && npm run test:gateway-identity && npm run test:api && npm run test:review-demo"
+    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:evidence-sources && npm run test:evidence-simulators && npm run test:evidence && npm run test:evidence-events && npm run test:evidence-pipeline && npm run test:trust-model && npm run test:trust && npm run test:trust-calibration && npm run test:gateway-identity && npm run test:api && npm run test:review-demo"
   },
   "engines": {
     "node": "24.20.0",

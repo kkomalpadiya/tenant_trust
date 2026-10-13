@@ -84,6 +84,7 @@ npm run evidence-simulators:verify
 npm run evidence-ingestion:verify
 npm run trust-explanations:verify
 npm run trust-score-lookup:verify
+npm run trust-engine:verify
 npm run mtls-gateway:verify
 npm run gateway-spoofing:verify
 npm run profile-record-api:verify
@@ -120,6 +121,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run trust-explanations:verify` validates the generated `trust.updated.v1` event and runs the T6.8 transition ledger against PostgreSQL inside a rolled-back transaction. Apply migration `023_trust_transition_explanations.sql` with `npm run infra:migrate` before running it in an environment that has not yet been migrated.
 
 `npm run trust-score-lookup:verify` is the T6.9 internal lookup gate. It proves that the application receives the current actor's fresh score, age, transition and model/configuration versions; that the exact freshness boundary remains usable; and that stale or missing state requires `DENY` without exposing a stale score as policy input. Apply migration `024_internal_trust_score_lookup.sql` with `npm run infra:migrate` first. See [Internal trust-score lookup and freshness contract](architecture/internal-trust-score-lookup.md).
+
+`npm run trust-engine:verify` is the Phase 6 completion gate. It runs the full repository suite and deterministic calibration fixtures, then verifies scoring boundaries, missing/stale behavior, recovery, replay/flood safeguards, tenant-scoped state/configuration, evidence consumption, explanations and the internal lookup against PostgreSQL. The fixtures remain explicitly labelled as unvalidated prototype defaults and do not establish effectiveness. See [Adaptive trust-engine verification and calibration fixtures](architecture/trust-engine-verification.md).
 
 `npm run tenant-isolation:verify` is the Phase 2 completion gate. It reprovisions the deterministic Alpha/Beta scenario, then runs the identity, database-query, resource, membership, security-configuration, cross-tenant tampering, Redis cache, NATS event and tenant-suspension checks in a fixed fail-fast order. Run the individual commands while diagnosing a boundary, then rerun this complete gate before treating tenant isolation as verified. See [Tenant isolation phase verification](architecture/tenant-isolation-verification.md).
 

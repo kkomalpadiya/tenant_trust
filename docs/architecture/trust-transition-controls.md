@@ -14,7 +14,7 @@ The initial, uncalibrated prototype has three bands:
 
 The five-point gaps on each side of a base boundary prevent a score near 40 or 70 from repeatedly changing bands. Deterioration applies immediately and may skip directly from high to low when the controlled score is below 35. Recovery requires two consecutive qualifying evaluations supported by at least two distinct enrolled sources. Each qualifying evaluation can advance only one band. A failed score or corroboration check resets the recovery streak.
 
-These thresholds are deterministic prototype defaults, not calibrated effectiveness claims. T6.7 can place revised values in a new immutable tenant configuration, and T6.10 will exercise calibration fixtures before the defaults support an evaluation claim.
+These thresholds are deterministic prototype defaults, not calibrated effectiveness claims. T6.7 can place revised values in a new immutable tenant configuration. The T6.10 calibration fixtures lock their deterministic behavior but deliberately do not support an evaluation or effectiveness claim.
 
 ## Bounded source influence
 

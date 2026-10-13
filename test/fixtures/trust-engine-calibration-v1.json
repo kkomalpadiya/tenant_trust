@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "tenant-trust-calibration-fixtures-v1",
+  "calibrationStatus": "UNVALIDATED_PROTOTYPE_DEFAULTS",
+  "purpose": "deterministic-regression-only",
+  "effectivenessClaim": false,
+  "weightedCases": [
+    {
+      "id": "normalized-minimum",
+      "components": {
+        "identity": 0,
+        "device": 0,
+        "behaviour": 0,
+        "certificate": 0,
+        "compliance": 0
+      },
+      "expectedScore": 0
+    },
+    {
+      "id": "normalized-maximum",
+      "components": {
+        "identity": 100,
+        "device": 100,
+        "behaviour": 100,
+        "certificate": 100,
+        "compliance": 100
+      },
+      "expectedScore": 100
+    },
+    {
+      "id": "default-weight-hand-check",
+      "components": {
+        "identity": 100,
+        "device": 80,
+        "behaviour": 60,
+        "certificate": 40,
+        "compliance": 20
+      },
+      "expectedScore": 64
+    }
+  ],
+  "temporalCases": [
+    {
+      "id": "exact-freshness-boundary",
+      "configuration": {
+        "initialScore": 60,
+        "smoothingAlpha": 0.5,
+        "staleAfterSeconds": 300
+      },
+      "previousState": null,
+      "observation": {
+        "score": 100,
+        "observedAt": "2026-10-13T08:00:00.000Z"
+      },
+      "evaluatedAt": "2026-10-13T08:05:00.000Z",
+      "expected": {
+        "score": 80,
+        "phase": "initialized",
+        "observationStatus": "fresh"
+      }
+    },
+    {
+      "id": "missing-signal-held-within-window",
+      "configuration": {
+        "initialScore": 60,
+        "smoothingAlpha": 0.5,
+        "staleAfterSeconds": 300
+      },
+      "previousState": {
+        "score": 80,
+        "anchorScore": 80,
+        "lastFreshObservedAt": "2026-10-13T08:00:00.000Z",
+        "lastEvaluatedAt": "2026-10-13T08:00:00.000Z"
+      },
+      "observation": null,
+      "evaluatedAt": "2026-10-13T08:05:00.000Z",
+      "expected": {
+        "score": 80,
+        "phase": "held",
+        "observationStatus": "missing"
+      }
+    },
+    {
+      "id": "stale-signal-withheld-and-decayed",
+      "configuration": {
+        "initialScore": 60,
+        "smoothingAlpha": 0.5,
+        "staleAfterSeconds": 300
+      },
+      "previousState": {
+        "score": 80,
+        "anchorScore": 80,
+        "lastFreshObservedAt": "2026-10-13T08:00:00.000Z",
+        "lastEvaluatedAt": "2026-10-13T08:05:00.000Z"
+      },
+      "observation": {
+        "score": 100,
+        "observedAt": "2026-10-13T08:00:00.000Z"
+      },
+      "evaluatedAt": "2026-10-13T08:10:00.000Z",
+      "expected": {
+        "score": 70,
+        "phase": "decayed",
+        "observationStatus": "stale"
+      }
+    }
+  ],
+  "bandBoundaries": [
+    { "score": 0, "expectedBand": "low" },
+    { "score": 39.99, "expectedBand": "low" },
+    { "score": 40, "expectedBand": "medium" },
+    { "score": 69.99, "expectedBand": "medium" },
+    { "score": 70, "expectedBand": "high" },
+    { "score": 100, "expectedBand": "high" }
+  ],
+  "recoveryCase": {
+    "initialState": { "score": 44, "band": "low", "recoveryStreak": 0 },
+    "candidateScores": [45, 45],
+    "source": {
+      "sourceId": "src_018f1234-5678-7abc-8def-0123456789e0",
+      "maximumInfluence": 1,
+      "corroboratingSourceIds": [
+        "src_018f1234-5678-7abc-8def-0123456789e1"
+      ]
+    },
+    "expected": [
+      { "score": 45, "band": "low", "transition": "held", "recoveryStreak": 1 },
+      { "score": 45, "band": "medium", "transition": "recovered", "recoveryStreak": 0 }
+    ]
+  },
+  "replayCase": {
+    "expectedOutcomes": [
+      null,
+      "EVIDENCE_EVENT_REPLAYED",
+      "EVIDENCE_NONCE_REPLAYED",
+      "EVIDENCE_SEQUENCE_REPLAYED"
+    ]
+  },
+  "floodCase": {
+    "safeguards": {
+      "rateLimitWindowSeconds": 60,
+      "rateLimitMaxEvents": 2,
+      "rateLimitSuspensionThreshold": 2,
+      "maximumInfluence": 0.4,
+      "tenantMaximumSourceInfluence": 0.2
+    },
+    "expectedOutcomes": [
+      null,
+      null,
+      "EVIDENCE_RATE_LIMITED",
+      "EVIDENCE_RATE_LIMITED",
+      "VERIFICATION_CONTEXT_NOT_FOUND"
+    ],
+    "expectedAcceptedCount": 2,
+    "expectedRateLimitedCount": 2,
+    "expectedEffectiveMaximumInfluence": 0.2
+  },
+  "tenantIsolationCase": {
+    "tenantIds": [
+      "tnt_018f1234-5678-7abc-8def-0123456789ab",
+      "tnt_018f1234-5678-7abc-8def-0123456789ac"
+    ],
+    "expectedIndependentAccepts": 2
+  }
+}
