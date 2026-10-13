@@ -16,7 +16,9 @@ T6.7 exposes trust-configuration changes only through an administrator service a
 
 T6.8 assembles the weighted, temporal and transition-control results into one immutable explanation for every state change. It binds prior/new state, five component contributions, accepted-evidence references and model/configuration versions, then hashes canonical explanation bytes and creates the existing `trust.updated.v1` event. PostgreSQL verifies those bindings and atomically stores the append-only explanation, contributions, event and current transition pointer.
 
-This service does not define raw-claim normalization rules or expose policy-ready freshness decisions. Those responsibilities belong to later Phase 6 tasks.
+T6.9 exposes that current transition through a context-bound internal lookup. PostgreSQL computes age from its own statement time and the transition's exact configuration. Fresh state returns a policy score plus age and versions; stale state withholds the policy score but retains the last-known value for audit; missing or stale state requires `DENY`. The application role can execute only the zero-argument lookup function and cannot read the underlying trust tables.
+
+This service does not define raw-claim normalization rules or make the final authorization decision. Those responsibilities belong to the trusted evidence resolvers and policy layer.
 
 Run `npm run trust-state:verify` from the repository root. The focused gate runs unit tests and a rolled-back PostgreSQL scenario.
 Run `npm run trust-score:verify` for weighted-score unit tests and independent hand-calculated examples.
@@ -25,3 +27,4 @@ Run `npm run trust-evidence-consumer:verify` for verified delivery, durable idem
 Run `npm run trust-controls:verify` for band boundaries, hysteresis, source influence, corroborated recovery and critical overrides.
 Run `npm run trust-configuration:verify` for authorization, validation, atomic activation, immutable history, copy-forward rollback and tenant isolation.
 Run `npm run trust-explanations:verify` for contract-valid events, canonical digests, exact component/evidence binding, atomic transition storage, idempotency and append-only history.
+Run `npm run trust-score-lookup:verify` for actor binding, fresh score/version output, exact freshness-boundary behavior, stale score withholding and conservative missing/stale denial.

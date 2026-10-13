@@ -41,6 +41,8 @@ Migration `023_trust_transition_explanations.sql` adds four tenant-bound relatio
 
 The tables use forced row-level security with no runtime policies or direct application/trust-engine privileges. Only the constrained security-definer function is executable by the trust engine, and history tables reject updates and deletes.
 
+Policy consumers do not read these tables. The later [internal trust-score lookup](internal-trust-score-lookup.md) reads only the current transition through a separate actor-bound function, computes freshness using PostgreSQL time and withholds stale scores from policy input.
+
 ## Verification
 
 Run `npm run trust-explanations:verify`. The gate runs the trust unit suite, validates a generated event against the shared JSON Schema, then uses a rolled-back PostgreSQL scenario to prove least privilege, exact contribution binding, atomic persistence, idempotent retry, forged-contribution rejection, digest linkage and append-only history.
