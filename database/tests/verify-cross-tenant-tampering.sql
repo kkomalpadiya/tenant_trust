@@ -66,22 +66,24 @@ BEGIN
     RAISE EXCEPTION 'Alpha actor updated a guessed Beta evidence source';
   END IF;
 
-  UPDATE trust.trust_configurations
-  SET model_version = model_version
-  WHERE tenant_id = 'tnt_018f1234-5678-7abc-8def-0123456789ac'
-    AND configuration_version = 1;
-  GET DIAGNOSTICS affected = ROW_COUNT;
-  IF affected <> 0 THEN
-    RAISE EXCEPTION 'Alpha actor updated a guessed Beta trust configuration';
-  END IF;
+  BEGIN
+    UPDATE trust.trust_configurations
+    SET model_version = model_version
+    WHERE tenant_id = 'tnt_018f1234-5678-7abc-8def-0123456789ac'
+      AND configuration_version = 1;
+    RAISE EXCEPTION 'Alpha actor bypassed the trust configuration lifecycle';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
 
-  UPDATE trust.policy_versions
-  SET policy_name = policy_name
-  WHERE policy_version_id = 'pol_018f1234-5678-7abc-8def-0123456789c1';
-  GET DIAGNOSTICS affected = ROW_COUNT;
-  IF affected <> 0 THEN
-    RAISE EXCEPTION 'Alpha actor updated a guessed Beta policy version';
-  END IF;
+  BEGIN
+    UPDATE trust.policy_versions
+    SET policy_name = policy_name
+    WHERE policy_version_id = 'pol_018f1234-5678-7abc-8def-0123456789c1';
+    RAISE EXCEPTION 'Alpha actor bypassed the policy bundle lifecycle';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
 
   BEGIN
     INSERT INTO app.resources (tenant_id, resource_id, owner_subject_id, resource_name)

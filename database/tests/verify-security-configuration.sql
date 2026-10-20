@@ -186,8 +186,8 @@ BEGIN
     UPDATE trust.policy_versions
     SET bundle_hash_sha256 = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     WHERE policy_version_id = 'pol_018f1234-5678-7abc-8def-0123456789c0';
-    RAISE EXCEPTION 'published policy content was rewritten';
-  EXCEPTION WHEN check_violation THEN
+    RAISE EXCEPTION 'administrator bypassed the policy bundle lifecycle functions';
+  EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
 

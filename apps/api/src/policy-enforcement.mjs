@@ -160,7 +160,7 @@ export function assertOpaPolicyDecisionClient(value) {
   return value;
 }
 
-function assertDecisionBinding(decision, input, inputHash) {
+function assertDecisionBinding(decision, input, inputHash, activePolicyBundle) {
   const expected = [
     [decision.requestId, input.requestContext.requestId],
     [decision.correlationId, input.requestContext.correlationId],
@@ -175,6 +175,10 @@ function assertDecisionBinding(decision, input, inputHash) {
     [decision.state.trustTransitionId, input.trust.transitionId],
     [decision.state.trustUpdateVersion, input.trust.updateVersion],
     [decision.state.trustConfigurationVersion, input.trust.configurationVersion],
+    [decision.policy.policyVersionId, activePolicyBundle.policyVersionId],
+    [decision.policy.bundleVersion, activePolicyBundle.bundleVersion],
+    [decision.policy.bundleHashSha256, activePolicyBundle.bundleHashSha256],
+    [decision.policy.decisionPath, activePolicyBundle.entrypoint],
   ];
   if (expected.some(([actual, wanted]) => actual !== wanted)) {
     unavailable("POLICY_RESPONSE_BINDING_MISMATCH");
@@ -185,9 +189,16 @@ function assertDecisionBinding(decision, input, inputHash) {
   }
 }
 
-export function createPolicyEnforcementService({ trustScoreLookupService, decisionClient } = {}) {
+export function createPolicyEnforcementService({
+  trustScoreLookupService,
+  policyBundleLookupService,
+  decisionClient,
+} = {}) {
   if (!trustScoreLookupService || typeof trustScoreLookupService.lookup !== "function") {
     throw new TypeError("A trust-score lookup service is required.");
+  }
+  if (!policyBundleLookupService || typeof policyBundleLookupService.lookupActive !== "function") {
+    throw new TypeError("An active policy-bundle lookup service is required.");
   }
   assertOpaPolicyDecisionClient(decisionClient);
 
@@ -215,6 +226,23 @@ export function createPolicyEnforcementService({ trustScoreLookupService, decisi
       requireRecord(trust, "TRUST_STATE_INVALID");
       if (trust.tenantId !== context.tenantId || trust.subjectId !== context.subjectId) {
         unavailable("TRUST_STATE_BINDING_MISMATCH");
+      }
+      let activePolicyBundle;
+      try {
+        activePolicyBundle = await policyBundleLookupService.lookupActive({
+          context,
+          policyName: "access-control",
+          signal,
+        });
+      } catch {
+        unavailable("POLICY_BUNDLE_LOOKUP_UNAVAILABLE");
+      }
+      requireRecord(activePolicyBundle, "ACTIVE_POLICY_BUNDLE_INVALID");
+      if (activePolicyBundle.tenantId !== context.tenantId
+        || activePolicyBundle.policyName !== "access-control"
+        || activePolicyBundle.state !== "active"
+        || activePolicyBundle.entrypoint !== POLICY_ENFORCEMENT_POLICY.decisionPath) {
+        unavailable("ACTIVE_POLICY_BUNDLE_INVALID");
       }
 
       const input = {
@@ -270,12 +298,17 @@ export function createPolicyEnforcementService({ trustScoreLookupService, decisi
       const immutableInput = deepFreeze(structuredClone(input));
       const inputHash = hashPolicyInput(immutableInput);
       const decision = await decisionClient.decide(immutableInput, { signal });
-      assertDecisionBinding(decision, immutableInput, inputHash);
+      assertDecisionBinding(decision, immutableInput, inputHash, activePolicyBundle);
       if (immutableInput.trust.requiredOutcome !== null
         && decision.outcome !== immutableInput.trust.requiredOutcome) {
         unavailable("POLICY_RESPONSE_CONSTRAINT_MISMATCH");
       }
-      return Object.freeze({ input: immutableInput, inputHash, decision });
+      return Object.freeze({
+        input: immutableInput,
+        inputHash,
+        policyBundle: deepFreeze(structuredClone(activePolicyBundle)),
+        decision,
+      });
     },
   });
   POLICY_SERVICES.add(service);

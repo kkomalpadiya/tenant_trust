@@ -72,6 +72,18 @@ function freshTrust() {
   };
 }
 
+function activePolicyBundle() {
+  return {
+    tenantId: ids.tenant,
+    policyVersionId: ids.policy,
+    policyName: "access-control",
+    bundleVersion: 2,
+    bundleHashSha256: hash,
+    entrypoint: "tenant_trust/authorization/decision",
+    state: "active",
+  };
+}
+
 function requestState() {
   return {
     certificateId: ids.certificate,
@@ -135,6 +147,7 @@ function enforcementWith(fetchImpl, trust = freshTrust()) {
   });
   return createPolicyEnforcementService({
     trustScoreLookupService: { lookup: async () => structuredClone(trust) },
+    policyBundleLookupService: { lookupActive: async () => activePolicyBundle() },
     decisionClient,
   });
 }
@@ -189,6 +202,21 @@ test("fails closed for network, malformed, and state-binding failures", async ()
   for (const fetchImpl of failures) {
     await assert.rejects(decideWith(enforcementWith(fetchImpl)), PolicyDecisionUnavailableError);
   }
+});
+
+test("an OPA decision must identify the tenant's exact active bundle", async () => {
+  const service = enforcementWith(async (_url, options) => {
+    const { input } = JSON.parse(options.body);
+    const result = outputFor(input);
+    result.policy = { ...result.policy, bundleVersion: 3 };
+    return { ok: true, json: async () => ({ result }) };
+  });
+
+  await assert.rejects(decideWith(service), (error) => {
+    assert.ok(error instanceof PolicyDecisionUnavailableError);
+    assert.equal(error.reasonCode, "POLICY_RESPONSE_BINDING_MISMATCH");
+    return true;
+  });
 });
 
 test("stale trust is a mandatory DENY signal that an OPA ALLOW cannot override", async () => {

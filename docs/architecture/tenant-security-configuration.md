@@ -32,7 +32,7 @@ The tenant and subject parameters come from trusted authentication resolution. R
 
 The deterministic seed creates separate planned issuer mappings and five planned synthetic evidence sources for Tenant Alpha and Tenant Beta. It also stores one active trust configuration and one published policy version for each tenant. The tenants intentionally have different trust settings and bundle digests so an accidental cross-tenant lookup is visible.
 
-These rows define ownership, integrity and lifecycle metadata only. A planned issuer is not an operational tenant CA, a planned source has no enrolled verification key, and a published policy is not active in OPA. Later PKI, evidence, trust and policy tasks must activate those components only after their own verification requirements pass.
+The original seed rows define ownership and bootstrap metadata only. A planned issuer is not an operational tenant CA, a planned source has no enrolled verification key, and the seeded policy metadata is deliberately unvalidated and non-activatable. Validated policy publication, atomic activation and exact decision provenance are implemented by the [tenant policy bundle lifecycle](tenant-policy-bundle-versioning.md).
 
 Irreversible tenant teardown retires issuer mappings and evidence sources, supersedes active trust and policy versions, and retains every configuration row under its tenant-qualified key. Published or draft immutable versions remain historical metadata, but the retired tenant stays suspended and cannot use them. See [Tenant suspension and teardown controls](tenant-lifecycle-controls.md).
 

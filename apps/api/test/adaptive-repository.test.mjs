@@ -123,6 +123,15 @@ function createPolicyService(decisions, outcome = "ALLOW") {
   });
   return createPolicyEnforcementService({
     trustScoreLookupService: { lookup: async () => trustState() },
+    policyBundleLookupService: { lookupActive: async () => ({
+      tenantId: ids.tenant,
+      policyVersionId: ids.policy,
+      policyName: "access-control",
+      bundleVersion: 1,
+      bundleHashSha256: hash,
+      entrypoint: "tenant_trust/authorization/decision",
+      state: "active",
+    }) },
     decisionClient,
   });
 }

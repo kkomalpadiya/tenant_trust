@@ -4,7 +4,7 @@
 
 T7.2 connects all five certificate-authenticated SaaS operations to the versioned T7.1 OPA contract under the explicit `adaptive-trust-opa-v1` authorization mode. The existing `pki-rbac-baseline-v1` path remains available unchanged for later comparative evaluation. The evidence-ingestion endpoint uses its own signed-source boundary and is not a human protected route.
 
-The enforcement adapter sends `POST /v1/data/tenant_trust/authorization/decision` with exactly `{ "input": ... }`. It accepts only one schema-valid `result`, verifies the echoed request, correlation, tenant, subject, input hash and certificate/tenant/subject/membership/trust versions, and requires a decision timestamp no earlier than the request. Network errors, non-success responses, invalid JSON, partial results and binding mismatches fail closed.
+The enforcement adapter sends `POST /v1/data/tenant_trust/authorization/decision` with exactly `{ "input": ... }`. It accepts only one schema-valid `result`, verifies the echoed request, correlation, tenant, subject, input hash and certificate/tenant/subject/membership/trust versions, requires an exact match to the tenant's active policy ID/version/digest/entrypoint, and requires a decision timestamp no earlier than the request. Network errors, non-success responses, invalid JSON, partial results, missing active policy and binding mismatches fail closed.
 
 ## Evaluation order
 
@@ -14,7 +14,7 @@ Each protected operation uses this order:
 2. Begin the tenant transaction, bind the actor and load current tenant, subject, membership and role authority.
 3. Match the presented certificate to inventory and revalidate its current authoritative status.
 4. Evaluate the role/action matrix. An ineligible row is denied without calling OPA.
-5. Load the current trust state and build the complete immutable policy input from server-controlled values.
+5. Load the current trust state and active tenant policy bundle, then build the complete immutable policy input from server-controlled values.
 6. Validate the OPA result and continue only for the exact outcome `ALLOW`.
 7. Recheck request-state freshness, run an explicitly tenant-qualified query and retain forced row-level security as an independent isolation layer.
 

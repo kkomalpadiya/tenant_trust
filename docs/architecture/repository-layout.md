@@ -8,6 +8,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 | `apps/web/` | Tenant dashboard, certificate controls, trust explanations and audit views |
 | `services/evidence/` | Source enrollment, signature and freshness validation, accepted evidence delivery |
 | `services/trust/` | Tenant-scoped trust-state version storage, score calculation, temporal smoothing, state transitions and explanations |
+| `services/policy/` | Validated tenant policy-bundle publication, atomic activation, immutable version history and active-bundle lookup |
 | `services/orchestrator/` | Security action state machine, certificate actions and governed recovery |
 | `services/audit/` | Durable audit delivery, Fabric integration, reconciliation and verification |
 | `packages/contracts/` | Versioned request, event and decision schemas plus certificate profiles shared by producers and consumers |
@@ -43,7 +44,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 - Role/action lookup accepts only that branded tenant context. Resource type and sensitivity come from the canonical action matrix, and export or administration remains non-allowing until all separately implemented controls pass.
 - Tenant database work runs inside a transaction with `identity.set_tenant_actor_context`; forced row-level security denies unbound, inactive, unauthorized and cross-tenant access even when application SQL omits a tenant predicate.
 - Platform tenant lifecycle work uses a separate transaction-local platform actor and execute-only role. Suspension denies live tenant activity; teardown removes tenant roles and retains referenced records plus append-only lifecycle history.
-- Tenant issuer mappings, evidence sources, trust settings and policy versions use tenant-qualified keys. Active members can read only their tenant's rows, and only its active administrators can change them.
+- Tenant issuer mappings, evidence sources, trust settings and policy versions use tenant-qualified keys. Active members can read only their tenant's rows. Tenant administrators manage policy versions only through the validated publication and atomic activation functions; direct table writes are revoked.
 - Source-authenticated evidence uses the exact submitted tenant/source/key/subject tuple only as lookup input to an execute-only verifier. Acceptance requires active authoritative state, matching source type/synthetic policy, a recomputed canonical digest and the enrolled Ed25519 signature; no submitted identity becomes database actor authority.
 - The tenant CA manifest defines one offline platform root and distinct Alpha/Beta state, key, provisioner and service-principal boundaries. Runtime certificate code must resolve the issuer from validated tenant context and must never accept caller-selected issuer routing.
 - Verified issuance returns success only after the certificate inventory boundary confirms an atomic certificate row and initial append-only lifecycle event. Certificate reads preserve tenant and actor ownership scope.
@@ -52,6 +53,7 @@ Use a single repository with explicit component boundaries. The paths below are 
 - Shared contracts describe interfaces without exposing component internals. Schema changes must account for both producers and consumers.
 - Component paths define responsibilities, not a requirement to run every component in a separate process. Deployment granularity will follow the local resource budget.
 - Certificate validation and policy enforcement gate protected operations. Trust computation supplies versioned input to policy decisions.
+- Protected API policy decisions must identify the exact active tenant bundle by immutable policy-version ID, tenant-local bundle version, SHA-256 digest and decision path. Missing, stale or mismatched provenance denies the request.
 - Protected API outcomes use server-generated request correlation and an append-only constrained PostgreSQL writer. Audit rows allowlist metadata and store resource hashes instead of raw identifiers, headers or payloads.
 - Protected API requests reject ambient cookie/bearer sessions, apply bounded body and execution limits, and pass abort signals through the repository. Sensitive POSTs reserve a tenant/actor/action-scoped hashed idempotency receipt in the same transaction as authorization and data access.
 - Durable off-chain state supports runtime decisions. Fabric delivery runs asynchronously and exposes pending, committed and failed audit states.

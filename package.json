@@ -74,6 +74,7 @@
     "protected-saas:verify": "node scripts/verify-protected-saas-baseline.mjs",
     "policy-contract:verify": "node --test packages/contracts/test/opa-decision-contract.test.mjs",
     "policy-enforcement:verify": "node --test apps/api/test/policy-enforcement.test.mjs apps/api/test/adaptive-repository.test.mjs",
+    "policy-bundles:verify": "npm run test:policy && node scripts/verify-policy-bundle-validation.mjs && node scripts/verify-policy-bundle-lifecycle.mjs && npm run policy-enforcement:verify",
     "demo:review": "node apps/review-demo/server.mjs",
     "test:review-demo": "node --test apps/review-demo/test/*.test.mjs",
     "role-action-matrix:verify": "npm run test:authorization",
@@ -97,8 +98,9 @@
     "test:trust": "npm test --workspace @tenant-trust/trust",
     "test:trust-calibration": "node --test test/trust-engine-calibration.test.mjs",
     "test:gateway-identity": "npm test --workspace @tenant-trust/gateway-identity",
+    "test:policy": "npm test --workspace @tenant-trust/policy",
     "test:api": "npm test --workspace @tenant-trust/api",
-    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:evidence-sources && npm run test:evidence-simulators && npm run test:evidence && npm run test:evidence-events && npm run test:evidence-pipeline && npm run test:trust-model && npm run test:trust && npm run test:trust-calibration && npm run test:gateway-identity && npm run test:api && npm run test:review-demo"
+    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:evidence-sources && npm run test:evidence-simulators && npm run test:evidence && npm run test:evidence-events && npm run test:evidence-pipeline && npm run test:trust-model && npm run test:trust && npm run test:trust-calibration && npm run test:gateway-identity && npm run test:policy && npm run test:api && npm run test:review-demo"
   },
   "engines": {
     "node": "24.20.0",
