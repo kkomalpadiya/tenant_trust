@@ -174,7 +174,7 @@ function createPool({
           roles: ["tenant-admin"],
         }] };
       }
-      if (text.includes("transaction_timestamp() AS status_observed_at")) {
+      if (text.includes("lock_current_actor_certificate_status")) {
         return { rowCount: 1, rows: [{
           tenant_id: ids.tenant,
           certificate_id: ids.certificate,

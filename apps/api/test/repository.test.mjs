@@ -50,7 +50,7 @@ function createPool(queryResult) {
       parameters = values;
       calls.push({ text, parameters });
       if (text.includes("array_agg")) return { rowCount: 1, rows: [authorityRow] };
-      if (text.includes("transaction_timestamp() AS status_observed_at")) {
+      if (text.includes("lock_current_actor_certificate_status")) {
         return { rowCount: 1, rows: [{
           tenant_id: authentication.tenantId,
           certificate_id: certificateId,
@@ -119,7 +119,7 @@ test("record queries bind the authenticated actor and preserve explicit tenant s
     "res_018f1234-5678-7abc-8def-0123456789b0",
   ]);
   assert.match(recordQuery.text, /WHERE tenant_id = \$1/u);
-  assert.ok(pool.calls.findIndex(({ text }) => text.includes("transaction_timestamp() AS status_observed_at"))
+  assert.ok(pool.calls.findIndex(({ text }) => text.includes("lock_current_actor_certificate_status"))
     < pool.calls.findIndex(({ text }) => text.includes("FROM app.resources")));
   assert.equal(pool.calls.at(-1).text, "COMMIT");
   assert.equal(pool.released, true);
@@ -218,7 +218,7 @@ test("one repository and pooled connection recheck certificate, tenant and membe
           membership_state: membershipState,
         }] };
       }
-      if (text.includes("transaction_timestamp() AS status_observed_at")) {
+      if (text.includes("lock_current_actor_certificate_status")) {
         return { rowCount: 1, rows: [{
           tenant_id: authentication.tenantId,
           certificate_id: certificateId,

@@ -17,6 +17,8 @@ export const REQUEST_STATE_POLICY = Object.freeze({
   futureClockSkewSeconds: CERTIFICATE_STATUS_POLICY.futureClockSkewSeconds,
   crossRequestAllowCache: false,
   revalidation: "every-protected-request",
+  certificateStateSerialization: "transaction-row-share-lock",
+  cacheInvalidation: "authoritative-version-on-next-request",
 });
 
 export class CertificateNotAcceptedError extends Error {

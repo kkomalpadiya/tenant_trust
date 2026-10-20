@@ -4,7 +4,7 @@
 
 T7.2 connects all five certificate-authenticated SaaS operations to the versioned T7.1 OPA contract under the explicit `adaptive-trust-opa-v1` authorization mode. The existing `pki-rbac-baseline-v1` path remains available unchanged for later comparative evaluation. The evidence-ingestion endpoint uses its own signed-source boundary and is not a human protected route.
 
-The enforcement adapter sends `POST /v1/data/tenant_trust/authorization/decision` with exactly `{ "input": ... }`. It accepts only one schema-valid `result`, verifies the echoed request, correlation, tenant, subject, input hash and certificate/tenant/subject/membership/trust versions, requires an exact match to the tenant's active policy ID/version/digest/entrypoint, and requires a decision timestamp no earlier than the request. Network errors, non-success responses, invalid JSON, partial results, missing active policy and binding mismatches fail closed.
+The enforcement adapter sends `POST /v1/data/tenant_trust/authorization/decision` with exactly `{ "input": ... }`. It accepts only one schema-valid `result`, verifies the echoed request, correlation, tenant, subject, input hash and certificate/tenant/subject/membership/trust versions, requires an exact match to the tenant's active policy ID/version/digest/entrypoint, and requires a decision timestamp no earlier than the request. The complete OPA exchange has an independent 1,500-millisecond deadline. Network errors, timeout, non-success responses, invalid JSON, partial results, missing active policy and binding mismatches fail closed without a cached-allow fallback.
 
 ## Evaluation order
 
@@ -15,8 +15,8 @@ Each protected operation uses this order:
 3. Match the presented certificate to inventory and revalidate its current authoritative status.
 4. Evaluate the role/action matrix. An ineligible row is denied without calling OPA.
 5. Load the current trust state and active tenant policy bundle, then build the complete immutable policy input from server-controlled values.
-6. Validate the OPA result and continue only for the exact outcome `ALLOW`.
-7. Recheck request-state freshness, run an explicitly tenant-qualified query and retain forced row-level security as an independent isolation layer.
+6. Validate the OPA result, then recheck that the authoritative trust age plus monotonic evaluation time is still within its configured boundary.
+7. Continue only for the exact outcome `ALLOW`, recheck request-state freshness, run an explicitly tenant-qualified query and retain forced row-level security as an independent isolation layer.
 
 This ordering means a high score or OPA `ALLOW` cannot repair a revoked certificate, inactive authority, ineligible role or a cross-tenant resource. A stale or missing trust state carries its mandatory `DENY` signal without exposing a usable policy score. T7.4 emits `STEP_UP`, `DENY` and `QUARANTINE` as non-allowing outcomes; their later workflows cannot bypass this gate.
 
@@ -30,4 +30,4 @@ Adaptive repository construction requires the branded policy-enforcement service
 
 Run `npm run policy-enforcement:verify`. The focused tests cover the exact OPA URL and envelope, complete input assembly, response/state binding, network and malformed-response failure, stale high-score denial, all five protected repository operations, revoked-certificate short-circuiting, cross-tenant denial after OPA `ALLOW`, and data-query suppression after `DENY`. `npm run test:api` additionally proves that every registered protected route supplies the immutable policy request context.
 
-T7.3 adds tenant policy bundles and T7.4 adds the executable Rego score/sensitivity rules. T7.5 verifies and consumes bound step-up proofs. T7.6 denies ordinary `DENY` outcomes without side effects and converts `QUARANTINE` outcomes into durable, correlated action requests; executing those requests remains a separate orchestration concern.
+T7.3 adds tenant policy bundles and T7.4 adds the executable Rego score/sensitivity rules. T7.5 verifies and consumes bound step-up proofs. T7.6 denies ordinary `DENY` outcomes without side effects and converts `QUARANTINE` outcomes into durable, correlated action requests. T7.7 defines the outage, trust-expiry and certificate-state serialization rules in [Policy outage and state-freshness controls](policy-outage-state-freshness.md); executing quarantine requests remains a separate orchestration concern.

@@ -13,13 +13,13 @@ After the gateway has authenticated the client certificate, the repository:
 1. starts a transaction, assumes `tenant_trust_app` locally and binds the gateway-derived tenant and subject;
 2. loads current tenant, subject, membership, role and version state through forced RLS;
 3. resolves the branded tenant context, which rejects inactive tenant, subject or membership state;
-4. matches the presented certificate's tenant, subject, issuer, profile, serial, fingerprint and validity timestamps to one inventory row;
+4. calls the constrained current-actor certificate lookup, matches the presented certificate's tenant, subject, issuer, profile, serial, fingerprint and validity timestamps to one inventory row, and holds a share lock on that row;
 5. applies `application-status-v1` to an exact fresh inventory lookup; and
 6. checks the five-second state deadline again immediately before every protected data query while the request deadline remains active.
 
 Only a fresh `active` certificate continues. Revoked, superseded, expired, unknown or mismatched certificates return `401 CERTIFICATE_NOT_ACCEPTED`. Missing, stale, malformed, timed-out or unavailable authoritative state returns `503 SERVICE_UNAVAILABLE`. Tenant, subject, membership, role and resource denials remain the uniform `403 ACCESS_DENIED` response. T4.8 records the bounded result under the already authenticated tenant/actor and server-generated request correlation without storing certificate material or error text.
 
-The protected query still uses an explicit context-derived tenant predicate and forced actor-aware RLS. Consequently, a tenant or membership change committed after the initial authority read is independently enforced by the data query. Certificate changes are observed on the next request and never later than the fixed in-request freshness deadline. Deadline expiry aborts pending database work and rolls the transaction back rather than returning a partial result or durable replay receipt.
+The protected query still uses an explicit context-derived tenant predicate and forced actor-aware RLS. Consequently, a tenant or membership change committed after the initial authority read is independently enforced by the data query. The certificate row share lock is held until the bounded request commits, so a concurrent revocation, expiry or supersession waits rather than racing the protected query. After that update commits, the next request observes its new version/state. The runtime role can execute only this actor-bound lookup and retains no direct certificate-update privilege. Deadline expiry aborts pending database work and rolls the transaction back rather than returning a partial result or durable replay receipt.
 
 ## Verification
 

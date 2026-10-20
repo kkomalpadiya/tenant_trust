@@ -247,14 +247,9 @@ export function certificateStatusSafeResponse(result) {
 const STATUS_QUERY = `
 SELECT tenant_id, certificate_id, subject_id, issuer_id, serial_number,
        fingerprint_sha256, state, not_before, not_after, version,
-       transaction_timestamp() AS status_observed_at
-FROM identity.certificates
-WHERE tenant_id = $1
-  AND certificate_id = $2
-  AND issuer_id = $3
-  AND serial_number = $4
-  AND fingerprint_sha256 = $5
-LIMIT 1`;
+       status_observed_at
+FROM identity.lock_current_actor_certificate_status($2, $3, $4, $5)
+WHERE tenant_id = $1`;
 
 export function createPostgresCertificateStatusRepository({ query } = {}) {
   if (typeof query !== "function") throw new TypeError("A transaction-bound PostgreSQL query function is required.");

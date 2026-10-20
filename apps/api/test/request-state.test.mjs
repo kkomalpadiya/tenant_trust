@@ -77,6 +77,8 @@ test("request state policy fixes a five-second no-cache revalidation boundary", 
     futureClockSkewSeconds: 2,
     crossRequestAllowCache: false,
     revalidation: "every-protected-request",
+    certificateStateSerialization: "transaction-row-share-lock",
+    cacheInvalidation: "authoritative-version-on-next-request",
   });
 });
 
@@ -94,6 +96,7 @@ test("an exact active certificate creates a branded state bound to authority ver
   assert.equal(client.calls.length, 2);
   assert.deepEqual(client.calls[0].values.slice(0, 2), [ids.tenant, ids.subject]);
   assert.deepEqual(client.calls[1].input.values.slice(0, 2), [ids.tenant, ids.certificate]);
+  assert.match(client.calls[1].input.text, /lock_current_actor_certificate_status/u);
 });
 
 test("unknown and revoked certificates are non-cacheable authentication denials", async () => {

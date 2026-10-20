@@ -91,7 +91,7 @@ function createPool({ roles = ["tenant-admin"], resourceRows = [], membershipRow
       if (text.includes("FROM app.resources")) {
         return { rowCount: resourceRows.length, rows: resourceRows };
       }
-      if (text.includes("transaction_timestamp() AS status_observed_at")) {
+      if (text.includes("lock_current_actor_certificate_status")) {
         const subjectId = parameters[0] === ids.tenant && parameters[1]?.startsWith("crt_")
           ? Object.keys(certificates).find((subject) => certificates[subject].certificateId === parameters[1])
           : ids.admin;

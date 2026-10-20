@@ -7,6 +7,7 @@ import {
   REQUEST_AUDIT_POLICY,
   REQUEST_SAFEGUARD_POLICY,
   REQUEST_STATE_POLICY,
+  PolicyDecisionUnavailableError,
   RequestAuditUnavailableError,
   createPostgresRequestAuditRecorder,
   createRequestAuditRecorder,
@@ -182,6 +183,27 @@ test("access denials retain trusted actor and hashed resource without enumeratio
   assert.equal(events[1].reasonCode, "ACCESS_DENIED");
   assert.equal(events[1].resourceIdHashSha256, hashAuditResourceIdentifier(recordId));
   assert.doesNotMatch(JSON.stringify(events), new RegExp(recordId, "u"));
+});
+
+test("policy outages return a bounded 503 and retain the internal failure reason only in audit", async (t) => {
+  const events = [];
+  const api = createApi({
+    events,
+    repositoryOverrides: {
+      async getProfile() {
+        throw new PolicyDecisionUnavailableError("POLICY_REQUEST_TIMEOUT");
+      },
+    },
+  });
+  t.after(() => api.close());
+  const response = await api.inject({ method: "GET", url: "/v1/profile" });
+
+  assert.equal(response.statusCode, 503);
+  assert.deepEqual(response.json(), { error: { code: "SERVICE_UNAVAILABLE" } });
+  assert.equal(response.headers["cache-control"], "no-store");
+  assert.equal(events.at(-1).decision, "deny");
+  assert.equal(events.at(-1).reasonCode, "POLICY_REQUEST_TIMEOUT");
+  assert.doesNotMatch(response.body, /POLICY_REQUEST_TIMEOUT/u);
 });
 
 test("failed authentication never trusts forged actor or tenant headers", async (t) => {

@@ -140,15 +140,20 @@ function outputFor(input, outcome = "ALLOW", overrides = {}) {
   };
 }
 
-function enforcementWith(fetchImpl, trust = freshTrust()) {
+function enforcementWith(fetchImpl, trust = freshTrust(), {
+  timeoutMilliseconds,
+  monotonicClock,
+} = {}) {
   const decisionClient = createOpaPolicyDecisionClient({
     baseUrl: "http://opa.internal:8181/ignored",
     fetchImpl,
+    ...(timeoutMilliseconds === undefined ? {} : { timeoutMilliseconds }),
   });
   return createPolicyEnforcementService({
     trustScoreLookupService: { lookup: async () => structuredClone(trust) },
     policyBundleLookupService: { lookupActive: async () => activePolicyBundle() },
     decisionClient,
+    ...(monotonicClock === undefined ? {} : { monotonicClock }),
   });
 }
 
@@ -204,6 +209,22 @@ test("fails closed for network, malformed, and state-binding failures", async ()
   }
 });
 
+test("OPA requests have an independent bounded deadline and no cached-allow fallback", async () => {
+  const service = enforcementWith(
+    async (_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    }),
+    freshTrust(),
+    { timeoutMilliseconds: 20 },
+  );
+
+  await assert.rejects(decideWith(service), (error) => {
+    assert.ok(error instanceof PolicyDecisionUnavailableError);
+    assert.equal(error.reasonCode, "POLICY_REQUEST_TIMEOUT");
+    return true;
+  });
+});
+
 test("an OPA decision must identify the tenant's exact active bundle", async () => {
   const service = enforcementWith(async (_url, options) => {
     const { input } = JSON.parse(options.body);
@@ -239,6 +260,49 @@ test("stale trust is a mandatory DENY signal that an OPA ALLOW cannot override",
   await assert.rejects(decideWith(service), (error) => {
     assert.ok(error instanceof PolicyDecisionUnavailableError);
     assert.equal(error.reasonCode, "POLICY_RESPONSE_CONSTRAINT_MISMATCH");
+    return true;
+  });
+});
+
+test("stale trust is accepted only when OPA returns the required explicit DENY", async () => {
+  const stale = {
+    ...freshTrust(),
+    state: "stale",
+    usableForPolicy: false,
+    requiredOutcome: "DENY",
+    reasonCode: "TRUST_STATE_STALE",
+    policyScore: null,
+    policyBand: null,
+    ageSeconds: 301,
+  };
+  const service = enforcementWith(async (_url, options) => {
+    const { input } = JSON.parse(options.body);
+    const result = outputFor(input, "DENY");
+    result.reasonCodes = ["TRUST_STATE_STALE"];
+    return { ok: true, json: async () => ({ result }) };
+  }, stale);
+
+  const evaluation = await decideWith(service);
+
+  assert.equal(evaluation.decision.outcome, "DENY");
+  assert.deepEqual(evaluation.decision.reasonCodes, ["TRUST_STATE_STALE"]);
+  assert.equal(evaluation.input.trust.policyScore, null);
+});
+
+test("fresh trust that expires during policy evaluation fails unavailable before data access", async () => {
+  const ticks = [1_000, 1_200];
+  const service = enforcementWith(
+    async (_url, options) => {
+      const { input } = JSON.parse(options.body);
+      return { ok: true, json: async () => ({ result: outputFor(input) }) };
+    },
+    { ...freshTrust(), ageSeconds: 299.9 },
+    { monotonicClock: () => ticks.shift() },
+  );
+
+  await assert.rejects(decideWith(service), (error) => {
+    assert.ok(error instanceof PolicyDecisionUnavailableError);
+    assert.equal(error.reasonCode, "TRUST_STATE_EXPIRED_DURING_DECISION");
     return true;
   });
 });

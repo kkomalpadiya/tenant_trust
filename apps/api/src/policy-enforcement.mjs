@@ -24,6 +24,10 @@ export const POLICY_ENFORCEMENT_POLICY = Object.freeze({
   inputCanonicalization: "tenant-trust-policy-json-v1",
   onlyAllowingOutcome: "ALLOW",
   failClosed: true,
+  maximumDecisionMilliseconds: 1_500,
+  allowCacheOnOutage: false,
+  staleTrustOutcome: "DENY",
+  freshnessRecheck: "after-policy-decision",
 });
 
 export class PolicyDecisionUnavailableError extends Error {
@@ -109,44 +113,116 @@ function buildDecisionUrl(baseUrl) {
   return new URL(DECISION_PATH, parsed).toString();
 }
 
+function assertDecisionTimeoutMilliseconds(value) {
+  if (!Number.isSafeInteger(value)
+    || value < 1
+    || value > POLICY_ENFORCEMENT_POLICY.maximumDecisionMilliseconds) {
+    throw new TypeError(
+      `The OPA decision timeout must be between 1 and ${POLICY_ENFORCEMENT_POLICY.maximumDecisionMilliseconds} milliseconds.`,
+    );
+  }
+  return value;
+}
+
+function decisionDeadline(externalSignal, timeoutMilliseconds) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMilliseconds);
+  timer.unref?.();
+  return Object.freeze({
+    signal: externalSignal
+      ? AbortSignal.any([externalSignal, controller.signal])
+      : controller.signal,
+    timedOut: () => controller.signal.aborted,
+    dispose: () => clearTimeout(timer),
+  });
+}
+
+function awaitWithSignal(value, signal) {
+  if (signal.aborted) return Promise.reject(signal.reason ?? new Error("Operation aborted."));
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(signal.reason ?? new Error("Operation aborted."));
+    signal.addEventListener("abort", onAbort, { once: true });
+    Promise.resolve(value).then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", onAbort);
+    });
+  });
+}
+
+function monotonicTime(monotonicClock) {
+  let value;
+  try {
+    value = monotonicClock();
+  } catch {
+    unavailable("POLICY_TIME_UNAVAILABLE");
+  }
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    unavailable("POLICY_TIME_UNAVAILABLE");
+  }
+  return value;
+}
+
+function assertTrustRemainsFresh(trust, observedAt, monotonicClock) {
+  if (trust.state !== "fresh") return;
+  const elapsedMilliseconds = monotonicTime(monotonicClock) - observedAt;
+  if (elapsedMilliseconds < 0) unavailable("POLICY_TIME_UNAVAILABLE");
+  if (trust.ageSeconds + elapsedMilliseconds / 1_000 > trust.staleAfterSeconds) {
+    unavailable("TRUST_STATE_EXPIRED_DURING_DECISION");
+  }
+}
+
 export function hashPolicyInput(input) {
   validateWith(validateInput, input, "POLICY_INPUT_INVALID");
   return createHash("sha256").update(canonicalize(input), "utf8").digest("hex");
 }
 
-export function createOpaPolicyDecisionClient({ baseUrl, fetchImpl = globalThis.fetch } = {}) {
+export function createOpaPolicyDecisionClient({
+  baseUrl,
+  fetchImpl = globalThis.fetch,
+  timeoutMilliseconds = POLICY_ENFORCEMENT_POLICY.maximumDecisionMilliseconds,
+} = {}) {
   if (typeof fetchImpl !== "function") throw new TypeError("A fetch implementation is required.");
   const decisionUrl = buildDecisionUrl(baseUrl);
+  const selectedTimeoutMilliseconds = assertDecisionTimeoutMilliseconds(timeoutMilliseconds);
   const client = Object.freeze({
+    timeoutMilliseconds: selectedTimeoutMilliseconds,
     async decide(input, { signal } = {}) {
       validateWith(validateInput, input, "POLICY_INPUT_INVALID");
-      let response;
+      const deadline = decisionDeadline(signal, selectedTimeoutMilliseconds);
       try {
-        response = await fetchImpl(decisionUrl, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ input }),
-          signal,
-        });
-      } catch {
-        unavailable("POLICY_REQUEST_FAILED");
+        let response;
+        try {
+          response = await awaitWithSignal(fetchImpl(decisionUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ input }),
+            signal: deadline.signal,
+          }), deadline.signal);
+        } catch {
+          if (signal?.aborted) unavailable("POLICY_REQUEST_CANCELLED");
+          if (deadline.timedOut()) unavailable("POLICY_REQUEST_TIMEOUT");
+          unavailable("POLICY_REQUEST_FAILED");
+        }
+        if (!response || response.ok !== true || typeof response.json !== "function") {
+          unavailable("POLICY_RESPONSE_UNAVAILABLE");
+        }
+        let body;
+        try {
+          body = await awaitWithSignal(response.json(), deadline.signal);
+        } catch {
+          if (signal?.aborted) unavailable("POLICY_REQUEST_CANCELLED");
+          if (deadline.timedOut()) unavailable("POLICY_REQUEST_TIMEOUT");
+          unavailable("POLICY_RESPONSE_INVALID");
+        }
+        if (!body || typeof body !== "object" || Array.isArray(body)
+          || Object.keys(body).length !== 1
+          || !("result" in body)) {
+          unavailable("POLICY_RESPONSE_INVALID");
+        }
+        validateWith(validateOutput, body.result, "POLICY_RESPONSE_INVALID");
+        return deepFreeze(structuredClone(body.result));
+      } finally {
+        deadline.dispose();
       }
-      if (!response || response.ok !== true || typeof response.json !== "function") {
-        unavailable("POLICY_RESPONSE_UNAVAILABLE");
-      }
-      let body;
-      try {
-        body = await response.json();
-      } catch {
-        unavailable("POLICY_RESPONSE_INVALID");
-      }
-      if (!body || typeof body !== "object" || Array.isArray(body)
-        || Object.keys(body).length !== 1
-        || !("result" in body)) {
-        unavailable("POLICY_RESPONSE_INVALID");
-      }
-      validateWith(validateOutput, body.result, "POLICY_RESPONSE_INVALID");
-      return deepFreeze(structuredClone(body.result));
     },
   });
   DECISION_CLIENTS.add(client);
@@ -193,6 +269,7 @@ export function createPolicyEnforcementService({
   trustScoreLookupService,
   policyBundleLookupService,
   decisionClient,
+  monotonicClock = () => performance.now(),
 } = {}) {
   if (!trustScoreLookupService || typeof trustScoreLookupService.lookup !== "function") {
     throw new TypeError("A trust-score lookup service is required.");
@@ -201,6 +278,7 @@ export function createPolicyEnforcementService({
     throw new TypeError("An active policy-bundle lookup service is required.");
   }
   assertOpaPolicyDecisionClient(decisionClient);
+  if (typeof monotonicClock !== "function") throw new TypeError("A monotonic policy clock is required.");
 
   const service = Object.freeze({
     policy: POLICY_ENFORCEMENT_POLICY,
@@ -224,6 +302,7 @@ export function createPolicyEnforcementService({
         unavailable("TRUST_LOOKUP_UNAVAILABLE");
       }
       requireRecord(trust, "TRUST_STATE_INVALID");
+      const trustReadAt = monotonicTime(monotonicClock);
       if (trust.tenantId !== context.tenantId || trust.subjectId !== context.subjectId) {
         unavailable("TRUST_STATE_BINDING_MISMATCH");
       }
@@ -303,6 +382,7 @@ export function createPolicyEnforcementService({
         && decision.outcome !== immutableInput.trust.requiredOutcome) {
         unavailable("POLICY_RESPONSE_CONSTRAINT_MISMATCH");
       }
+      assertTrustRemainsFresh(immutableInput.trust, trustReadAt, monotonicClock);
       return Object.freeze({
         input: immutableInput,
         inputHash,

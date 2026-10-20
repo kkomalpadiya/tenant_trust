@@ -199,6 +199,7 @@ test("the PostgreSQL adapter uses bound parameters and normalizes database times
     fingerprintSha256: certificate().fingerprintSha256,
   }, { signal });
   assert.match(invocation.sql, /tenant_id = \$1/u);
+  assert.match(invocation.sql, /lock_current_actor_certificate_status/u);
   assert.deepEqual(invocation.values, [ids.tenant, ids.certificate, ids.issuer, certificate().serialNumber, certificate().fingerprintSha256]);
   assert.equal(invocation.options.signal, signal);
   assert.equal(status.version, 3);

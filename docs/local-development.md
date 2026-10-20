@@ -95,6 +95,7 @@ npm run request-state:verify
 npm run request-outcomes:verify
 npm run request-safeguards:verify
 npm run protected-saas:verify
+npm run policy-resilience:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -127,6 +128,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run adaptive-policy:verify` is the T7.4 score and resource-sensitivity policy gate. It tests tenant policy-data validation, all exact Rego boundaries with the pinned OPA image, a real decision against the API output schema and canonical input digest, and protected-route enforcement regression tests. The checked-in thresholds are explicitly unvalidated prototype defaults. See [Adaptive score and resource-sensitivity policy](architecture/adaptive-authorization-policy.md).
 
 `npm run policy-outcomes:verify` is the T7.6 DENY/QUARANTINE enforcement gate. It proves ordinary denial cannot reach protected data or emit an action, quarantine cannot reach protected data but commits one correlated append-only action request, persistence failures roll back, and sensitive-operation receipts are not reserved for quarantined work. Apply migration `027_policy_denial_quarantine_enforcement.sql` first. See [DENY and QUARANTINE enforcement](architecture/deny-quarantine-enforcement.md).
+
+`npm run policy-resilience:verify` is the T7.7 outage and state-freshness gate. It proves OPA timeout and response failures cannot reuse an allow, stale or in-flight-expiring trust cannot reach protected data, the API exposes only a non-cacheable generic unavailable response, and the actor-bound certificate lookup serializes lifecycle updates without granting the runtime role direct `UPDATE`. Apply migration `028_policy_state_freshness_controls.sql` first. See [Policy outage and state-freshness controls](architecture/policy-outage-state-freshness.md).
 
 `npm run trust-engine:verify` is the Phase 6 completion gate. It runs the full repository suite and deterministic calibration fixtures, then verifies scoring boundaries, missing/stale behavior, recovery, replay/flood safeguards, tenant-scoped state/configuration, evidence consumption, explanations and the internal lookup against PostgreSQL. The fixtures remain explicitly labelled as unvalidated prototype defaults and do not establish effectiveness. See [Adaptive trust-engine verification and calibration fixtures](architecture/trust-engine-verification.md).
 
