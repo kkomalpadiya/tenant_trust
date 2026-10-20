@@ -136,7 +136,7 @@ function createPolicyService(decisions, outcome = "ALLOW") {
   });
 }
 
-function createPool({ certificateState = "active" } = {}) {
+function createPool({ certificateState = "active", stepUpProofAvailable = true } = {}) {
   const calls = [];
   const recordRow = (recordId) => ({
     resource_id: recordId,
@@ -184,6 +184,19 @@ function createPool({ certificateState = "active" } = {}) {
       }
       if (text.includes("reserve_api_sensitive_operation")) {
         return { rowCount: 1, rows: [{ operation_id: ids.operation, replayed: false }] };
+      }
+      if (text.includes("consume_step_up_proof")) {
+        if (!stepUpProofAvailable) return { rowCount: 0, rows: [] };
+        stepUpProofAvailable = false;
+        return { rowCount: 1, rows: [{
+          proof_id_hash_sha256: values[0],
+          tenant_id: ids.tenant,
+          subject_id: ids.subject,
+          action: values[2],
+          session_id_hash_sha256: values[1],
+          verified_at: "2026-10-13T08:59:30.000Z",
+          expires_at: "2026-10-13T09:04:30.000Z",
+        }] };
       }
       if (text.includes("tenant.display_name AS tenant_display_name")) {
         return { rowCount: 1, rows: [{
@@ -291,4 +304,33 @@ test("DENY remains non-allow and blocks protected data queries", async () => {
     AccessDeniedError,
   );
   assert.equal(pool.calls.some(({ text }) => text.includes("FROM app.resources")), false);
+});
+
+test("a sensitive operation consumes its tenant, subject, action and session-bound proof once", async () => {
+  const decisions = [];
+  const pool = createPool();
+  const repository = repositoryWith(pool, decisions);
+  const presentation = {
+    proofId: "sup_018f1234-5678-7abc-8def-0123456789a1",
+    sessionId: "sus_018f1234-5678-7abc-8def-0123456789a2",
+  };
+
+  await repository.exportRecords(authentication, [ids.record], {
+    idempotencyKey: "idem_018f1234-5678-7abc-8def-0123456789a3",
+    policyRequest: { ...policyRequest(9, "POST", "/v1/tenant-records/export"), stepUpPresentation: presentation },
+  });
+  await assert.rejects(
+    repository.exportRecords(authentication, [ids.record], {
+      idempotencyKey: "idem_018f1234-5678-7abc-8def-0123456789a4",
+      policyRequest: { ...policyRequest(10, "POST", "/v1/tenant-records/export"), stepUpPresentation: presentation },
+    }),
+    AccessDeniedError,
+  );
+
+  assert.equal(decisions.length, 1);
+  assert.equal(decisions[0].requestContext.stepUp.status, "valid");
+  assert.equal(decisions[0].requestContext.stepUp.tenantId, ids.tenant);
+  assert.equal(decisions[0].requestContext.stepUp.subjectId, ids.subject);
+  assert.equal(decisions[0].requestContext.stepUp.action, "record:export");
+  assert.match(decisions[0].requestContext.stepUp.sessionIdHashSha256, /^[0-9a-f]{64}$/u);
 });

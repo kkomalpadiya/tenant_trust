@@ -137,6 +137,66 @@ test_sensitive_export_requires_step_up_at_exactly_65 if {
     result.obligations.stepUp.binding == ["tenant", "subject", "action", "session"]
 }
 
+test_sensitive_export_allows_a_fresh_bound_step_up_proof if {
+    candidate := policy_input("record:export", "sensitive", 65, ["tenant-admin"])
+    bound := object.union(candidate, {
+        "requestContext": object.union(candidate.requestContext, {
+            "stepUp": {
+                "status": "valid",
+                "proofIdHashSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "tenantId": tenant_id,
+                "subjectId": subject_id,
+                "action": "record:export",
+                "sessionIdHashSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "verifiedAt": "2026-10-20T08:59:30.000Z",
+                "expiresAt": "2026-10-20T09:04:30.000Z",
+            },
+        }),
+    })
+    result := authorization.decision with input as bound
+    result.outcome == "ALLOW"
+}
+
+test_step_up_proof_for_another_action_is_not_accepted if {
+    candidate := policy_input("record:export", "sensitive", 65, ["tenant-admin"])
+    mismatched := object.union(candidate, {
+        "requestContext": object.union(candidate.requestContext, {
+            "stepUp": {
+                "status": "valid",
+                "proofIdHashSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "tenantId": tenant_id,
+                "subjectId": subject_id,
+                "action": "tenant:admin",
+                "sessionIdHashSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "verifiedAt": "2026-10-20T08:59:30.000Z",
+                "expiresAt": "2026-10-20T09:04:30.000Z",
+            },
+        }),
+    })
+    result := authorization.decision with input as mismatched
+    result.outcome == "STEP_UP"
+}
+
+test_expired_step_up_proof_is_not_accepted if {
+    candidate := policy_input("record:export", "sensitive", 65, ["tenant-admin"])
+    expired := object.union(candidate, {
+        "requestContext": object.union(candidate.requestContext, {
+            "stepUp": {
+                "status": "valid",
+                "proofIdHashSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "tenantId": tenant_id,
+                "subjectId": subject_id,
+                "action": "record:export",
+                "sessionIdHashSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "verifiedAt": "2026-10-20T08:54:00.000Z",
+                "expiresAt": "2026-10-20T08:59:00.000Z",
+            },
+        }),
+    })
+    result := authorization.decision with input as expired
+    result.outcome == "STEP_UP"
+}
+
 test_critical_tenant_admin_is_denied_immediately_below_80 if {
     candidate := policy_input("tenant:admin", "critical", 79.99, ["tenant-admin"])
     result := authorization.decision with input as candidate

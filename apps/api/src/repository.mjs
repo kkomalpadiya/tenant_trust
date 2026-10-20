@@ -23,6 +23,15 @@ import {
   POLICY_ENFORCEMENT_POLICY,
   assertPolicyEnforcementService,
 } from "./policy-enforcement.mjs";
+import {
+  STEP_UP_POLICY,
+  StepUpAuthenticationError,
+  createStepUpChallengeMaterial,
+  createStepUpProofMaterial,
+  hashStepUpValue,
+  normalizeStepUpPresentation,
+  verifyStepUpChallengeSignature,
+} from "./step-up-authentication.mjs";
 
 const RESOURCE_ID = /^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -221,6 +230,7 @@ export function createPostgresTenantRepository({
   }
 
   async function authorizeProtectedOperation({
+    query,
     authentication,
     context,
     requestState,
@@ -242,13 +252,44 @@ export function createPostgresTenantRepository({
 
     const authorization = evaluateOperation(context, action);
     if (authorization.outcome !== "policy-required") throw new AccessDeniedError();
+    let stepUp = null;
+    if (sensitive) {
+      const presentation = normalizeStepUpPresentation(policyRequest?.stepUpPresentation);
+      if (presentation) {
+        const consumedAt = asIsoTimestamp(clock());
+        const consumed = await query(
+          `SELECT proof_id_hash_sha256, tenant_id::text, subject_id::text, action,
+             session_id_hash_sha256, verified_at, expires_at
+           FROM audit.consume_step_up_proof($1, $2, $3, $4, $5)`,
+          [
+            hashStepUpValue(presentation.proofId),
+            hashStepUpValue(presentation.sessionId),
+            action,
+            policyRequest.requestId,
+            consumedAt,
+          ],
+        );
+        if (consumed.rowCount !== 1) throw new AccessDeniedError();
+        const row = consumed.rows[0];
+        stepUp = Object.freeze({
+          status: "valid",
+          proofIdHashSha256: row.proof_id_hash_sha256,
+          tenantId: row.tenant_id,
+          subjectId: row.subject_id,
+          action: row.action,
+          sessionIdHashSha256: row.session_id_hash_sha256,
+          verifiedAt: asIsoTimestamp(row.verified_at),
+          expiresAt: asIsoTimestamp(row.expires_at),
+        });
+      }
+    }
     const evaluation = await policyEnforcementService.decide({
       authentication,
       context,
       requestState,
       authorization,
       action,
-      policyRequest,
+      policyRequest: { ...policyRequest, stepUp },
       signal,
     });
     if (evaluation.decision.outcome !== POLICY_ENFORCEMENT_POLICY.onlyAllowingOutcome) {
@@ -347,6 +388,7 @@ export function createPostgresTenantRepository({
         throw new IdempotencyConflictError();
       }
       if (error?.code === "42501") throw new AccessDeniedError();
+      if (error instanceof StepUpAuthenticationError) throw new AccessDeniedError();
       if (error instanceof TenantContextError) throw new AccessDeniedError();
       throw error;
     } finally {
@@ -360,9 +402,85 @@ export function createPostgresTenantRepository({
     requestStatePolicy: REQUEST_STATE_POLICY,
     requestSafeguardPolicy: REQUEST_SAFEGUARD_POLICY,
 
+    async issueStepUpChallenge(authentication, action, factorId, { signal } = {}) {
+      return withTenantContext(authentication, async (query, context) => {
+        const authorization = evaluateOperation(context, action);
+        if (authorization.outcome !== "policy-required") throw new AccessDeniedError();
+        const material = createStepUpChallengeMaterial({
+          tenantId: context.tenantId,
+          subjectId: context.subjectId,
+          action,
+          factorId,
+          now: clock(),
+        });
+        const result = await query(
+          `SELECT (audit.issue_step_up_challenge($1, $2, $3, $4, $5, $6, $7)).*`,
+          [material.challengeId, material.factorId, material.action, material.nonceBase64url,
+            material.sessionIdHashSha256, material.issuedAt, material.expiresAt],
+        );
+        if (result.rowCount !== 1) throw new AccessDeniedError();
+        return Object.freeze({
+          challengeId: material.challengeId,
+          factorId: material.factorId,
+          algorithm: STEP_UP_POLICY.algorithm,
+          action: material.action,
+          nonceBase64url: material.nonceBase64url,
+          sessionId: material.sessionId,
+          issuedAt: material.issuedAt,
+          expiresAt: material.expiresAt,
+        });
+      }, { signal });
+    },
+
+    async verifyStepUpChallenge(authentication, challengeId, signatureBase64url, { signal } = {}) {
+      return withTenantContext(authentication, async (query, context) => {
+        const result = await query(
+          `SELECT tenant_id::text, subject_id::text, challenge_id::text, factor_id::text,
+             action, nonce_base64url, session_id_hash_sha256, issued_at, expires_at,
+             public_key_base64url::text
+           FROM audit.get_step_up_challenge($1)`,
+          [challengeId],
+        );
+        if (result.rowCount !== 1) throw new AccessDeniedError();
+        const row = result.rows[0];
+        const challenge = Object.freeze({
+          tenantId: row.tenant_id,
+          subjectId: row.subject_id,
+          challengeId: row.challenge_id,
+          factorId: row.factor_id,
+          action: row.action,
+          nonceBase64url: row.nonce_base64url,
+          sessionIdHashSha256: row.session_id_hash_sha256,
+          issuedAt: asIsoTimestamp(row.issued_at),
+          expiresAt: asIsoTimestamp(row.expires_at),
+        });
+        if (challenge.tenantId !== context.tenantId || challenge.subjectId !== context.subjectId) {
+          throw new AccessDeniedError();
+        }
+        verifyStepUpChallengeSignature({
+          challenge,
+          publicKeyBase64url: row.public_key_base64url,
+          signatureBase64url,
+        });
+        const proof = createStepUpProofMaterial({ now: clock() });
+        const completed = await query(
+          `SELECT (audit.complete_step_up_challenge($1, $2, $3, $4)).*`,
+          [challengeId, proof.proofIdHashSha256, proof.verifiedAt, proof.expiresAt],
+        );
+        if (completed.rowCount !== 1) throw new AccessDeniedError();
+        return Object.freeze({
+          proofId: proof.proofId,
+          action: challenge.action,
+          verifiedAt: proof.verifiedAt,
+          expiresAt: proof.expiresAt,
+        });
+      }, { signal });
+    },
+
     async getProfile(authentication, { policyRequest, signal } = {}) {
       return withTenantContext(authentication, async (query, context, requestState) => {
         await authorizeProtectedOperation({
+          query,
           authentication,
           context,
           requestState,
@@ -405,6 +523,7 @@ export function createPostgresTenantRepository({
     async listRecords(authentication, { policyRequest, signal } = {}) {
       return withTenantContext(authentication, async (query, context, requestState) => {
         await authorizeProtectedOperation({
+          query,
           authentication,
           context,
           requestState,
@@ -428,6 +547,7 @@ export function createPostgresTenantRepository({
       if (!RESOURCE_ID.test(recordId ?? "")) throw new TypeError("A valid record ID is required.");
       return withTenantContext(authentication, async (query, context, requestState) => {
         await authorizeProtectedOperation({
+          query,
           authentication,
           context,
           requestState,
@@ -465,6 +585,7 @@ export function createPostgresTenantRepository({
         }
         const operationId = reservation.rows[0].operation_id;
         await authorizeProtectedOperation({
+          query,
           authentication,
           context,
           requestState,
@@ -514,6 +635,7 @@ export function createPostgresTenantRepository({
         }
         const operationId = reservation.rows[0].operation_id;
         await authorizeProtectedOperation({
+          query,
           authentication,
           context,
           requestState,

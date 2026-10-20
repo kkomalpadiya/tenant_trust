@@ -182,3 +182,73 @@ test("authorization denials remain uniform and non-enumerating", async (t) => {
     assert.doesNotMatch(response.body, /tenant|subject|record|operation/u);
   }
 });
+
+test("step-up challenge routes use the mTLS subject and return only opaque challenge and proof material", async (t) => {
+  const factorId = "suf_018f1234-5678-7abc-8def-0123456789d1";
+  const challengeId = "suc_018f1234-5678-7abc-8def-0123456789d2";
+  const signatureBase64url = "A".repeat(86);
+  const observed = [];
+  const api = createTenantTrustApi({
+    identityResolver: { resolve: async () => authentication },
+    repository: createRepository({
+      async issueStepUpChallenge(resolved, action, selectedFactorId) {
+        observed.push({ kind: "issue", resolved, action, selectedFactorId });
+        return { challengeId, factorId, action, sessionId: "sus_018f1234-5678-7abc-8def-0123456789d3" };
+      },
+      async verifyStepUpChallenge(resolved, selectedChallengeId, signature) {
+        observed.push({ kind: "verify", resolved, selectedChallengeId, signature });
+        return { proofId: "sup_018f1234-5678-7abc-8def-0123456789d4", action: "record:export" };
+      },
+    }),
+  });
+  t.after(() => api.close());
+
+  const challenge = await api.inject({
+    method: "POST",
+    url: "/v1/step-up/challenges",
+    payload: { action: "record:export", factorId },
+  });
+  assert.equal(challenge.statusCode, 200);
+  assert.equal(challenge.json().stepUpChallenge.challengeId, challengeId);
+
+  const verification = await api.inject({
+    method: "POST",
+    url: `/v1/step-up/challenges/${challengeId}/verifications`,
+    payload: { signatureBase64url },
+  });
+  assert.equal(verification.statusCode, 200);
+  assert.match(verification.json().stepUpProof.proofId, /^sup_/u);
+  assert.deepEqual(observed, [
+    { kind: "issue", resolved: authentication, action: "record:export", selectedFactorId: factorId },
+    { kind: "verify", resolved: authentication, selectedChallengeId: challengeId, signature: signatureBase64url },
+  ]);
+});
+
+test("a sensitive request forwards the opaque proof and session only to the repository", async (t) => {
+  let presentation;
+  const api = createTenantTrustApi({
+    identityResolver: { resolve: async () => authentication },
+    repository: createRepository({
+      async exportRecords(_authentication, _recordIds, options) {
+        presentation = options.policyRequest.stepUpPresentation;
+        return { operation: { operationId: "op_018f1234-5678-7abc-8def-0123456789d5" }, records: [] };
+      },
+    }),
+  });
+  t.after(() => api.close());
+  const proofId = "sup_018f1234-5678-7abc-8def-0123456789d6";
+  const sessionId = "sus_018f1234-5678-7abc-8def-0123456789d7";
+  const response = await api.inject({
+    method: "POST",
+    url: "/v1/tenant-records/export",
+    headers: {
+      "idempotency-key": idempotencyKey,
+      "x-step-up-proof": proofId,
+      "x-step-up-session": sessionId,
+    },
+    payload: { recordIds: [recordIds[0]] },
+  });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(presentation, { proofId, sessionId });
+  assert.doesNotMatch(response.body, /sup_|sus_/u);
+});

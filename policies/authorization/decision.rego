@@ -100,6 +100,22 @@ role_eligible(rule) if {
     role in rule.roles
 }
 
+step_up_proof_valid(rule) if {
+    rule.stepUpRequired == true
+    input.requestContext.stepUp.status == "valid"
+    input.requestContext.stepUp.tenantId == input.tenantContext.tenantId
+    input.requestContext.stepUp.subjectId == input.tenantContext.subjectId
+    input.requestContext.stepUp.action == input.action
+    regex.match("^[0-9a-f]{64}$", input.requestContext.stepUp.proofIdHashSha256)
+    regex.match("^[0-9a-f]{64}$", input.requestContext.stepUp.sessionIdHashSha256)
+    verified_at := time.parse_rfc3339_ns(input.requestContext.stepUp.verifiedAt)
+    expires_at := time.parse_rfc3339_ns(input.requestContext.stepUp.expiresAt)
+    requested_at := time.parse_rfc3339_ns(input.requestContext.requestedAt)
+    verified_at <= requested_at
+    requested_at <= expires_at
+    requested_at - verified_at <= policy_configuration.stepUpMaximumAgeSeconds * 1000000000
+}
+
 trust_reason := input.trust.reasonCode if {
     input.trust.reasonCode != null
 } else := "TRUST_STATE_UNUSABLE"
@@ -130,6 +146,7 @@ policy_result := deny_result("POLICY_CONFIGURATION_INVALID") if {
 } else := step_up_result if {
     rule := configured_rule
     rule.stepUpRequired == true
+    not step_up_proof_valid(rule)
 } else := allow_result
 
 deny_result(reason) := {

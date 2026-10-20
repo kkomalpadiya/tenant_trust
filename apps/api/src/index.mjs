@@ -40,3 +40,13 @@ export {
   normalizeSensitiveIdempotencyKey,
   runWithRequestTimeout,
 } from "./request-safeguards.mjs";
+export {
+  STEP_UP_POLICY,
+  StepUpAuthenticationError,
+  createStepUpChallengeMaterial,
+  createStepUpProofMaterial,
+  createStepUpSigningPayload,
+  hashStepUpValue,
+  normalizeStepUpPresentation,
+  verifyStepUpChallengeSignature,
+} from "./step-up-authentication.mjs";

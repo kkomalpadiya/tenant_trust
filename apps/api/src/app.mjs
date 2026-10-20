@@ -38,6 +38,13 @@ import {
   assertStatelessMtlsRequest,
   runWithRequestTimeout,
 } from "./request-safeguards.mjs";
+import {
+  STEP_UP_CHALLENGE_ID_PATTERN,
+  STEP_UP_FACTOR_ID_PATTERN,
+  STEP_UP_PROOF_ID_PATTERN,
+  STEP_UP_SESSION_ID_PATTERN,
+  STEP_UP_SIGNATURE_PATTERN,
+} from "./step-up-authentication.mjs";
 
 const RECORD_ID_PATTERN = "^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 const SUBJECT_ID_PATTERN = "^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
@@ -124,6 +131,8 @@ function sensitiveRequestHeaders() {
     required: ["idempotency-key"],
     properties: {
       "idempotency-key": { type: "string", pattern: SENSITIVE_IDEMPOTENCY_KEY_PATTERN },
+      "x-step-up-proof": { type: "string", pattern: STEP_UP_PROOF_ID_PATTERN },
+      "x-step-up-session": { type: "string", pattern: STEP_UP_SESSION_ID_PATTERN },
     },
   };
 }
@@ -280,6 +289,8 @@ export function createTenantTrustApi({
       }
 
       const resourceIdHashSha256 = hashAuditResourceIdentifier(resourceIdentifier(request, authentication));
+      const proofId = request.headers["x-step-up-proof"];
+      const sessionId = request.headers["x-step-up-session"];
       const policyRequest = Object.freeze({
         requestId: correlation.requestId,
         correlationId: correlation.correlationId,
@@ -292,6 +303,9 @@ export function createTenantTrustApi({
         sourceNetworkZone: "unknown",
         resourceIdHashSha256,
         ownerSubjectId: null,
+        stepUpPresentation: proofId === undefined && sessionId === undefined
+          ? null
+          : Object.freeze({ proofId, sessionId }),
       });
       await requestAuditRecorder.record({
         schemaVersion: "1.0.0",
@@ -381,6 +395,70 @@ export function createTenantTrustApi({
       profile: await repository.getProfile(authentication, { policyRequest, signal }),
     }),
   }));
+
+  if (typeof repository.issueStepUpChallenge === "function"
+    && typeof repository.verifyStepUpChallenge === "function") {
+    api.post("/v1/step-up/challenges", {
+      schema: {
+        querystring: noQueryParameters(),
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["action", "factorId"],
+          properties: {
+            action: { type: "string", enum: ["record:export", "tenant:admin"] },
+            factorId: { type: "string", pattern: STEP_UP_FACTOR_ID_PATTERN },
+          },
+        },
+      },
+    }, createAuditedHandler({
+      action: "step-up:challenge",
+      resourceType: "step-up-factor",
+      routeTemplate: "/v1/step-up/challenges",
+      resourceIdentifier: (request) => request.body.factorId,
+      execute: async (authentication, request, signal) => ({
+        stepUpChallenge: await repository.issueStepUpChallenge(
+          authentication,
+          request.body.action,
+          request.body.factorId,
+          { signal },
+        ),
+      }),
+    }));
+
+    api.post("/v1/step-up/challenges/:challengeId/verifications", {
+      schema: {
+        querystring: noQueryParameters(),
+        params: {
+          type: "object",
+          additionalProperties: false,
+          required: ["challengeId"],
+          properties: { challengeId: { type: "string", pattern: STEP_UP_CHALLENGE_ID_PATTERN } },
+        },
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["signatureBase64url"],
+          properties: {
+            signatureBase64url: { type: "string", pattern: STEP_UP_SIGNATURE_PATTERN },
+          },
+        },
+      },
+    }, createAuditedHandler({
+      action: "step-up:verify",
+      resourceType: "step-up-challenge",
+      routeTemplate: "/v1/step-up/challenges/:challengeId/verifications",
+      resourceIdentifier: (request) => request.params.challengeId,
+      execute: async (authentication, request, signal) => ({
+        stepUpProof: await repository.verifyStepUpChallenge(
+          authentication,
+          request.params.challengeId,
+          request.body.signatureBase64url,
+          { signal },
+        ),
+      }),
+    }));
+  }
 
   api.get("/v1/tenant-records", {
     schema: { querystring: noQueryParameters() },
