@@ -18,7 +18,7 @@ Each protected operation uses this order:
 6. Validate the OPA result and continue only for the exact outcome `ALLOW`.
 7. Recheck request-state freshness, run an explicitly tenant-qualified query and retain forced row-level security as an independent isolation layer.
 
-This ordering means a high score or OPA `ALLOW` cannot repair a revoked certificate, inactive authority, ineligible role or a cross-tenant resource. A stale or missing trust state carries its mandatory `DENY` signal without exposing a usable policy score. `STEP_UP`, `DENY` and `QUARANTINE` are non-allow in T7.2; their later workflows cannot bypass this gate.
+This ordering means a high score or OPA `ALLOW` cannot repair a revoked certificate, inactive authority, ineligible role or a cross-tenant resource. A stale or missing trust state carries its mandatory `DENY` signal without exposing a usable policy score. T7.4 emits `STEP_UP`, `DENY` and `QUARANTINE` as non-allowing outcomes; their later workflows cannot bypass this gate.
 
 ## Request context and modes
 
@@ -30,4 +30,4 @@ Adaptive repository construction requires the branded policy-enforcement service
 
 Run `npm run policy-enforcement:verify`. The focused tests cover the exact OPA URL and envelope, complete input assembly, response/state binding, network and malformed-response failure, stale high-score denial, all five protected repository operations, revoked-certificate short-circuiting, cross-tenant denial after OPA `ALLOW`, and data-query suppression after `DENY`. `npm run test:api` additionally proves that every registered protected route supplies the immutable policy request context.
 
-T7.2 does not define Rego rules, tenant policy bundles, score thresholds, step-up verification or quarantine execution. Those are separate later tasks.
+T7.3 adds tenant policy bundles and T7.4 adds the executable Rego score/sensitivity rules. Step-up proof verification and quarantine execution remain separate T7.5 and T7.6 tasks.

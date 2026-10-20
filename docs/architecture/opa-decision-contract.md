@@ -2,7 +2,7 @@
 
 ## Boundary
 
-T7.1 defines the versioned data exchanged between the API policy enforcement point and OPA. T7.2 connects protected routes to that contract. Policy bundles and thresholds, step-up challenges and quarantine execution remain later Phase 7 tasks.
+T7.1 defines the versioned data exchanged between the API policy enforcement point and OPA. T7.2 connects protected routes to that contract, T7.3 versions tenant bundles and T7.4 supplies the first executable score/sensitivity rules. Step-up proof acceptance and quarantine execution remain later Phase 7 tasks.
 
 The canonical JSON Schemas are:
 
@@ -26,7 +26,7 @@ The application assembles policy input only from validated server-side state. HT
 
 `identity.valid` records the certificate verdict; it is not a caller assertion. A false verdict remains representable so policy and enforcement can produce a reasoned non-allow outcome. A true verdict requires active authoritative status, a positive status version and bounded freshness times.
 
-Tenant, subject and action values appear in more than one section so policy can verify their binding. The future input builder must reject any mismatch before or during evaluation. A high trust score never repairs an invalid certificate, inactive tenant/subject/membership, missing role, cross-tenant resource or mismatched step-up proof.
+Tenant, subject and action values appear in more than one section so policy can verify their binding. The input builder and Rego policy reject mismatches before authorization. A high trust score never repairs an invalid certificate, inactive tenant/subject/membership, missing role, cross-tenant resource or mismatched step-up proof.
 
 ## Trust freshness
 

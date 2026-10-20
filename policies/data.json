@@ -1,0 +1,86 @@
+{
+  "tenant_trust_policy": {
+    "authorization": {
+      "configuration": {
+        "schemaVersion": "1.0.0",
+        "policyProfile": "slide-14-prototype-v1",
+        "calibrationStatus": "unvalidated-prototype-defaults",
+        "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+        "scoreBands": {
+          "quarantineBelow": 50,
+          "restrictedBelow": 65,
+          "conditionalBelow": 80,
+          "maximum": 100
+        },
+        "actionRules": [
+          {
+            "action": "profile:read",
+            "sensitivity": "confidential",
+            "minimumScore": 55,
+            "roles": ["tenant-member", "tenant-admin"],
+            "stepUpRequired": false
+          },
+          {
+            "action": "record:read",
+            "sensitivity": "confidential",
+            "minimumScore": 55,
+            "roles": ["tenant-member", "tenant-admin"],
+            "stepUpRequired": false
+          },
+          {
+            "action": "record:write",
+            "sensitivity": "confidential",
+            "minimumScore": 65,
+            "roles": ["tenant-member", "tenant-admin"],
+            "stepUpRequired": false
+          },
+          {
+            "action": "record:export",
+            "sensitivity": "sensitive",
+            "minimumScore": 65,
+            "roles": ["tenant-admin"],
+            "stepUpRequired": true
+          },
+          {
+            "action": "tenant:admin",
+            "sensitivity": "critical",
+            "minimumScore": 80,
+            "roles": ["tenant-admin"],
+            "stepUpRequired": true
+          },
+          {
+            "action": "member:manage",
+            "sensitivity": "critical",
+            "minimumScore": 80,
+            "roles": ["tenant-admin"],
+            "stepUpRequired": true
+          },
+          {
+            "action": "certificate:manage",
+            "sensitivity": "critical",
+            "minimumScore": 80,
+            "roles": ["tenant-admin"],
+            "stepUpRequired": true
+          },
+          {
+            "action": "admin-key:rotate",
+            "sensitivity": "critical",
+            "minimumScore": 90,
+            "roles": ["tenant-admin"],
+            "stepUpRequired": true
+          }
+        ],
+        "stepUpMaximumAgeSeconds": 300,
+        "quarantineAction": "restrict-access"
+      },
+      "runtime": {
+        "policy": {
+          "policyVersionId": "pol_018f1234-5678-7abc-8def-0123456789c2",
+          "bundleVersion": 2,
+          "bundleHashSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decisionPath": "tenant_trust/authorization/decision"
+        }
+      }
+    }
+  }
+}

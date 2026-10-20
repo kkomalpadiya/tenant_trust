@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { TenantContextError, assertNoTenantSwitch } from "@tenant-trust/tenant-context";
+import { validateAdaptiveAuthorizationPolicyData } from "./adaptive-authorization-policy.mjs";
 
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SUBJECT_ID = /^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -153,7 +154,7 @@ function normalizeModules(value) {
   return modules;
 }
 
-function normalizePublishRequest(value) {
+function normalizePublishRequest(value, tenantId) {
   const input = requireExactFields(
     value,
     ["bundleVersion", "data", "entrypoint", "modules", "policyName", "reasonCode"],
@@ -166,12 +167,15 @@ function normalizePublishRequest(value) {
     || !REASON_CODE.test(input.reasonCode ?? "")) {
     fail("PUBLISH_REQUEST_INVALID");
   }
+  const data = cloneJson(input.data);
   return {
     policyName: input.policyName,
     bundleVersion: input.bundleVersion,
     entrypoint: input.entrypoint,
     modules: normalizeModules(input.modules),
-    data: cloneJson(input.data),
+    data: input.policyName === POLICY_BUNDLE_LIFECYCLE.policyName
+      ? validateAdaptiveAuthorizationPolicyData(data, tenantId)
+      : data,
     reasonCode: input.reasonCode,
   };
 }
@@ -292,7 +296,7 @@ export function createPolicyBundleManagementService({
 
     async publish({ context: contextValue, request, signal } = {}) {
       const context = trustedContext(contextValue, true);
-      const normalized = normalizePublishRequest(request);
+      const normalized = normalizePublishRequest(request, context.tenantId);
       const policyVersionId = requirePolicyVersionId(idFactory);
       const occurredAt = utcNow(clock);
       const candidate = deepFreeze({

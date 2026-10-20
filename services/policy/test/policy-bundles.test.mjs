@@ -4,6 +4,7 @@ import { resolveTenantContext } from "@tenant-trust/tenant-context";
 import {
   POLICY_BUNDLE_LIFECYCLE,
   PolicyBundleError,
+  createSlide14PrototypePolicyData,
   createOpaPolicyBundleValidator,
   createPolicyBundleLookupService,
   createPolicyBundleManagementService,
@@ -49,7 +50,7 @@ const publishRequest = Object.freeze({
     path: "tenant_trust/authorization.rego",
     source: "package tenant_trust.authorization\n\ndefault decision := null\n",
   })]),
-  data: Object.freeze({ thresholds: Object.freeze({}) }),
+  data: createSlide14PrototypePolicyData({ tenantId: ids.alpha }),
   reasonCode: "INITIAL_VALIDATED_BUNDLE",
 });
 

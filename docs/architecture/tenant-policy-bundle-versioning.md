@@ -8,7 +8,7 @@ T7.3 extends the tenant-owned `trust.policy_versions` registry rather than intro
 - a tenant-local, monotonically increasing bundle version;
 - the fixed `tenant_trust/authorization/decision` entrypoint;
 - one or more bounded Rego v1 modules restricted to the `tenant_trust.authorization` package;
-- bounded JSON data for later tenant thresholds and sensitivity rules; and
+- bounded JSON data containing tenant thresholds and sensitivity rules; and
 - the exact OPA engine/version, Rego version and validation time.
 
 The management service normalizes line endings and module order, rejects unsafe paths, unknown request fields, invalid JSON values and oversized content, invokes a trusted OPA compiler adapter, and then calculates SHA-256 over deterministic canonical JSON. The tenant administrator supplies policy content and a reason, but cannot supply tenant identity, publisher identity, policy-version ID, bundle digest, validation receipt or lifecycle state.
@@ -34,7 +34,7 @@ An active database row is the tenant's policy authority. Before calling OPA, the
 
 Any mismatch is a non-allowing policy response. This makes deployment skew safe: activation is atomic in PostgreSQL, and a still-old or incorrectly loaded OPA instance cannot authorize requests because its provenance will not match. Policy distribution is an operational adapter, not a second source of truth, and application callers still do not use OPA management APIs.
 
-T7.3 establishes versioning and selection but does not define score thresholds or sensitivity outcomes. T7.4 supplies those executable policy rules and tenant data.
+T7.4 now supplies and validates that executable tenant data. `access-control` publication rejects cross-tenant data, incomplete or duplicate action rules, sensitivity downgrades, broader role eligibility and removal of mandatory step-up. Thresholds remain explicitly unvalidated prototype defaults and can be changed only by publishing a new tenant-scoped bundle version.
 
 ## Verification
 

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "1.0.0",
+  "contractId": "opa-decision-input-v1",
+  "identity": {
+    "source": "mtls-certificate",
+    "authenticationId": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+    "subjectId": "sub_018f1234-5678-7abc-8def-0123456789ab",
+    "certificateId": "crt_018f1234-5678-7abc-8def-0123456789ab",
+    "issuerId": "iss_018f1234-5678-7abc-8def-0123456789b4",
+    "serialNumber": "00000000000000000000000000000001",
+    "fingerprintSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "valid": true,
+    "certificateState": "active",
+    "statusSource": "authoritative",
+    "statusVersion": 4,
+    "statusObservedAt": "2026-10-20T09:00:00.000Z",
+    "checkedAt": "2026-10-20T09:00:00.000Z",
+    "validUntil": "2026-10-20T09:05:00.000Z"
+  },
+  "tenantContext": {
+    "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+    "subjectId": "sub_018f1234-5678-7abc-8def-0123456789ab",
+    "roles": ["tenant-member"],
+    "tenantState": "active",
+    "subjectState": "active",
+    "membershipState": "active",
+    "versions": { "tenant": 2, "subject": 3, "membership": 4 }
+  },
+  "action": "profile:read",
+  "resource": {
+    "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+    "resourceType": "subject-profile",
+    "resourceIdHashSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "sensitivity": "confidential",
+    "scope": "self",
+    "ownerSubjectId": "sub_018f1234-5678-7abc-8def-0123456789ab"
+  },
+  "trust": {
+    "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+    "subjectId": "sub_018f1234-5678-7abc-8def-0123456789ab",
+    "state": "fresh",
+    "usableForPolicy": true,
+    "requiredOutcome": null,
+    "reasonCode": null,
+    "policyScore": 55,
+    "policyBand": "medium",
+    "lastKnownScore": 55,
+    "lastKnownBand": "medium",
+    "ageSeconds": 2,
+    "staleAfterSeconds": 300,
+    "transitionId": "trn_018f1234-5678-7abc-8def-0123456789ab",
+    "updateVersion": 5,
+    "modelVersion": "1.0.0",
+    "configurationVersion": 1,
+    "observedAt": "2026-10-20T08:59:58.000Z",
+    "evaluatedAt": "2026-10-20T09:00:00.000Z",
+    "recordedAt": "2026-10-20T09:00:00.000Z",
+    "explanationHashSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "requestContext": {
+    "requestId": "req_018f1234-5678-7abc-8def-0123456789ab",
+    "correlationId": "cor_018f1234-5678-7abc-8def-0123456789ab",
+    "requestedAt": "2026-10-20T09:00:00.000Z",
+    "method": "GET",
+    "routeTemplate": "/v1/profile",
+    "sourceNetworkZone": "external",
+    "stepUp": {
+      "status": "absent",
+      "proofIdHashSha256": null,
+      "tenantId": null,
+      "subjectId": null,
+      "action": null,
+      "sessionIdHashSha256": null,
+      "verifiedAt": null,
+      "expiresAt": null
+    }
+  }
+}

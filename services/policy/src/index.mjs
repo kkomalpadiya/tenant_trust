@@ -9,3 +9,10 @@ export {
   hashPolicyBundleDocument,
   policyBundleSafeDenial,
 } from "./policy-bundles.mjs";
+
+export {
+  ADAPTIVE_AUTHORIZATION_POLICY,
+  AdaptiveAuthorizationPolicyError,
+  createSlide14PrototypePolicyData,
+  validateAdaptiveAuthorizationPolicyData,
+} from "./adaptive-authorization-policy.mjs";
