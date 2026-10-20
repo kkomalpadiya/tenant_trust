@@ -1,0 +1,291 @@
+{
+  "schemaVersion": "1.0.0",
+  "fixtureId": "adaptive-policy-matrix-v1",
+  "baseInputFixture": "slide14-profile-read.json",
+  "profiles": [
+    {
+      "id": "alpha-default",
+      "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+      "policyProfile": "slide-14-prototype-v1",
+      "minimumScoreOverrides": {},
+      "stepUpRequiredOverrides": []
+    },
+    {
+      "id": "beta-strict",
+      "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ac",
+      "policyProfile": "strict-beta-v1",
+      "minimumScoreOverrides": {
+        "profile:read": 60
+      },
+      "stepUpRequiredOverrides": [
+        "record:read"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "decimal-below-quarantine",
+      "categories": ["score-edge", "decimal-score"],
+      "profile": "alpha-default",
+      "action": "profile:read",
+      "score": 49.999,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "QUARANTINE", "reasonCode": "TRUST_SCORE_QUARANTINE" }
+    },
+    {
+      "id": "exact-quarantine-boundary",
+      "categories": ["score-edge"],
+      "profile": "alpha-default",
+      "action": "profile:read",
+      "score": 50,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "DENY", "reasonCode": "TRUST_SCORE_BELOW_ACTION_MINIMUM" }
+    },
+    {
+      "id": "exact-profile-read-minimum",
+      "categories": ["score-edge", "action"],
+      "profile": "alpha-default",
+      "action": "profile:read",
+      "score": 55,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "ALLOW", "reasonCode": "POLICY_ALLOW" }
+    },
+    {
+      "id": "decimal-above-profile-read-minimum",
+      "categories": ["decimal-score"],
+      "profile": "alpha-default",
+      "action": "profile:read",
+      "score": 55.125,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "ALLOW", "reasonCode": "POLICY_ALLOW" }
+    },
+    {
+      "id": "record-read-member",
+      "categories": ["action", "role"],
+      "profile": "alpha-default",
+      "action": "record:read",
+      "score": 55,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "ALLOW", "reasonCode": "POLICY_ALLOW" }
+    },
+    {
+      "id": "record-write-decimal-below-minimum",
+      "categories": ["score-edge", "decimal-score"],
+      "profile": "alpha-default",
+      "action": "record:write",
+      "score": 64.999,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "DENY", "reasonCode": "TRUST_SCORE_BELOW_ACTION_MINIMUM" }
+    },
+    {
+      "id": "record-write-exact-minimum",
+      "categories": ["score-edge", "action"],
+      "profile": "alpha-default",
+      "action": "record:write",
+      "score": 65,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "ALLOW", "reasonCode": "POLICY_ALLOW" }
+    },
+    {
+      "id": "record-export-exact-minimum",
+      "categories": ["score-edge", "action"],
+      "profile": "alpha-default",
+      "action": "record:export",
+      "score": 65,
+      "roles": ["tenant-admin"],
+      "sensitivity": "sensitive",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "STEP_UP", "reasonCode": "STEP_UP_REQUIRED" }
+    },
+    {
+      "id": "record-export-valid-proof",
+      "categories": ["action", "role"],
+      "profile": "alpha-default",
+      "action": "record:export",
+      "score": 65,
+      "roles": ["tenant-admin"],
+      "sensitivity": "sensitive",
+      "stepUpProof": "valid",
+      "expected": { "outcome": "ALLOW", "reasonCode": "POLICY_ALLOW" }
+    },
+    {
+      "id": "record-export-member-role-denied",
+      "categories": ["role"],
+      "profile": "alpha-default",
+      "action": "record:export",
+      "score": 100,
+      "roles": ["tenant-member"],
+      "sensitivity": "sensitive",
+      "stepUpProof": "valid",
+      "expected": { "outcome": "DENY", "reasonCode": "ROLE_NOT_ELIGIBLE" }
+    },
+    {
+      "id": "tenant-admin-decimal-below-minimum",
+      "categories": ["score-edge", "decimal-score"],
+      "profile": "alpha-default",
+      "action": "tenant:admin",
+      "score": 79.999,
+      "roles": ["tenant-admin"],
+      "sensitivity": "critical",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "DENY", "reasonCode": "TRUST_SCORE_BELOW_ACTION_MINIMUM" }
+    },
+    {
+      "id": "tenant-admin-exact-minimum",
+      "categories": ["score-edge", "action"],
+      "profile": "alpha-default",
+      "action": "tenant:admin",
+      "score": 80,
+      "roles": ["tenant-admin"],
+      "sensitivity": "critical",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "STEP_UP", "reasonCode": "STEP_UP_REQUIRED" }
+    },
+    {
+      "id": "member-manage-exact-minimum",
+      "categories": ["action"],
+      "profile": "alpha-default",
+      "action": "member:manage",
+      "score": 80,
+      "roles": ["tenant-admin"],
+      "sensitivity": "critical",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "STEP_UP", "reasonCode": "STEP_UP_REQUIRED" }
+    },
+    {
+      "id": "certificate-manage-exact-minimum",
+      "categories": ["action"],
+      "profile": "alpha-default",
+      "action": "certificate:manage",
+      "score": 80,
+      "roles": ["tenant-admin"],
+      "sensitivity": "critical",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "STEP_UP", "reasonCode": "STEP_UP_REQUIRED" }
+    },
+    {
+      "id": "admin-key-rotate-decimal-below-minimum",
+      "categories": ["score-edge", "decimal-score"],
+      "profile": "alpha-default",
+      "action": "admin-key:rotate",
+      "score": 89.999,
+      "roles": ["tenant-admin"],
+      "sensitivity": "critical",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "DENY", "reasonCode": "TRUST_SCORE_BELOW_ACTION_MINIMUM" }
+    },
+    {
+      "id": "admin-key-rotate-exact-minimum",
+      "categories": ["score-edge", "action"],
+      "profile": "alpha-default",
+      "action": "admin-key:rotate",
+      "score": 90,
+      "roles": ["tenant-admin"],
+      "sensitivity": "critical",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "STEP_UP", "reasonCode": "STEP_UP_REQUIRED" }
+    },
+    {
+      "id": "maximum-score-valid-proof",
+      "categories": ["score-edge"],
+      "profile": "alpha-default",
+      "action": "admin-key:rotate",
+      "score": 100,
+      "roles": ["tenant-admin"],
+      "sensitivity": "critical",
+      "stepUpProof": "valid",
+      "expected": { "outcome": "ALLOW", "reasonCode": "POLICY_ALLOW" }
+    },
+    {
+      "id": "profile-read-sensitivity-mismatch",
+      "categories": ["sensitivity"],
+      "profile": "alpha-default",
+      "action": "profile:read",
+      "score": 100,
+      "roles": ["tenant-member"],
+      "sensitivity": "sensitive",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "DENY", "reasonCode": "RESOURCE_SENSITIVITY_MISMATCH" }
+    },
+    {
+      "id": "record-export-sensitivity-mismatch",
+      "categories": ["sensitivity"],
+      "profile": "alpha-default",
+      "action": "record:export",
+      "score": 100,
+      "roles": ["tenant-admin"],
+      "sensitivity": "confidential",
+      "stepUpProof": "valid",
+      "expected": { "outcome": "DENY", "reasonCode": "RESOURCE_SENSITIVITY_MISMATCH" }
+    },
+    {
+      "id": "alpha-profile-read-at-57",
+      "categories": ["tenant-policy"],
+      "profile": "alpha-default",
+      "action": "profile:read",
+      "score": 57,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "ALLOW", "reasonCode": "POLICY_ALLOW" }
+    },
+    {
+      "id": "beta-profile-read-at-57",
+      "categories": ["tenant-policy"],
+      "profile": "beta-strict",
+      "action": "profile:read",
+      "score": 57,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "DENY", "reasonCode": "TRUST_SCORE_BELOW_ACTION_MINIMUM" }
+    },
+    {
+      "id": "alpha-record-read-at-60",
+      "categories": ["tenant-policy"],
+      "profile": "alpha-default",
+      "action": "record:read",
+      "score": 60,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "ALLOW", "reasonCode": "POLICY_ALLOW" }
+    },
+    {
+      "id": "beta-record-read-requires-step-up",
+      "categories": ["tenant-policy"],
+      "profile": "beta-strict",
+      "action": "record:read",
+      "score": 60,
+      "roles": ["tenant-member"],
+      "sensitivity": "confidential",
+      "stepUpProof": "absent",
+      "expected": { "outcome": "STEP_UP", "reasonCode": "STEP_UP_REQUIRED" }
+    },
+    {
+      "id": "expired-step-up-proof",
+      "categories": ["expired-step-up"],
+      "profile": "alpha-default",
+      "action": "record:export",
+      "score": 100,
+      "roles": ["tenant-admin"],
+      "sensitivity": "sensitive",
+      "stepUpProof": "expired",
+      "expected": { "outcome": "STEP_UP", "reasonCode": "STEP_UP_REQUIRED" }
+    }
+  ]
+}

@@ -79,6 +79,7 @@
     "step-up-authentication:verify": "npm run test:api && npm run policy:test && node scripts/verify-bound-step-up-authentication.mjs",
     "policy-outcomes:verify": "npm run policy-enforcement:verify && node scripts/verify-policy-denial-quarantine-enforcement.mjs",
     "policy-resilience:verify": "node --test apps/api/test/policy-enforcement.test.mjs apps/api/test/request-state.test.mjs apps/api/test/request-audit.test.mjs packages/certificate-status/test/status.test.mjs && npm run policy:test && node scripts/verify-policy-state-resilience.mjs && npm run request-state:verify && npm run trust-score-lookup:verify",
+    "policy-matrix:verify": "npm run test:policy && npm run policy:test && node scripts/verify-policy-matrix.mjs",
     "demo:review": "node apps/review-demo/server.mjs",
     "test:review-demo": "node --test apps/review-demo/test/*.test.mjs",
     "role-action-matrix:verify": "npm run test:authorization",

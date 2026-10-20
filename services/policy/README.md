@@ -13,3 +13,5 @@ For the `access-control` policy, publication additionally validates the complete
 Run `npm run policy-bundles:verify` after `npm run infra:migrate`. The gate runs service tests, uses the pinned OPA image to accept valid Rego v1 and reject invalid syntax, exercises the rolled-back PostgreSQL lifecycle and reruns protected-route policy enforcement.
 
 Run `npm run adaptive-policy:verify` to test the configuration validator, exact Rego score boundaries, real OPA output contract and canonical input digest. See `docs/architecture/adaptive-authorization-policy.md`.
+
+Run `npm run policy-matrix:verify` for the T7.8 fixture-driven decision matrix across every action, fractional and exact score boundaries, roles, sensitivities, distinct tenant policies and expired step-up proof. See `docs/architecture/policy-matrix-verification.md`.

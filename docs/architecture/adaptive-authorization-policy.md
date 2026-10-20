@@ -56,4 +56,4 @@ Run:
 npm run adaptive-policy:verify
 ```
 
-The gate runs policy-service tests, 14 Rego tests (including the readiness policy), one real OPA evaluation validated through the API client and the protected-route enforcement regressions. It also proves OPA's input digest matches the application's canonical SHA-256 digest.
+The gate runs policy-service tests, the checked-in Rego suite, one real OPA evaluation validated through the API client and the protected-route enforcement regressions. It also proves OPA's input digest matches the application's canonical SHA-256 digest. The broader T7.8 tenant-variation and boundary matrix is documented in [Adaptive policy matrix verification](policy-matrix-verification.md).
