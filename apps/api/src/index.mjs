@@ -1,6 +1,7 @@
 export { createGatewayRequestAuthenticator, createTenantTrustApi } from "./app.mjs";
 export {
   AccessDeniedError,
+  QuarantineEnforcedError,
   createPostgresTenantRepository,
 } from "./repository.mjs";
 export {

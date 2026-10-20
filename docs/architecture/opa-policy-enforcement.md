@@ -30,4 +30,4 @@ Adaptive repository construction requires the branded policy-enforcement service
 
 Run `npm run policy-enforcement:verify`. The focused tests cover the exact OPA URL and envelope, complete input assembly, response/state binding, network and malformed-response failure, stale high-score denial, all five protected repository operations, revoked-certificate short-circuiting, cross-tenant denial after OPA `ALLOW`, and data-query suppression after `DENY`. `npm run test:api` additionally proves that every registered protected route supplies the immutable policy request context.
 
-T7.3 adds tenant policy bundles and T7.4 adds the executable Rego score/sensitivity rules. Step-up proof verification and quarantine execution remain separate T7.5 and T7.6 tasks.
+T7.3 adds tenant policy bundles and T7.4 adds the executable Rego score/sensitivity rules. T7.5 verifies and consumes bound step-up proofs. T7.6 denies ordinary `DENY` outcomes without side effects and converts `QUARANTINE` outcomes into durable, correlated action requests; executing those requests remains a separate orchestration concern.

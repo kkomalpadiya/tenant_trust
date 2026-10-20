@@ -2,7 +2,7 @@
 
 ## Boundary
 
-T7.1 defines the versioned data exchanged between the API policy enforcement point and OPA. T7.2 connects protected routes to that contract, T7.3 versions tenant bundles and T7.4 supplies the first executable score/sensitivity rules. Step-up proof acceptance and quarantine execution remain later Phase 7 tasks.
+T7.1 defines the versioned data exchanged between the API policy enforcement point and OPA. T7.2 connects protected routes to that contract, T7.3 versions tenant bundles and T7.4 supplies the first executable score/sensitivity rules. T7.5 adds bound step-up proof acceptance, and T7.6 turns quarantine outcomes into durable action requests while keeping protected access denied. Executing those action requests remains later orchestration work.
 
 The canonical JSON Schemas are:
 

@@ -2,7 +2,7 @@
 
 ## Boundary
 
-T4.4 defines the role eligibility contract consumed by the API and policy enforcement. T4.6 wraps it in the explicit `pki-rbac-baseline-v1` mode, which requires tenant-scoped certificate authentication and deliberately uses no adaptive trust input. Under `adaptive-trust-opa-v1`, T7.4 now applies tenant-configured score thresholds and the same canonical sensitivities in OPA. The baseline still does not consume trust, and bound step-up proof acceptance remains T7.5.
+T4.4 defines the role eligibility contract consumed by the API and policy enforcement. T4.6 wraps it in the explicit `pki-rbac-baseline-v1` mode, which requires tenant-scoped certificate authentication and deliberately uses no adaptive trust input. Under `adaptive-trust-opa-v1`, T7.4 applies tenant-configured score thresholds and the same canonical sensitivities in OPA, T7.5 accepts bound step-up proofs and T7.6 enforces DENY/QUARANTINE outcomes. The baseline still does not consume trust.
 
 The resolver accepts only an immutable tenant context produced from gateway-authenticated certificate identity and authoritative active tenant, subject, membership and role state. It never accepts a role, tenant, subject, resource type or sensitivity from request input. PostgreSQL forced row-level security remains the authoritative resource-scope check.
 
@@ -28,7 +28,7 @@ Platform administration is intentionally absent. Infrastructure authority does n
 - An unknown or malformed action resolves to a generic immutable denial without reflecting attacker input.
 - A copied or caller-built context is rejected; only the branded trusted tenant context is accepted.
 - Tenant administrators with multiple tenant roles resolve deterministically to the administrator row, never by caller ordering.
-- `requires-controls` is non-allowing. T7.4 returns `STEP_UP` for configured export and administration rules; no protected operation proceeds until T7.5 implements and verifies a real action-bound proof. Audit requirements remain independent.
+- `requires-controls` is non-allowing. T7.4 returns `STEP_UP` for configured export and administration rules; no protected operation proceeds until a verified, one-time action-bound proof is consumed. Audit requirements remain independent.
 - An `allow` row establishes role eligibility only. Certificate status, active identity state, tenant/resource scope, request context and applicable policy remain mandatory, and any missing input denies.
 
 The executable source is `packages/authorization/src/index.mjs`. `npm run role-action-matrix:verify` proves the complete matrix, mode-selection and denial invariants. `npm run pki-rbac-baseline:verify` proves live Baseline B behavior.

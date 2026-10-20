@@ -37,12 +37,20 @@ const RESOURCE_ID = /^res_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SUBJECT_ID = /^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const OPERATION_ID = /^op_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const SECURITY_ACTION_ID = /^act_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const MAX_EXPORT_RECORDS = 25;
 
 export class AccessDeniedError extends Error {
   constructor() {
     super("Access denied.");
     this.name = "AccessDeniedError";
+  }
+}
+
+export class QuarantineEnforcedError extends AccessDeniedError {
+  constructor() {
+    super();
+    this.name = "QuarantineEnforcedError";
   }
 }
 
@@ -94,6 +102,10 @@ function defaultOperationIdFactory() {
   return `op_${randomUUID()}`;
 }
 
+function defaultSecurityActionIdFactory() {
+  return `act_${randomUUID()}`;
+}
+
 async function defaultSensitiveOperationAuthorizer() {
   throw new AccessDeniedError();
 }
@@ -115,6 +127,14 @@ function createOperationId(operationIdFactory) {
     throw new TypeError("The operation ID factory returned an invalid ID.");
   }
   return operationId;
+}
+
+function createSecurityActionId(securityActionIdFactory) {
+  const actionId = securityActionIdFactory();
+  if (!SECURITY_ACTION_ID.test(actionId ?? "")) {
+    throw new TypeError("The security action ID factory returned an invalid ID.");
+  }
+  return actionId;
 }
 
 function operationMetadata(context, operationId, action, replayed, attributes = {}) {
@@ -169,6 +189,7 @@ export function createPostgresTenantRepository({
   contextResolver = resolveTenantContext,
   sensitiveOperationAuthorizer = defaultSensitiveOperationAuthorizer,
   operationIdFactory = defaultOperationIdFactory,
+  securityActionIdFactory = defaultSecurityActionIdFactory,
   clock = () => new Date(),
 } = {}) {
   if (!pool || typeof pool.connect !== "function") throw new TypeError("A PostgreSQL pool is required.");
@@ -190,6 +211,9 @@ export function createPostgresTenantRepository({
     throw new TypeError("A sensitive operation authorizer must be a function.");
   }
   if (typeof operationIdFactory !== "function") throw new TypeError("An operation ID factory is required.");
+  if (typeof securityActionIdFactory !== "function") {
+    throw new TypeError("A security action ID factory is required.");
+  }
   if (typeof clock !== "function") throw new TypeError("A trusted request-state clock is required.");
   const requestStateRevalidator = createRequestStateRevalidator({ clock });
 
@@ -292,6 +316,33 @@ export function createPostgresTenantRepository({
       policyRequest: { ...policyRequest, stepUp },
       signal,
     });
+    if (evaluation.decision.outcome === "QUARANTINE") {
+      const actionId = createSecurityActionId(securityActionIdFactory);
+      const quarantine = evaluation.decision.obligations.quarantine;
+      const requestedAt = asIsoTimestamp(clock());
+      const requested = await query(
+        `SELECT (audit.request_quarantine_action(
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+         )).*`,
+        [
+          actionId,
+          evaluation.decision.decisionId,
+          policyRequest.requestId,
+          policyRequest.correlationId,
+          requestState.certificateId,
+          action,
+          quarantine.actionType,
+          evaluation.decision.reasonCodes[0],
+          evaluation.input.resource.resourceIdHashSha256,
+          evaluation.input.trust.transitionId,
+          evaluation.policyBundle.policyVersionId,
+          evaluation.inputHash,
+          requestedAt,
+        ],
+      );
+      if (requested.rowCount !== 1) throw new AccessDeniedError();
+      throw new QuarantineEnforcedError();
+    }
     if (evaluation.decision.outcome !== POLICY_ENFORCEMENT_POLICY.onlyAllowingOutcome) {
       throw new AccessDeniedError();
     }
@@ -382,10 +433,25 @@ export function createPostgresTenantRepository({
       await query("COMMIT");
       return result;
     } catch (error) {
+      if (transactionStarted && error instanceof QuarantineEnforcedError && !signal?.aborted) {
+        try {
+          await client.query("COMMIT");
+          transactionStarted = false;
+        } catch (commitError) {
+          await rollbackQuietly(client);
+          transactionStarted = false;
+          if (isTimeoutError(commitError, signal)) throw new RequestTimeoutError();
+          throw commitError;
+        }
+        throw error;
+      }
       if (transactionStarted) await rollbackQuietly(client);
       if (isTimeoutError(error, signal)) throw new RequestTimeoutError();
       if (error?.code === "P0001" && error?.message === "SENSITIVE_OPERATION_IDEMPOTENCY_CONFLICT") {
         throw new IdempotencyConflictError();
+      }
+      if (error?.code === "P0001" && error?.message === "QUARANTINE_ACTION_IDEMPOTENCY_CONFLICT") {
+        throw new AccessDeniedError();
       }
       if (error?.code === "42501") throw new AccessDeniedError();
       if (error instanceof StepUpAuthenticationError) throw new AccessDeniedError();
@@ -573,6 +639,19 @@ export function createPostgresTenantRepository({
       const keyHash = hashSensitiveIdempotencyKey(normalizedIdempotencyKey);
       const requestHash = hashSensitiveRequest("record:export", requestedRecordIds);
       return withTenantContext(authentication, async (query, context, requestState, operationSignal) => {
+        if (policyModeSelected) {
+          await authorizeProtectedOperation({
+            query,
+            authentication,
+            context,
+            requestState,
+            action: "record:export",
+            policyRequest,
+            attributes: { requestedRecordCount: requestedRecordIds.length },
+            sensitive: true,
+            signal: operationSignal,
+          });
+        }
         const candidateOperationId = createOperationId(operationIdFactory);
         const reservation = await query(
           `SELECT operation_id, replayed
@@ -584,18 +663,20 @@ export function createPostgresTenantRepository({
           throw new TypeError("The sensitive-operation receipt was invalid.");
         }
         const operationId = reservation.rows[0].operation_id;
-        await authorizeProtectedOperation({
-          query,
-          authentication,
-          context,
-          requestState,
-          action: "record:export",
-          policyRequest,
-          operationId,
-          attributes: { requestedRecordCount: requestedRecordIds.length },
-          sensitive: true,
-          signal: operationSignal,
-        });
+        if (!policyModeSelected) {
+          await authorizeProtectedOperation({
+            query,
+            authentication,
+            context,
+            requestState,
+            action: "record:export",
+            policyRequest,
+            operationId,
+            attributes: { requestedRecordCount: requestedRecordIds.length },
+            sensitive: true,
+            signal: operationSignal,
+          });
+        }
 
         const result = await query(
           `SELECT resource_id::text, owner_subject_id::text, resource_name, version, created_at, updated_at
@@ -623,6 +704,19 @@ export function createPostgresTenantRepository({
       const keyHash = hashSensitiveIdempotencyKey(normalizedIdempotencyKey);
       const requestHash = hashSensitiveRequest("tenant:admin", [subjectId]);
       return withTenantContext(authentication, async (query, context, requestState, operationSignal) => {
+        if (policyModeSelected) {
+          await authorizeProtectedOperation({
+            query,
+            authentication,
+            context,
+            requestState,
+            action: "tenant:admin",
+            policyRequest,
+            attributes: { targetSubjectId: subjectId },
+            sensitive: true,
+            signal: operationSignal,
+          });
+        }
         const candidateOperationId = createOperationId(operationIdFactory);
         const reservation = await query(
           `SELECT operation_id, replayed
@@ -634,18 +728,20 @@ export function createPostgresTenantRepository({
           throw new TypeError("The sensitive-operation receipt was invalid.");
         }
         const operationId = reservation.rows[0].operation_id;
-        await authorizeProtectedOperation({
-          query,
-          authentication,
-          context,
-          requestState,
-          action: "tenant:admin",
-          policyRequest,
-          operationId,
-          attributes: { targetSubjectId: subjectId },
-          sensitive: true,
-          signal: operationSignal,
-        });
+        if (!policyModeSelected) {
+          await authorizeProtectedOperation({
+            query,
+            authentication,
+            context,
+            requestState,
+            action: "tenant:admin",
+            policyRequest,
+            operationId,
+            attributes: { targetSubjectId: subjectId },
+            sensitive: true,
+            signal: operationSignal,
+          });
+        }
 
         const result = await query(
           `SELECT

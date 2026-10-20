@@ -40,7 +40,7 @@ OPA checks configuration validity, tenant/subject/resource binding, active autho
 
 Unknown actions, sensitivity downgrades, role mismatches, scores below the action minimum and invalid configuration return `DENY`. Stale or missing trust preserves its mandatory denial reason and exposes no policy-usable score. A score below 50 returns `QUARANTINE`, but the policy does not mutate tenant, subject or certificate state.
 
-A rule marked `stepUpRequired` returns `STEP_UP` until T7.5's Ed25519 challenge flow supplies a fresh proof that is bound to the tenant, subject, action and session. The API consumes that proof once, in the protected operation's transaction, and OPA independently checks its bindings and maximum age before returning `ALLOW`. T7.6 consumes quarantine obligations through a separate auditable workflow.
+A rule marked `stepUpRequired` returns `STEP_UP` until the Ed25519 challenge flow supplies a fresh proof that is bound to the tenant, subject, action and session. The API consumes that proof once, in the protected operation's transaction, and OPA independently checks its bindings and maximum age before returning `ALLOW`. A `QUARANTINE` obligation now blocks protected access and creates a durable, correlated action request through the separate auditable workflow.
 
 ## Tenant configuration safety
 

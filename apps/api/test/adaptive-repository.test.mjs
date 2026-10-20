@@ -19,6 +19,7 @@ const ids = Object.freeze({
   transition: "trn_018f1234-5678-7abc-8def-0123456789ab",
   policy: "pol_018f1234-5678-7abc-8def-0123456789ab",
   decision: "dec_018f1234-5678-7abc-8def-0123456789ab",
+  securityAction: "act_018f1234-5678-7abc-8def-0123456789ab",
   record: "res_018f1234-5678-7abc-8def-0123456789b0",
   foreignRecord: "res_018f1234-5678-7abc-8def-0123456789b1",
   operation: "op_018f1234-5678-7abc-8def-0123456789ab",
@@ -81,6 +82,9 @@ function policyRequest(index, method = "GET", routeTemplate = "/v1/profile") {
 }
 
 function outputFor(input, outcome = "ALLOW") {
+  const quarantine = outcome === "QUARANTINE"
+    ? { required: true, actionType: "restrict-access" }
+    : null;
   return {
     schemaVersion: "1.0.0",
     contractId: "opa-decision-output-v1",
@@ -90,7 +94,9 @@ function outputFor(input, outcome = "ALLOW") {
     tenantId: input.tenantContext.tenantId,
     subjectId: input.tenantContext.subjectId,
     outcome,
-    reasonCodes: [outcome === "ALLOW" ? "ACCESS_ALLOWED" : "ACCESS_DENIED"],
+    reasonCodes: [outcome === "ALLOW"
+      ? "ACCESS_ALLOWED"
+      : outcome === "QUARANTINE" ? "TRUST_SCORE_QUARANTINE" : "ACCESS_DENIED"],
     evaluatedAt: "2026-10-13T09:00:00.050Z",
     input: { contractId: input.contractId, hashSha256: hashPolicyInput(input) },
     policy: {
@@ -108,7 +114,7 @@ function outputFor(input, outcome = "ALLOW") {
       trustUpdateVersion: input.trust.updateVersion,
       trustConfigurationVersion: input.trust.configurationVersion,
     },
-    obligations: { stepUp: null, quarantine: null },
+    obligations: { stepUp: null, quarantine },
   };
 }
 
@@ -136,7 +142,11 @@ function createPolicyService(decisions, outcome = "ALLOW") {
   });
 }
 
-function createPool({ certificateState = "active", stepUpProofAvailable = true } = {}) {
+function createPool({
+  certificateState = "active",
+  stepUpProofAvailable = true,
+  quarantineWriteAvailable = true,
+} = {}) {
   const calls = [];
   const recordRow = (recordId) => ({
     resource_id: recordId,
@@ -198,6 +208,16 @@ function createPool({ certificateState = "active", stepUpProofAvailable = true }
           expires_at: "2026-10-13T09:04:30.000Z",
         }] };
       }
+      if (text.includes("request_quarantine_action")) {
+        if (!quarantineWriteAvailable) throw new Error("quarantine action storage unavailable");
+        return { rowCount: 1, rows: [{
+          action_id: values[0],
+          decision_id: values[1],
+          correlation_id: values[3],
+          action_type: values[6],
+          reason_code: values[7],
+        }] };
+      }
       if (text.includes("tenant.display_name AS tenant_display_name")) {
         return { rowCount: 1, rows: [{
           tenant_display_name: "Tenant Alpha",
@@ -236,6 +256,7 @@ function repositoryWith(pool, decisions, outcome = "ALLOW") {
     authorizationMode: mode,
     policyEnforcementService: createPolicyService(decisions, outcome),
     operationIdFactory: () => ids.operation,
+    securityActionIdFactory: () => ids.securityAction,
     clock: () => new Date("2026-10-13T09:00:01.000Z"),
   });
 }
@@ -303,6 +324,77 @@ test("DENY remains non-allow and blocks protected data queries", async () => {
     }),
     AccessDeniedError,
   );
+  assert.equal(pool.calls.some(({ text }) => text.includes("FROM app.resources")), false);
+  assert.equal(pool.calls.some(({ text }) => text.includes("request_quarantine_action")), false);
+  assert.equal(pool.calls.some(({ text }) => text === "COMMIT"), false);
+  assert.equal(pool.calls.some(({ text }) => text === "ROLLBACK"), true);
+});
+
+test("QUARANTINE blocks protected data and commits a correlated action request", async () => {
+  const decisions = [];
+  const pool = createPool();
+  const request = policyRequest(11, "GET", "/v1/tenant-records");
+  const repository = repositoryWith(pool, decisions, "QUARANTINE");
+
+  await assert.rejects(
+    repository.listRecords(authentication, { policyRequest: request }),
+    AccessDeniedError,
+  );
+
+  assert.equal(pool.calls.some(({ text }) => text.includes("FROM app.resources")), false);
+  const actionRequest = pool.calls.find(({ text }) => text.includes("request_quarantine_action"));
+  assert.ok(actionRequest);
+  assert.deepEqual(actionRequest.parameters, [
+    ids.securityAction,
+    ids.decision,
+    request.requestId,
+    request.correlationId,
+    ids.certificate,
+    "record:read",
+    "restrict-access",
+    "TRUST_SCORE_QUARANTINE",
+    hash,
+    ids.transition,
+    ids.policy,
+    hashPolicyInput(decisions[0]),
+    "2026-10-13T09:00:01.000Z",
+  ]);
+  assert.equal(pool.calls.some(({ text }) => text === "COMMIT"), true);
+  assert.equal(pool.calls.some(({ text }) => text === "ROLLBACK"), false);
+});
+
+test("QUARANTINE fails closed and rolls back when its action request cannot persist", async () => {
+  const decisions = [];
+  const pool = createPool({ quarantineWriteAvailable: false });
+  const repository = repositoryWith(pool, decisions, "QUARANTINE");
+
+  await assert.rejects(
+    repository.listRecords(authentication, {
+      policyRequest: policyRequest(12, "GET", "/v1/tenant-records"),
+    }),
+    /quarantine action storage unavailable/u,
+  );
+
+  assert.equal(pool.calls.some(({ text }) => text.includes("FROM app.resources")), false);
+  assert.equal(pool.calls.some(({ text }) => text === "COMMIT"), false);
+  assert.equal(pool.calls.some(({ text }) => text === "ROLLBACK"), true);
+});
+
+test("QUARANTINE is enforced before a sensitive-operation receipt is reserved", async () => {
+  const decisions = [];
+  const pool = createPool();
+  const repository = repositoryWith(pool, decisions, "QUARANTINE");
+
+  await assert.rejects(
+    repository.exportRecords(authentication, [ids.record], {
+      idempotencyKey: "idem_018f1234-5678-7abc-8def-0123456789a5",
+      policyRequest: policyRequest(13, "POST", "/v1/tenant-records/export"),
+    }),
+    AccessDeniedError,
+  );
+
+  assert.equal(pool.calls.some(({ text }) => text.includes("request_quarantine_action")), true);
+  assert.equal(pool.calls.some(({ text }) => text.includes("reserve_api_sensitive_operation")), false);
   assert.equal(pool.calls.some(({ text }) => text.includes("FROM app.resources")), false);
 });
 

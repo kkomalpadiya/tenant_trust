@@ -77,6 +77,7 @@
     "policy-bundles:verify": "npm run test:policy && node scripts/verify-policy-bundle-validation.mjs && node scripts/verify-policy-bundle-lifecycle.mjs && npm run policy-enforcement:verify",
     "adaptive-policy:verify": "npm run test:policy && npm run policy:test && node scripts/verify-adaptive-authorization-policy.mjs && npm run policy-enforcement:verify",
     "step-up-authentication:verify": "npm run test:api && npm run policy:test && node scripts/verify-bound-step-up-authentication.mjs",
+    "policy-outcomes:verify": "npm run policy-enforcement:verify && node scripts/verify-policy-denial-quarantine-enforcement.mjs",
     "demo:review": "node apps/review-demo/server.mjs",
     "test:review-demo": "node --test apps/review-demo/test/*.test.mjs",
     "role-action-matrix:verify": "npm run test:authorization",
