@@ -28,6 +28,25 @@ node scripts/check-environment.mjs --profile=core
 
 Before running the Fabric demonstration, use `--profile=fabric`. A resource failure is a real failed check; a successful smoke test does not clear it.
 
+## Fabric audit network
+
+T8.2 adds a separately managed Fabric Compose project. Run the Fabric resource check, then start and verify the private audit network:
+
+```powershell
+npm run check:environment -- --profile=fabric
+npm run fabric:up
+npm run fabric:verify
+npm run fabric:status
+```
+
+`fabric:up` uses digest-pinned Fabric 2.5.16 peer, orderer and tools images plus Fabric CA 1.5.17. It creates ignored organization identities and channel blocks under `runtime/fabric`, preserves them on repeated starts, and joins the platform peer to both tenant channels while each tenant peer joins only its own. Fabric enrollment and TLS certificates are issued by four Fabric CAs and never reuse the step-ca SaaS certificate hierarchy. See [Reproducible private Fabric network](architecture/reproducible-private-fabric-network.md).
+
+Stop only the Fabric services while retaining their identities and ledgers:
+
+```powershell
+npm run fabric:down
+```
+
 ## Docker and Ubuntu
 
 Start Docker Desktop and wait for the Linux engine. Enable the WSL2 engine and Ubuntu integration in Docker settings if Ubuntu cannot access Docker. Confirm:

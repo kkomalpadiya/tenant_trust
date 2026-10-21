@@ -1,0 +1,323 @@
+name: tenant-trust-fabric
+
+x-ca-common: &ca-common
+  image: ${FABRIC_CA_IMAGE}
+  restart: unless-stopped
+  networks:
+    - fabric
+
+x-peer-common: &peer-common
+  image: ${FABRIC_PEER_IMAGE}
+  restart: unless-stopped
+  networks:
+    - fabric
+
+services:
+  ca-orderer:
+    <<: *ca-common
+    hostname: ca-orderer
+    environment:
+      FABRIC_CA_ORDERER_ADMIN_PASSWORD: ${FABRIC_CA_ORDERER_ADMIN_PASSWORD}
+      FABRIC_CA_SERVER_CA_NAME: ca-orderer
+      FABRIC_CA_SERVER_CSR_CN: ca-orderer
+      FABRIC_CA_SERVER_CSR_HOSTS: ca-orderer,localhost
+      FABRIC_CA_SERVER_TLS_ENABLED: "true"
+      FABRIC_CA_SERVER_PORT: "7054"
+    command: ["sh", "-c", "exec fabric-ca-server start -b \"admin:$${FABRIC_CA_ORDERER_ADMIN_PASSWORD}\""]
+    ports:
+      - "127.0.0.1:${FABRIC_CA_ORDERER_HOST_PORT}:7054"
+    volumes:
+      - ../../runtime/fabric/ca/orderer:/etc/hyperledger/fabric-ca-server
+    healthcheck:
+      test: ["CMD-SHELL", "FABRIC_CA_CLIENT_HOME=/tmp/health fabric-ca-client getcainfo -u https://localhost:7054 --caname ca-orderer --tls.certfiles /etc/hyperledger/fabric-ca-server/ca-cert.pem >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  ca-platform:
+    <<: *ca-common
+    hostname: ca-platform
+    environment:
+      FABRIC_CA_PLATFORM_ADMIN_PASSWORD: ${FABRIC_CA_PLATFORM_ADMIN_PASSWORD}
+      FABRIC_CA_SERVER_CA_NAME: ca-platform
+      FABRIC_CA_SERVER_CSR_CN: ca-platform
+      FABRIC_CA_SERVER_CSR_HOSTS: ca-platform,localhost
+      FABRIC_CA_SERVER_TLS_ENABLED: "true"
+      FABRIC_CA_SERVER_PORT: "7054"
+    command: ["sh", "-c", "exec fabric-ca-server start -b \"admin:$${FABRIC_CA_PLATFORM_ADMIN_PASSWORD}\""]
+    ports:
+      - "127.0.0.1:${FABRIC_CA_PLATFORM_HOST_PORT}:7054"
+    volumes:
+      - ../../runtime/fabric/ca/platform:/etc/hyperledger/fabric-ca-server
+    healthcheck:
+      test: ["CMD-SHELL", "FABRIC_CA_CLIENT_HOME=/tmp/health fabric-ca-client getcainfo -u https://localhost:7054 --caname ca-platform --tls.certfiles /etc/hyperledger/fabric-ca-server/ca-cert.pem >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  ca-alpha:
+    <<: *ca-common
+    hostname: ca-alpha
+    environment:
+      FABRIC_CA_ALPHA_ADMIN_PASSWORD: ${FABRIC_CA_ALPHA_ADMIN_PASSWORD}
+      FABRIC_CA_SERVER_CA_NAME: ca-alpha
+      FABRIC_CA_SERVER_CSR_CN: ca-alpha
+      FABRIC_CA_SERVER_CSR_HOSTS: ca-alpha,localhost
+      FABRIC_CA_SERVER_TLS_ENABLED: "true"
+      FABRIC_CA_SERVER_PORT: "7054"
+    command: ["sh", "-c", "exec fabric-ca-server start -b \"admin:$${FABRIC_CA_ALPHA_ADMIN_PASSWORD}\""]
+    ports:
+      - "127.0.0.1:${FABRIC_CA_ALPHA_HOST_PORT}:7054"
+    volumes:
+      - ../../runtime/fabric/ca/alpha:/etc/hyperledger/fabric-ca-server
+    healthcheck:
+      test: ["CMD-SHELL", "FABRIC_CA_CLIENT_HOME=/tmp/health fabric-ca-client getcainfo -u https://localhost:7054 --caname ca-alpha --tls.certfiles /etc/hyperledger/fabric-ca-server/ca-cert.pem >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  ca-beta:
+    <<: *ca-common
+    hostname: ca-beta
+    environment:
+      FABRIC_CA_BETA_ADMIN_PASSWORD: ${FABRIC_CA_BETA_ADMIN_PASSWORD}
+      FABRIC_CA_SERVER_CA_NAME: ca-beta
+      FABRIC_CA_SERVER_CSR_CN: ca-beta
+      FABRIC_CA_SERVER_CSR_HOSTS: ca-beta,localhost
+      FABRIC_CA_SERVER_TLS_ENABLED: "true"
+      FABRIC_CA_SERVER_PORT: "7054"
+    command: ["sh", "-c", "exec fabric-ca-server start -b \"admin:$${FABRIC_CA_BETA_ADMIN_PASSWORD}\""]
+    ports:
+      - "127.0.0.1:${FABRIC_CA_BETA_HOST_PORT}:7054"
+    volumes:
+      - ../../runtime/fabric/ca/beta:/etc/hyperledger/fabric-ca-server
+    healthcheck:
+      test: ["CMD-SHELL", "FABRIC_CA_CLIENT_HOME=/tmp/health fabric-ca-client getcainfo -u https://localhost:7054 --caname ca-beta --tls.certfiles /etc/hyperledger/fabric-ca-server/ca-cert.pem >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  ca-bootstrap:
+    image: ${FABRIC_CA_IMAGE}
+    profiles: ["tools"]
+    depends_on:
+      ca-orderer:
+        condition: service_healthy
+      ca-platform:
+        condition: service_healthy
+      ca-alpha:
+        condition: service_healthy
+      ca-beta:
+        condition: service_healthy
+    environment:
+      FABRIC_CA_ORDERER_ADMIN_PASSWORD: ${FABRIC_CA_ORDERER_ADMIN_PASSWORD}
+      FABRIC_CA_PLATFORM_ADMIN_PASSWORD: ${FABRIC_CA_PLATFORM_ADMIN_PASSWORD}
+      FABRIC_CA_ALPHA_ADMIN_PASSWORD: ${FABRIC_CA_ALPHA_ADMIN_PASSWORD}
+      FABRIC_CA_BETA_ADMIN_PASSWORD: ${FABRIC_CA_BETA_ADMIN_PASSWORD}
+      FABRIC_ORDERER_SECRET: ${FABRIC_ORDERER_SECRET}
+      FABRIC_ORDERER_ORG_ADMIN_SECRET: ${FABRIC_ORDERER_ORG_ADMIN_SECRET}
+      FABRIC_PLATFORM_PEER_SECRET: ${FABRIC_PLATFORM_PEER_SECRET}
+      FABRIC_PLATFORM_ORG_ADMIN_SECRET: ${FABRIC_PLATFORM_ORG_ADMIN_SECRET}
+      FABRIC_AUDIT_WRITER_SECRET: ${FABRIC_AUDIT_WRITER_SECRET}
+      FABRIC_AUDIT_VERIFIER_SECRET: ${FABRIC_AUDIT_VERIFIER_SECRET}
+      FABRIC_AUDIT_LISTENER_SECRET: ${FABRIC_AUDIT_LISTENER_SECRET}
+      FABRIC_ALPHA_PEER_SECRET: ${FABRIC_ALPHA_PEER_SECRET}
+      FABRIC_ALPHA_ORG_ADMIN_SECRET: ${FABRIC_ALPHA_ORG_ADMIN_SECRET}
+      FABRIC_ALPHA_AUDITOR_SECRET: ${FABRIC_ALPHA_AUDITOR_SECRET}
+      FABRIC_BETA_PEER_SECRET: ${FABRIC_BETA_PEER_SECRET}
+      FABRIC_BETA_ORG_ADMIN_SECRET: ${FABRIC_BETA_ORG_ADMIN_SECRET}
+      FABRIC_BETA_AUDITOR_SECRET: ${FABRIC_BETA_AUDITOR_SECRET}
+    entrypoint: ["/bin/sh", "/scripts/bootstrap-identities.sh"]
+    volumes:
+      - ../../runtime/fabric:/fabric
+      - ./bootstrap-identities.sh:/scripts/bootstrap-identities.sh:ro
+      - ./msp-config.yaml:/scripts/msp-config.yaml:ro
+    networks:
+      - fabric
+
+  orderer0.audit.tenant-trust.test:
+    image: ${FABRIC_ORDERER_IMAGE}
+    hostname: orderer0.audit.tenant-trust.test
+    environment:
+      FABRIC_LOGGING_SPEC: INFO
+      ORDERER_GENERAL_LISTENADDRESS: 0.0.0.0
+      ORDERER_GENERAL_LISTENPORT: "7050"
+      ORDERER_GENERAL_LOCALMSPID: TenantTrustOrdererMSP
+      ORDERER_GENERAL_LOCALMSPDIR: /var/hyperledger/orderer/msp
+      ORDERER_GENERAL_BOOTSTRAPMETHOD: none
+      ORDERER_CHANNELPARTICIPATION_ENABLED: "true"
+      ORDERER_GENERAL_TLS_ENABLED: "true"
+      ORDERER_GENERAL_TLS_PRIVATEKEY: /var/hyperledger/orderer/tls/server.key
+      ORDERER_GENERAL_TLS_CERTIFICATE: /var/hyperledger/orderer/tls/server.crt
+      ORDERER_GENERAL_TLS_ROOTCAS: '[/var/hyperledger/orderer/tls/ca.crt]'
+      ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE: /var/hyperledger/orderer/tls/server.crt
+      ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY: /var/hyperledger/orderer/tls/server.key
+      ORDERER_GENERAL_CLUSTER_ROOTCAS: '[/var/hyperledger/orderer/tls/ca.crt]'
+      ORDERER_ADMIN_LISTENADDRESS: 0.0.0.0:9443
+      ORDERER_ADMIN_TLS_ENABLED: "true"
+      ORDERER_ADMIN_TLS_PRIVATEKEY: /var/hyperledger/orderer/tls/server.key
+      ORDERER_ADMIN_TLS_CERTIFICATE: /var/hyperledger/orderer/tls/server.crt
+      ORDERER_ADMIN_TLS_CLIENTROOTCAS: '[/var/hyperledger/orderer/tls/ca.crt]'
+      ORDERER_OPERATIONS_LISTENADDRESS: 0.0.0.0:9444
+      ORDERER_OPERATIONS_TLS_ENABLED: "false"
+      ORDERER_METRICS_PROVIDER: disabled
+    ports:
+      - "127.0.0.1:${FABRIC_ORDERER_HOST_PORT}:7050"
+      - "127.0.0.1:${FABRIC_ORDERER_ADMIN_HOST_PORT}:9443"
+    volumes:
+      - ../../runtime/fabric/organizations/ordererOrganizations/audit.tenant-trust.test/orderers/orderer0.audit.tenant-trust.test/msp:/var/hyperledger/orderer/msp:ro
+      - ../../runtime/fabric/organizations/ordererOrganizations/audit.tenant-trust.test/orderers/orderer0.audit.tenant-trust.test/tls:/var/hyperledger/orderer/tls:ro
+      - orderer-data:/var/hyperledger/production/orderer
+    restart: unless-stopped
+    networks:
+      - fabric
+
+  peer0.platform.audit.tenant-trust.test:
+    <<: *peer-common
+    hostname: peer0.platform.audit.tenant-trust.test
+    environment:
+      FABRIC_LOGGING_SPEC: INFO
+      CORE_PEER_ID: peer0.platform.audit.tenant-trust.test
+      CORE_PEER_ADDRESS: peer0.platform.audit.tenant-trust.test:7051
+      CORE_PEER_LISTENADDRESS: 0.0.0.0:7051
+      CORE_PEER_CHAINCODEADDRESS: peer0.platform.audit.tenant-trust.test:7052
+      CORE_PEER_CHAINCODELISTENADDRESS: 0.0.0.0:7052
+      CORE_PEER_GOSSIP_EXTERNALENDPOINT: peer0.platform.audit.tenant-trust.test:7051
+      CORE_PEER_GOSSIP_BOOTSTRAP: ""
+      CORE_PEER_GOSSIP_USELEADERELECTION: "true"
+      CORE_PEER_GOSSIP_ORGLEADER: "false"
+      CORE_PEER_LOCALMSPID: PlatformAuditMSP
+      CORE_PEER_MSPCONFIGPATH: /etc/hyperledger/fabric/msp
+      CORE_PEER_TLS_ENABLED: "true"
+      CORE_PEER_TLS_CERT_FILE: /etc/hyperledger/fabric/tls/server.crt
+      CORE_PEER_TLS_KEY_FILE: /etc/hyperledger/fabric/tls/server.key
+      CORE_PEER_TLS_ROOTCERT_FILE: /etc/hyperledger/fabric/tls/ca.crt
+      CORE_LEDGER_STATE_STATEDATABASE: goleveldb
+      CORE_OPERATIONS_LISTENADDRESS: 0.0.0.0:9444
+      CORE_OPERATIONS_TLS_ENABLED: "false"
+      CORE_METRICS_PROVIDER: disabled
+    ports:
+      - "127.0.0.1:${FABRIC_PLATFORM_PEER_HOST_PORT}:7051"
+    volumes:
+      - ../../runtime/fabric/organizations/peerOrganizations/platform.audit.tenant-trust.test/peers/peer0.platform.audit.tenant-trust.test/msp:/etc/hyperledger/fabric/msp:ro
+      - ../../runtime/fabric/organizations/peerOrganizations/platform.audit.tenant-trust.test/peers/peer0.platform.audit.tenant-trust.test/tls:/etc/hyperledger/fabric/tls:ro
+      - platform-peer-data:/var/hyperledger/production
+    healthcheck:
+      test: ["CMD", "peer", "node", "status"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 8s
+
+  peer0.alpha.audit.tenant-trust.test:
+    <<: *peer-common
+    hostname: peer0.alpha.audit.tenant-trust.test
+    environment:
+      FABRIC_LOGGING_SPEC: INFO
+      CORE_PEER_ID: peer0.alpha.audit.tenant-trust.test
+      CORE_PEER_ADDRESS: peer0.alpha.audit.tenant-trust.test:7051
+      CORE_PEER_LISTENADDRESS: 0.0.0.0:7051
+      CORE_PEER_CHAINCODEADDRESS: peer0.alpha.audit.tenant-trust.test:7052
+      CORE_PEER_CHAINCODELISTENADDRESS: 0.0.0.0:7052
+      CORE_PEER_GOSSIP_EXTERNALENDPOINT: peer0.alpha.audit.tenant-trust.test:7051
+      CORE_PEER_GOSSIP_BOOTSTRAP: ""
+      CORE_PEER_GOSSIP_USELEADERELECTION: "true"
+      CORE_PEER_GOSSIP_ORGLEADER: "false"
+      CORE_PEER_LOCALMSPID: TenantAlphaAuditMSP
+      CORE_PEER_MSPCONFIGPATH: /etc/hyperledger/fabric/msp
+      CORE_PEER_TLS_ENABLED: "true"
+      CORE_PEER_TLS_CERT_FILE: /etc/hyperledger/fabric/tls/server.crt
+      CORE_PEER_TLS_KEY_FILE: /etc/hyperledger/fabric/tls/server.key
+      CORE_PEER_TLS_ROOTCERT_FILE: /etc/hyperledger/fabric/tls/ca.crt
+      CORE_LEDGER_STATE_STATEDATABASE: goleveldb
+      CORE_OPERATIONS_LISTENADDRESS: 0.0.0.0:9444
+      CORE_OPERATIONS_TLS_ENABLED: "false"
+      CORE_METRICS_PROVIDER: disabled
+    ports:
+      - "127.0.0.1:${FABRIC_ALPHA_PEER_HOST_PORT}:7051"
+    volumes:
+      - ../../runtime/fabric/organizations/peerOrganizations/alpha.audit.tenant-trust.test/peers/peer0.alpha.audit.tenant-trust.test/msp:/etc/hyperledger/fabric/msp:ro
+      - ../../runtime/fabric/organizations/peerOrganizations/alpha.audit.tenant-trust.test/peers/peer0.alpha.audit.tenant-trust.test/tls:/etc/hyperledger/fabric/tls:ro
+      - alpha-peer-data:/var/hyperledger/production
+    healthcheck:
+      test: ["CMD", "peer", "node", "status"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 8s
+
+  peer0.beta.audit.tenant-trust.test:
+    <<: *peer-common
+    hostname: peer0.beta.audit.tenant-trust.test
+    environment:
+      FABRIC_LOGGING_SPEC: INFO
+      CORE_PEER_ID: peer0.beta.audit.tenant-trust.test
+      CORE_PEER_ADDRESS: peer0.beta.audit.tenant-trust.test:7051
+      CORE_PEER_LISTENADDRESS: 0.0.0.0:7051
+      CORE_PEER_CHAINCODEADDRESS: peer0.beta.audit.tenant-trust.test:7052
+      CORE_PEER_CHAINCODELISTENADDRESS: 0.0.0.0:7052
+      CORE_PEER_GOSSIP_EXTERNALENDPOINT: peer0.beta.audit.tenant-trust.test:7051
+      CORE_PEER_GOSSIP_BOOTSTRAP: ""
+      CORE_PEER_GOSSIP_USELEADERELECTION: "true"
+      CORE_PEER_GOSSIP_ORGLEADER: "false"
+      CORE_PEER_LOCALMSPID: TenantBetaAuditMSP
+      CORE_PEER_MSPCONFIGPATH: /etc/hyperledger/fabric/msp
+      CORE_PEER_TLS_ENABLED: "true"
+      CORE_PEER_TLS_CERT_FILE: /etc/hyperledger/fabric/tls/server.crt
+      CORE_PEER_TLS_KEY_FILE: /etc/hyperledger/fabric/tls/server.key
+      CORE_PEER_TLS_ROOTCERT_FILE: /etc/hyperledger/fabric/tls/ca.crt
+      CORE_LEDGER_STATE_STATEDATABASE: goleveldb
+      CORE_OPERATIONS_LISTENADDRESS: 0.0.0.0:9444
+      CORE_OPERATIONS_TLS_ENABLED: "false"
+      CORE_METRICS_PROVIDER: disabled
+    ports:
+      - "127.0.0.1:${FABRIC_BETA_PEER_HOST_PORT}:7051"
+    volumes:
+      - ../../runtime/fabric/organizations/peerOrganizations/beta.audit.tenant-trust.test/peers/peer0.beta.audit.tenant-trust.test/msp:/etc/hyperledger/fabric/msp:ro
+      - ../../runtime/fabric/organizations/peerOrganizations/beta.audit.tenant-trust.test/peers/peer0.beta.audit.tenant-trust.test/tls:/etc/hyperledger/fabric/tls:ro
+      - beta-peer-data:/var/hyperledger/production
+    healthcheck:
+      test: ["CMD", "peer", "node", "status"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 8s
+
+  channel-bootstrap:
+    image: ${FABRIC_TOOLS_IMAGE}
+    profiles: ["tools"]
+    entrypoint: ["/bin/sh", "/scripts/create-channels.sh"]
+    volumes:
+      - ../../runtime/fabric:/fabric
+      - ./configtx.yaml:/etc/hyperledger/fabric-config/configtx.yaml:ro
+      - ./create-channels.sh:/scripts/create-channels.sh:ro
+    networks:
+      - fabric
+
+  network-verify:
+    image: ${FABRIC_TOOLS_IMAGE}
+    profiles: ["tools"]
+    entrypoint: ["/bin/sh", "/scripts/verify-network.sh"]
+    volumes:
+      - ../../runtime/fabric:/fabric:ro
+      - ./verify-network.sh:/scripts/verify-network.sh:ro
+    networks:
+      - fabric
+
+volumes:
+  orderer-data:
+    name: ${FABRIC_ORDERER_VOLUME_NAME}
+  platform-peer-data:
+    name: ${FABRIC_PLATFORM_PEER_VOLUME_NAME}
+  alpha-peer-data:
+    name: ${FABRIC_ALPHA_PEER_VOLUME_NAME}
+  beta-peer-data:
+    name: ${FABRIC_BETA_PEER_VOLUME_NAME}
+
+networks:
+  fabric:
+    name: ${FABRIC_NETWORK_NAME}

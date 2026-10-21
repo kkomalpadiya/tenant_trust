@@ -1,0 +1,197 @@
+Organizations:
+  - &TenantTrustOrdererOrg
+    Name: TenantTrustOrdererMSP
+    ID: TenantTrustOrdererMSP
+    MSPDir: /fabric/organizations/ordererOrganizations/audit.tenant-trust.test/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('TenantTrustOrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('TenantTrustOrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('TenantTrustOrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer0.audit.tenant-trust.test:7050
+
+  - &PlatformAuditOrg
+    Name: PlatformAuditMSP
+    ID: PlatformAuditMSP
+    MSPDir: /fabric/organizations/peerOrganizations/platform.audit.tenant-trust.test/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('PlatformAuditMSP.admin', 'PlatformAuditMSP.peer', 'PlatformAuditMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('PlatformAuditMSP.admin', 'PlatformAuditMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('PlatformAuditMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('PlatformAuditMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.platform.audit.tenant-trust.test
+        Port: 7051
+
+  - &TenantAlphaAuditOrg
+    Name: TenantAlphaAuditMSP
+    ID: TenantAlphaAuditMSP
+    MSPDir: /fabric/organizations/peerOrganizations/alpha.audit.tenant-trust.test/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('TenantAlphaAuditMSP.admin', 'TenantAlphaAuditMSP.peer', 'TenantAlphaAuditMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('TenantAlphaAuditMSP.admin', 'TenantAlphaAuditMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('TenantAlphaAuditMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('TenantAlphaAuditMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.alpha.audit.tenant-trust.test
+        Port: 7051
+
+  - &TenantBetaAuditOrg
+    Name: TenantBetaAuditMSP
+    ID: TenantBetaAuditMSP
+    MSPDir: /fabric/organizations/peerOrganizations/beta.audit.tenant-trust.test/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('TenantBetaAuditMSP.admin', 'TenantBetaAuditMSP.peer', 'TenantBetaAuditMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('TenantBetaAuditMSP.admin', 'TenantBetaAuditMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('TenantBetaAuditMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('TenantBetaAuditMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.beta.audit.tenant-trust.test
+        Port: 7051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  ACLs:
+    _lifecycle/CommitChaincodeDefinition: /Channel/Application/Writers
+    _lifecycle/QueryChaincodeDefinition: /Channel/Application/Readers
+    _lifecycle/QueryChaincodeDefinitions: /Channel/Application/Readers
+    lscc/ChaincodeExists: /Channel/Application/Readers
+    lscc/GetDeploymentSpec: /Channel/Application/Readers
+    lscc/GetChaincodeData: /Channel/Application/Readers
+    lscc/GetInstantiatedChaincodes: /Channel/Application/Readers
+    qscc/GetChainInfo: /Channel/Application/Readers
+    qscc/GetBlockByNumber: /Channel/Application/Readers
+    qscc/GetBlockByHash: /Channel/Application/Readers
+    qscc/GetTransactionByID: /Channel/Application/Readers
+    qscc/GetBlockByTxID: /Channel/Application/Readers
+    cscc/GetConfigBlock: /Channel/Application/Readers
+    cscc/GetChannelConfig: /Channel/Application/Readers
+    peer/Propose: /Channel/Application/Writers
+    peer/ChaincodeToChaincode: /Channel/Application/Writers
+    event/Block: /Channel/Application/Readers
+    event/FilteredBlock: /Channel/Application/Readers
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer0.audit.tenant-trust.test:7050
+  EtcdRaft:
+    Consenters:
+      - Host: orderer0.audit.tenant-trust.test
+        Port: 7050
+        ClientTLSCert: /fabric/organizations/ordererOrganizations/audit.tenant-trust.test/orderers/orderer0.audit.tenant-trust.test/tls/server.crt
+        ServerTLSCert: /fabric/organizations/ordererOrganizations/audit.tenant-trust.test/orderers/orderer0.audit.tenant-trust.test/tls/server.crt
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 10 MB
+    PreferredMaxBytes: 2 MB
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  TenantAlphaAuditChannel:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *TenantTrustOrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *PlatformAuditOrg
+        - *TenantAlphaAuditOrg
+
+  TenantBetaAuditChannel:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *TenantTrustOrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *PlatformAuditOrg
+        - *TenantBetaAuditOrg
