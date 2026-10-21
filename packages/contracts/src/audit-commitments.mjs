@@ -123,7 +123,7 @@ export function assertSelectedAuditEvent(event) {
   return recordType;
 }
 
-function assertLedgerValue(value) {
+export function assertAuditLedgerValue(value) {
   if (!isPlainObject(value)) throw new TypeError("ledgerValue must be a plain JSON object");
   const keys = Object.keys(value).sort();
   if (keys.length !== AUDIT_LEDGER_VALUE_FIELDS.length
@@ -181,7 +181,7 @@ function sameSha256(left, right) {
 
 export function verifyAuditCommitment({ channelName, event, ledgerKey, ledgerValue }) {
   try {
-    assertLedgerValue(ledgerValue);
+    assertAuditLedgerValue(ledgerValue);
     const expected = buildAuditCommitment({ channelName, event });
     return ledgerKey === expected.ledgerKey
       && ledgerValue.recordType === expected.ledgerValue.recordType

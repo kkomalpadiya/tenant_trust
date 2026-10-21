@@ -86,6 +86,7 @@
     "fabric-topology:verify": "node scripts/verify-fabric-topology.mjs",
     "audit-commitments:verify": "npm run test:contracts && node scripts/verify-audit-commitment-contract.mjs",
     "fabric-chaincode:verify": "npm run test:audit-chaincode && node scripts/verify-fabric-network-definition.mjs && npm run fabric:verify",
+    "fabric-gateway:verify": "node --test apps/api/test/fabric-audit-gateway.test.mjs && node scripts/verify-fabric-network-definition.mjs && node scripts/verify-fabric-gateway.mjs",
     "fabric:up": "node scripts/fabric-network.mjs up",
     "fabric:verify": "node scripts/fabric-network.mjs verify",
     "fabric:status": "node scripts/fabric-network.mjs status",

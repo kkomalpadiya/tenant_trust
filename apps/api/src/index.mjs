@@ -1,5 +1,11 @@
 export { createGatewayRequestAuthenticator, createTenantTrustApi } from "./app.mjs";
 export {
+  FABRIC_AUDIT_GATEWAY_POLICY,
+  FabricAuditGatewayError,
+  connectFabricAuditGatewayFromEnvironment,
+  createFabricAuditGateway,
+} from "./fabric-audit-gateway.mjs";
+export {
   AccessDeniedError,
   QuarantineEnforcedError,
   createPostgresTenantRepository,
