@@ -23,6 +23,7 @@ import {
   POLICY_ENFORCEMENT_POLICY,
   assertPolicyEnforcementService,
 } from "./policy-enforcement.mjs";
+import { createPolicyDecisionProvenance } from "./policy-decision-provenance.mjs";
 import {
   STEP_UP_POLICY,
   StepUpAuthenticationError,
@@ -51,6 +52,13 @@ export class QuarantineEnforcedError extends AccessDeniedError {
   constructor() {
     super();
     this.name = "QuarantineEnforcedError";
+  }
+}
+
+class RecordedPolicyDenialError extends AccessDeniedError {
+  constructor() {
+    super();
+    this.name = "RecordedPolicyDenialError";
   }
 }
 
@@ -316,6 +324,16 @@ export function createPostgresTenantRepository({
       policyRequest: { ...policyRequest, stepUp },
       signal,
     });
+    const provenance = createPolicyDecisionProvenance(evaluation);
+    const recorded = await query(
+      "SELECT (audit.record_policy_decision_provenance($1, $2)).*",
+      [provenance.canonicalJson, provenance.hashSha256],
+    );
+    if (recorded.rowCount !== 1
+      || recorded.rows[0].decision_id !== evaluation.decision.decisionId
+      || recorded.rows[0].provenance_hash_sha256 !== provenance.hashSha256) {
+      throw new Error("Policy decision provenance persistence was not confirmed.");
+    }
     if (evaluation.decision.outcome === "QUARANTINE") {
       const actionId = createSecurityActionId(securityActionIdFactory);
       const quarantine = evaluation.decision.obligations.quarantine;
@@ -344,7 +362,7 @@ export function createPostgresTenantRepository({
       throw new QuarantineEnforcedError();
     }
     if (evaluation.decision.outcome !== POLICY_ENFORCEMENT_POLICY.onlyAllowingOutcome) {
-      throw new AccessDeniedError();
+      throw new RecordedPolicyDenialError();
     }
   }
 
@@ -433,7 +451,9 @@ export function createPostgresTenantRepository({
       await query("COMMIT");
       return result;
     } catch (error) {
-      if (transactionStarted && error instanceof QuarantineEnforcedError && !signal?.aborted) {
+      if (transactionStarted
+        && (error instanceof QuarantineEnforcedError || error instanceof RecordedPolicyDenialError)
+        && !signal?.aborted) {
         try {
           await client.query("COMMIT");
           transactionStarted = false;
@@ -443,6 +463,7 @@ export function createPostgresTenantRepository({
           if (isTimeoutError(commitError, signal)) throw new RequestTimeoutError();
           throw commitError;
         }
+        if (error instanceof RecordedPolicyDenialError) throw new AccessDeniedError();
         throw error;
       }
       if (transactionStarted) await rollbackQuietly(client);

@@ -14,6 +14,10 @@ export {
   hashPolicyInput,
 } from "./policy-enforcement.mjs";
 export {
+  POLICY_DECISION_PROVENANCE_POLICY,
+  createPolicyDecisionProvenance,
+} from "./policy-decision-provenance.mjs";
+export {
   CertificateNotAcceptedError,
   REQUEST_STATE_POLICY,
   RequestStateUnavailableError,

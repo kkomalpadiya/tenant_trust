@@ -97,6 +97,7 @@ npm run request-safeguards:verify
 npm run protected-saas:verify
 npm run policy-resilience:verify
 npm run policy-matrix:verify
+npm run policy-provenance:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -133,6 +134,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run policy-resilience:verify` is the T7.7 outage and state-freshness gate. It proves OPA timeout and response failures cannot reuse an allow, stale or in-flight-expiring trust cannot reach protected data, the API exposes only a non-cacheable generic unavailable response, and the actor-bound certificate lookup serializes lifecycle updates without granting the runtime role direct `UPDATE`. Apply migration `028_policy_state_freshness_controls.sql` first. See [Policy outage and state-freshness controls](architecture/policy-outage-state-freshness.md).
 
 `npm run policy-matrix:verify` is the T7.8 adaptive-policy matrix gate. It verifies all supported actions plus exact and decimal score boundaries, roles, resource sensitivities, different valid tenant configurations and expired step-up proof through the pinned OPA image and API output contract. It requires Docker and `.env`, but does not require running services or mutate persistent infrastructure. See [Adaptive policy matrix verification](architecture/policy-matrix-verification.md).
+
+`npm run policy-provenance:verify` is the T7.9 complete decision-provenance gate. It proves that every contract-valid adaptive decision is canonically hashed and durably bound to its server request, result, certificate and authority versions, trust transition and explanation digest, active policy bundle and canonical input digest. It also checks fail-closed persistence, exact-replay idempotency, cross-tenant rejection, least privilege and append-only enforcement. Apply migration `029_policy_decision_provenance.sql` first. Database fixtures roll back. See [Policy decision provenance](architecture/policy-decision-provenance.md).
 
 `npm run trust-engine:verify` is the Phase 6 completion gate. It runs the full repository suite and deterministic calibration fixtures, then verifies scoring boundaries, missing/stale behavior, recovery, replay/flood safeguards, tenant-scoped state/configuration, evidence consumption, explanations and the internal lookup against PostgreSQL. The fixtures remain explicitly labelled as unvalidated prototype defaults and do not establish effectiveness. See [Adaptive trust-engine verification and calibration fixtures](architecture/trust-engine-verification.md).
 

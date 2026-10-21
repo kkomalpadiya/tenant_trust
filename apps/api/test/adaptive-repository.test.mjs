@@ -88,7 +88,7 @@ function outputFor(input, outcome = "ALLOW") {
   return {
     schemaVersion: "1.0.0",
     contractId: "opa-decision-output-v1",
-    decisionId: ids.decision,
+    decisionId: input.requestContext.requestId.replace(/^req_/u, "dec_"),
     requestId: input.requestContext.requestId,
     correlationId: input.requestContext.correlationId,
     tenantId: input.tenantContext.tenantId,
@@ -146,6 +146,7 @@ function createPool({
   certificateState = "active",
   stepUpProofAvailable = true,
   quarantineWriteAvailable = true,
+  provenanceWriteAvailable = true,
 } = {}) {
   const calls = [];
   const recordRow = (recordId) => ({
@@ -218,6 +219,14 @@ function createPool({
           reason_code: values[7],
         }] };
       }
+      if (text.includes("record_policy_decision_provenance")) {
+        if (!provenanceWriteAvailable) throw new Error("policy provenance storage unavailable");
+        const document = JSON.parse(values[0]);
+        return { rowCount: 1, rows: [{
+          decision_id: document.decision.decisionId,
+          provenance_hash_sha256: values[1],
+        }] };
+      }
       if (text.includes("tenant.display_name AS tenant_display_name")) {
         return { rowCount: 1, rows: [{
           tenant_display_name: "Tenant Alpha",
@@ -263,7 +272,8 @@ function repositoryWith(pool, decisions, outcome = "ALLOW") {
 
 test("every protected repository operation requires an OPA ALLOW decision", async () => {
   const decisions = [];
-  const repository = repositoryWith(createPool(), decisions);
+  const pool = createPool();
+  const repository = repositoryWith(pool, decisions);
 
   await repository.getProfile(authentication, { policyRequest: policyRequest(1) });
   await repository.listRecords(authentication, { policyRequest: policyRequest(2, "GET", "/v1/tenant-records") });
@@ -286,6 +296,34 @@ test("every protected repository operation requires an OPA ALLOW decision", asyn
     "record:export",
     "tenant:admin",
   ]);
+  const provenanceDocuments = pool.calls
+    .filter(({ text }) => text.includes("record_policy_decision_provenance"))
+    .map(({ parameters }) => JSON.parse(parameters[0]));
+  assert.equal(provenanceDocuments.length, 5);
+  assert.deepEqual(
+    provenanceDocuments.map(({ request }) => request.action),
+    decisions.map(({ action }) => action),
+  );
+  assert.ok(provenanceDocuments.every(({ trustState }) => trustState.transitionId === ids.transition));
+  assert.ok(provenanceDocuments.every(({ policy }) => policy.policyVersionId === ids.policy));
+  assert.ok(provenanceDocuments.every(({ decision }) => decision.outcome === "ALLOW"));
+});
+
+test("a protected result cannot proceed when decision provenance is unavailable", async () => {
+  const decisions = [];
+  const pool = createPool({ provenanceWriteAvailable: false });
+  const repository = repositoryWith(pool, decisions);
+
+  await assert.rejects(
+    repository.listRecords(authentication, {
+      policyRequest: policyRequest(14, "GET", "/v1/tenant-records"),
+    }),
+    /policy provenance storage unavailable/u,
+  );
+  assert.equal(decisions.length, 1);
+  assert.equal(pool.calls.some(({ text }) => text.includes("FROM app.resources")), false);
+  assert.equal(pool.calls.some(({ text }) => text === "COMMIT"), false);
+  assert.equal(pool.calls.some(({ text }) => text === "ROLLBACK"), true);
 });
 
 test("a revoked certificate cannot reach OPA even with a maximum trust score", async () => {
@@ -326,8 +364,9 @@ test("DENY remains non-allow and blocks protected data queries", async () => {
   );
   assert.equal(pool.calls.some(({ text }) => text.includes("FROM app.resources")), false);
   assert.equal(pool.calls.some(({ text }) => text.includes("request_quarantine_action")), false);
-  assert.equal(pool.calls.some(({ text }) => text === "COMMIT"), false);
-  assert.equal(pool.calls.some(({ text }) => text === "ROLLBACK"), true);
+  assert.equal(pool.calls.some(({ text }) => text.includes("record_policy_decision_provenance")), true);
+  assert.equal(pool.calls.some(({ text }) => text === "COMMIT"), true);
+  assert.equal(pool.calls.some(({ text }) => text === "ROLLBACK"), false);
 });
 
 test("QUARANTINE blocks protected data and commits a correlated action request", async () => {
@@ -346,7 +385,7 @@ test("QUARANTINE blocks protected data and commits a correlated action request",
   assert.ok(actionRequest);
   assert.deepEqual(actionRequest.parameters, [
     ids.securityAction,
-    ids.decision,
+    request.requestId.replace(/^req_/u, "dec_"),
     request.requestId,
     request.correlationId,
     ids.certificate,
