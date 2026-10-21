@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { assertAuditLedgerValue, buildAuditCommitment } from "@tenant-trust/contracts/audit-commitments";
+export {
+  AuditVerificationError,
+  createCausalAuditVerifier,
+  createPostgresCausalAuditVerificationRepository,
+} from "./verification.mjs";
 
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const EVENT_ID = /^evt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
