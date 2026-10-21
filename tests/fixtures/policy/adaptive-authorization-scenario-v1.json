@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "1.0.0",
+  "fixtureId": "adaptive-authorization-scenario-v1",
+  "calibrationStatus": "UNVALIDATED_PROTOTYPE_DEFAULTS",
+  "effectivenessClaim": false,
+  "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+  "subjectId": "sub_018f1234-5678-7abc-8def-0123456789ac",
+  "certificateId": "crt_018f1234-5678-7abc-8def-0123456789a1",
+  "issuerId": "iss_018f1234-5678-7abc-8def-0123456789b4",
+  "trustConfiguration": {
+    "modelVersion": "1.0.0",
+    "configurationVersion": 1,
+    "initialScore": 60,
+    "smoothingAlpha": 0.3,
+    "staleAfterSeconds": 3600,
+    "weights": {
+      "identity": 0.2,
+      "device": 0.25,
+      "behaviour": 0.25,
+      "certificate": 0.15,
+      "compliance": 0.15
+    }
+  },
+  "baseline": {
+    "transitionId": "trn_018f1234-5678-7abc-8def-0123456789a1",
+    "eventId": "evt_018f1234-5678-7abc-8def-0123456789a1",
+    "correlationId": "cor_018f1234-5678-7abc-8def-0123456789a1",
+    "updateVersion": 1,
+    "observedSecondsBeforeRun": 120,
+    "evaluatedSecondsBeforeRun": 110,
+    "components": {
+      "identity": 90,
+      "device": 90,
+      "behaviour": 90,
+      "certificate": 90,
+      "compliance": 90
+    },
+    "evidenceReferences": [
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c1", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d1", "evidenceType": "identity" },
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c2", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d2", "evidenceType": "device" },
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c3", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d3", "evidenceType": "behaviour" },
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c4", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d4", "evidenceType": "certificate" },
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c5", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d5", "evidenceType": "compliance" }
+    ],
+    "causationId": "evt_018f1234-5678-7abc-8def-0123456789d3",
+    "source": {
+      "sourceId": "src_018f1234-5678-7abc-8def-0123456789b8",
+      "maximumInfluence": 0.25,
+      "corroboratingSourceIds": []
+    },
+    "criticalEvidence": null,
+    "expected": {
+      "weightedScore": 90,
+      "smoothedScore": 69,
+      "score": 69,
+      "band": "medium",
+      "transition": "held"
+    }
+  },
+  "riskyEvidence": {
+    "transitionId": "trn_018f1234-5678-7abc-8def-0123456789a2",
+    "eventId": "evt_018f1234-5678-7abc-8def-0123456789a2",
+    "correlationId": "cor_018f1234-5678-7abc-8def-0123456789a2",
+    "updateVersion": 2,
+    "observedSecondsBeforeRun": 30,
+    "evaluatedSecondsBeforeRun": 20,
+    "components": {
+      "identity": 90,
+      "device": 90,
+      "behaviour": 0,
+      "certificate": 90,
+      "compliance": 90
+    },
+    "evidenceReferences": [
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c1", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d1", "evidenceType": "identity" },
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c2", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d2", "evidenceType": "device" },
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c6", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d6", "evidenceType": "behaviour" },
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c4", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d4", "evidenceType": "certificate" },
+      { "evidenceId": "evd_018f1234-5678-7abc-8def-0123456789c5", "sourceEventId": "evt_018f1234-5678-7abc-8def-0123456789d5", "evidenceType": "compliance" }
+    ],
+    "causationId": "evt_018f1234-5678-7abc-8def-0123456789d6",
+    "source": {
+      "sourceId": "src_018f1234-5678-7abc-8def-0123456789b8",
+      "maximumInfluence": 0.25,
+      "corroboratingSourceIds": []
+    },
+    "criticalEvidence": {
+      "kind": "account-takeover-pattern",
+      "componentId": "behaviour"
+    },
+    "expected": {
+      "weightedScore": 67.5,
+      "smoothedScore": 68.55,
+      "score": 20,
+      "band": "low",
+      "transition": "critical-override"
+    }
+  },
+  "requests": {
+    "normalAccess": {
+      "requestId": "req_018f1234-5678-7abc-8def-0123456789e0",
+      "correlationId": "cor_018f1234-5678-7abc-8def-0123456789e0",
+      "action": "profile:read",
+      "expectedOutcome": "ALLOW",
+      "expectedReasonCode": "POLICY_ALLOW"
+    },
+    "baselineExport": {
+      "requestId": "req_018f1234-5678-7abc-8def-0123456789e1",
+      "correlationId": "cor_018f1234-5678-7abc-8def-0123456789e1",
+      "action": "record:export",
+      "proofIdHashSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "expectedOutcome": "ALLOW",
+      "expectedReasonCode": "POLICY_ALLOW"
+    },
+    "restrictedExport": {
+      "requestId": "req_018f1234-5678-7abc-8def-0123456789e2",
+      "correlationId": "cor_018f1234-5678-7abc-8def-0123456789e2",
+      "action": "record:export",
+      "proofIdHashSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expectedOutcome": "QUARANTINE",
+      "expectedReasonCode": "TRUST_SCORE_QUARANTINE",
+      "expectedActionType": "restrict-access"
+    }
+  }
+}

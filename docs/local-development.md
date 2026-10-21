@@ -98,6 +98,8 @@ npm run protected-saas:verify
 npm run policy-resilience:verify
 npm run policy-matrix:verify
 npm run policy-provenance:verify
+npm run adaptive-authorization-scenario:verify
+npm run context-aware-authorization:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -136,6 +138,10 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run policy-matrix:verify` is the T7.8 adaptive-policy matrix gate. It verifies all supported actions plus exact and decimal score boundaries, roles, resource sensitivities, different valid tenant configurations and expired step-up proof through the pinned OPA image and API output contract. It requires Docker and `.env`, but does not require running services or mutate persistent infrastructure. See [Adaptive policy matrix verification](architecture/policy-matrix-verification.md).
 
 `npm run policy-provenance:verify` is the T7.9 complete decision-provenance gate. It proves that every contract-valid adaptive decision is canonically hashed and durably bound to its server request, result, certificate and authority versions, trust transition and explanation digest, active policy bundle and canonical input digest. It also checks fail-closed persistence, exact-replay idempotency, cross-tenant rejection, least privilege and append-only enforcement. Apply migration `029_policy_decision_provenance.sql` first. Database fixtures roll back. See [Policy decision provenance](architecture/policy-decision-provenance.md).
+
+`npm run adaptive-authorization-scenario:verify` is the focused T7.10 scenario. The same valid active certificate first receives normal access and an allowed, step-up-bound sensitive export at trust 69. New account-takeover behavior evidence creates a complete critical-override explanation, lowers controlled trust to 20 and changes a fresh sensitive-export request to `QUARANTINE`. The pinned OPA output passes the API contract and canonical provenance binds the result to the new transition and explanation digest. The fixture remains an unvalidated deterministic prototype case and makes no detection-effectiveness claim.
+
+`npm run context-aware-authorization:verify` is the complete Phase 7 gate. It runs every Phase 7 contract, lifecycle, policy, step-up, outcome, resilience, matrix, provenance and scenario check in fail-fast order. Start the local stack, provision the demo and apply migrations through `029_policy_decision_provenance.sql` first. Database fixtures used by the component gates roll back. Use `--scenario-only` only for focused diagnosis. See [Context-aware authorization verification](architecture/context-aware-authorization-verification.md).
 
 `npm run trust-engine:verify` is the Phase 6 completion gate. It runs the full repository suite and deterministic calibration fixtures, then verifies scoring boundaries, missing/stale behavior, recovery, replay/flood safeguards, tenant-scoped state/configuration, evidence consumption, explanations and the internal lookup against PostgreSQL. The fixtures remain explicitly labelled as unvalidated prototype defaults and do not establish effectiveness. See [Adaptive trust-engine verification and calibration fixtures](architecture/trust-engine-verification.md).
 
