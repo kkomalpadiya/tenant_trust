@@ -1,0 +1,187 @@
+{
+  "schemaVersion": "1.0.0",
+  "networkName": "tenant-trust-audit",
+  "channelParticipationApi": true,
+  "systemChannel": false,
+  "stateDatabase": "goleveldb",
+  "chaincode": {
+    "name": "tenant-trust-audit",
+    "language": "typescript",
+    "identityRoleAttribute": "tenantTrust.role"
+  },
+  "identityBoundary": {
+    "authority": "fabric-ca",
+    "oneEnrollmentAuthorityPerMsp": true,
+    "reusesSaasPki": false,
+    "generatedMaterialLocation": "runtime/fabric",
+    "commitGeneratedMaterial": false
+  },
+  "ordering": {
+    "consensus": "etcdraft",
+    "mspId": "TenantTrustOrdererMSP",
+    "localNodeCount": 1,
+    "productionMinimumNodeCount": 3,
+    "highAvailabilityClaimed": false,
+    "nodes": [
+      "orderer0.audit.tenant-trust.test"
+    ]
+  },
+  "peerOrganizations": [
+    {
+      "name": "platform-audit",
+      "mspId": "PlatformAuditMSP",
+      "peers": [
+        "peer0.platform.audit.tenant-trust.test"
+      ],
+      "roles": [
+        "audit-writer",
+        "audit-verifier",
+        "audit-commit-listener"
+      ]
+    },
+    {
+      "name": "tenant-alpha-audit",
+      "mspId": "TenantAlphaAuditMSP",
+      "peers": [
+        "peer0.alpha.audit.tenant-trust.test"
+      ],
+      "roles": [
+        "tenant-auditor"
+      ]
+    },
+    {
+      "name": "tenant-beta-audit",
+      "mspId": "TenantBetaAuditMSP",
+      "peers": [
+        "peer0.beta.audit.tenant-trust.test"
+      ],
+      "roles": [
+        "tenant-auditor"
+      ]
+    }
+  ],
+  "tenants": [
+    {
+      "slug": "tenant-alpha",
+      "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+      "mspId": "TenantAlphaAuditMSP",
+      "channel": "tt-audit-alpha-v1"
+    },
+    {
+      "slug": "tenant-beta",
+      "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ac",
+      "mspId": "TenantBetaAuditMSP",
+      "channel": "tt-audit-beta-v1"
+    }
+  ],
+  "channels": [
+    {
+      "name": "tt-audit-alpha-v1",
+      "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ab",
+      "ordererMspId": "TenantTrustOrdererMSP",
+      "peerMspIds": [
+        "PlatformAuditMSP",
+        "TenantAlphaAuditMSP"
+      ],
+      "anchorPeers": [
+        "peer0.platform.audit.tenant-trust.test",
+        "peer0.alpha.audit.tenant-trust.test"
+      ],
+      "policies": {
+        "readers": "OR('PlatformAuditMSP.member','TenantAlphaAuditMSP.member')",
+        "writers": "OR('PlatformAuditMSP.member','TenantAlphaAuditMSP.member')",
+        "admins": "AND('PlatformAuditMSP.admin','TenantAlphaAuditMSP.admin')",
+        "lifecycleEndorsement": "AND('PlatformAuditMSP.peer','TenantAlphaAuditMSP.peer')",
+        "endorsement": "AND('PlatformAuditMSP.peer','TenantAlphaAuditMSP.peer')"
+      },
+      "permissions": {
+        "submitCommitment": [
+          {
+            "mspId": "PlatformAuditMSP",
+            "role": "audit-writer"
+          }
+        ],
+        "queryCommitment": [
+          {
+            "mspId": "PlatformAuditMSP",
+            "role": "audit-verifier"
+          },
+          {
+            "mspId": "TenantAlphaAuditMSP",
+            "role": "tenant-auditor"
+          }
+        ],
+        "listenForCommits": [
+          {
+            "mspId": "PlatformAuditMSP",
+            "role": "audit-commit-listener"
+          },
+          {
+            "mspId": "TenantAlphaAuditMSP",
+            "role": "tenant-auditor"
+          }
+        ]
+      },
+      "publicState": "commitments-only",
+      "privateDataCollections": []
+    },
+    {
+      "name": "tt-audit-beta-v1",
+      "tenantId": "tnt_018f1234-5678-7abc-8def-0123456789ac",
+      "ordererMspId": "TenantTrustOrdererMSP",
+      "peerMspIds": [
+        "PlatformAuditMSP",
+        "TenantBetaAuditMSP"
+      ],
+      "anchorPeers": [
+        "peer0.platform.audit.tenant-trust.test",
+        "peer0.beta.audit.tenant-trust.test"
+      ],
+      "policies": {
+        "readers": "OR('PlatformAuditMSP.member','TenantBetaAuditMSP.member')",
+        "writers": "OR('PlatformAuditMSP.member','TenantBetaAuditMSP.member')",
+        "admins": "AND('PlatformAuditMSP.admin','TenantBetaAuditMSP.admin')",
+        "lifecycleEndorsement": "AND('PlatformAuditMSP.peer','TenantBetaAuditMSP.peer')",
+        "endorsement": "AND('PlatformAuditMSP.peer','TenantBetaAuditMSP.peer')"
+      },
+      "permissions": {
+        "submitCommitment": [
+          {
+            "mspId": "PlatformAuditMSP",
+            "role": "audit-writer"
+          }
+        ],
+        "queryCommitment": [
+          {
+            "mspId": "PlatformAuditMSP",
+            "role": "audit-verifier"
+          },
+          {
+            "mspId": "TenantBetaAuditMSP",
+            "role": "tenant-auditor"
+          }
+        ],
+        "listenForCommits": [
+          {
+            "mspId": "PlatformAuditMSP",
+            "role": "audit-commit-listener"
+          },
+          {
+            "mspId": "TenantBetaAuditMSP",
+            "role": "tenant-auditor"
+          }
+        ]
+      },
+      "publicState": "commitments-only",
+      "privateDataCollections": []
+    }
+  ],
+  "dataBoundary": {
+    "rawEvidenceOnChain": false,
+    "detailedApplicationStateOnChain": false,
+    "plainTenantIdOnChain": false,
+    "plainSubjectOrResourceIdOnChain": false,
+    "commitmentPreimagesOffChain": true,
+    "crossTenantSharedApplicationChannel": false
+  }
+}

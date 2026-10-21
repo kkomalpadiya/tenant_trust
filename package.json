@@ -83,6 +83,7 @@
     "policy-provenance:verify": "npm run test:api && node scripts/verify-policy-decision-provenance.mjs",
     "adaptive-authorization-scenario:verify": "node scripts/verify-adaptive-authorization-scenario.mjs",
     "context-aware-authorization:verify": "node scripts/verify-context-aware-authorization-phase.mjs",
+    "fabric-topology:verify": "node scripts/verify-fabric-topology.mjs",
     "demo:review": "node apps/review-demo/server.mjs",
     "test:review-demo": "node --test apps/review-demo/test/*.test.mjs",
     "role-action-matrix:verify": "npm run test:authorization",

@@ -79,4 +79,4 @@ Production high availability, billing/subscriptions, external customer onboardin
 
 ## Remaining implementation decisions
 
-Application languages, frontend framework, runtime targets and initial resource budgets are defined in [the technology stack](architecture/technology-stack.md). The second factor, certificate status mechanism, Fabric topology, detailed thresholds and reporting deadline remain decisions for their respective tasks. This document does not claim those components are already implemented or experimentally validated.
+Application languages, frontend framework, runtime targets and initial resource budgets are defined in [the technology stack](architecture/technology-stack.md). The [Fabric topology and audit permission design](architecture/fabric-topology-and-audit-permissions.md) now fixes the two local tenant channels, their organizations, endorsement and visibility boundaries, but no Fabric network is running yet. The final second-factor mechanism, detailed thresholds and reporting deadline remain decisions for their respective tasks. This document does not claim those components are already implemented or experimentally validated.
