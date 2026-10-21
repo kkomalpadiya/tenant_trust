@@ -15,7 +15,7 @@ try {
   assert.equal(apiSource.includes("FABRIC_GATEWAY_WRITER_MSP_PATH"), false);
   assert.equal(apiSource.includes("FABRIC_GATEWAY_VERIFIER_MSP_PATH"), false);
   assert.equal(apiSource.includes("/v1/audit"), false);
-  assert.deepEqual(Object.keys(client).sort(), ["close", "policy", "readCommitment", "submitCommitment"]);
+  assert.deepEqual(Object.keys(client).sort(), ["close", "policy", "queryTransactionStatus", "readCommitment", "submitCommitment"]);
   assert.equal(JSON.stringify(client).includes("PRIVATE KEY"), false);
 
   for (const tenant of topology.tenants) {
@@ -30,8 +30,16 @@ try {
     });
     const first = await client.submitCommitment({ tenantId: tenant.tenantId, ledgerValue });
     assert(new Set(["created", "duplicate"]).has(first.status));
+    const firstStatus = await first.waitForCommit();
+    assert.equal(firstStatus.successful, true);
+    assert.equal(firstStatus.transactionId, first.transactionId);
+    assert.deepEqual(await client.queryTransactionStatus({ tenantId: tenant.tenantId, transactionId: first.transactionId }), {
+      ...firstStatus,
+      source: "qscc",
+    });
     const retry = await client.submitCommitment({ tenantId: tenant.tenantId, ledgerValue });
     assert.equal(retry.status, "duplicate");
+    assert.equal((await retry.waitForCommit()).successful, true);
     assert.deepEqual(
       await client.readCommitment({
         tenantId: tenant.tenantId,

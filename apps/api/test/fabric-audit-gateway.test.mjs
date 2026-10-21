@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import fabricProtos from "@hyperledger/fabric-protos";
 import {
   FABRIC_AUDIT_GATEWAY_POLICY,
   FabricAuditGatewayError,
@@ -11,6 +12,7 @@ const topology = JSON.parse(await readFile(new URL("../../../config/fabric-topol
 const alphaTenantId = "tnt_018f1234-5678-7abc-8def-0123456789ab";
 const betaTenantId = "tnt_018f1234-5678-7abc-8def-0123456789ac";
 const hash = (character) => character.repeat(64);
+const transactionId = hash("c");
 const ledgerValue = Object.freeze({
   canonicalizationProfile: "tenant-trust-audit-commitment-json-v1",
   commitmentHashSha256: hash("b"),
@@ -25,16 +27,32 @@ function gatewayFixture() {
   let writerClosed = 0;
   let verifierClosed = 0;
   let transportClosed = 0;
-  const contract = (mode, channelName) => ({
-    async submitTransaction(name, value) {
-      calls.push({ mode, channelName, operation: "submit", name, value });
-      return Buffer.from(JSON.stringify({
-        ledgerKey: `audit~${ledgerValue.recordType}~${ledgerValue.eventKeyHashSha256}`,
-        status: "created",
-      }));
+  const contract = (mode, channelName, chaincodeName) => ({
+    async submitAsync(name, options) {
+      calls.push({ mode, channelName, operation: "submit", name, options });
+      return {
+        getResult: () => Buffer.from(JSON.stringify({
+          ledgerKey: `audit~${ledgerValue.recordType}~${ledgerValue.eventKeyHashSha256}`,
+          status: "created",
+        })),
+        getTransactionId: () => transactionId,
+        getStatus: async () => ({ transactionId, code: 0, successful: true, blockNumber: 42n }),
+      };
     },
     async evaluateTransaction(name, recordType, eventKeyHashSha256) {
       calls.push({ mode, channelName, operation: "evaluate", name, recordType, eventKeyHashSha256 });
+      if (chaincodeName === "qscc" && name === "GetTransactionByID") {
+        const processed = new fabricProtos.peer.ProcessedTransaction();
+        processed.setValidationcode(0);
+        return processed.serializeBinary();
+      }
+      if (chaincodeName === "qscc" && name === "GetBlockByTxID") {
+        const header = new fabricProtos.common.BlockHeader();
+        header.setNumber(42);
+        const block = new fabricProtos.common.Block();
+        block.setHeader(header);
+        return block.serializeBinary();
+      }
       return Buffer.from(JSON.stringify(ledgerValue));
     },
   });
@@ -42,7 +60,7 @@ function gatewayFixture() {
     getNetwork(channelName) {
       return { getContract: (chaincodeName, contractName) => {
         calls.push({ mode: "writer", channelName, operation: "contract", chaincodeName, contractName });
-        return contract("writer", channelName);
+        return contract("writer", channelName, chaincodeName);
       } };
     },
     close() { writerClosed += 1; },
@@ -51,7 +69,7 @@ function gatewayFixture() {
     getNetwork(channelName) {
       return { getContract: (chaincodeName, contractName) => {
         calls.push({ mode: "verifier", channelName, operation: "contract", chaincodeName, contractName });
-        return contract("verifier", channelName);
+        return contract("verifier", channelName, chaincodeName);
       } };
     },
     close() { verifierClosed += 1; },
@@ -73,10 +91,11 @@ test("submissions derive the tenant channel and use only the writer session", as
   const fixture = gatewayFixture();
   const result = await fixture.client.submitCommitment({ tenantId: alphaTenantId, ledgerValue });
 
-  assert.deepEqual(result, {
-    ledgerKey: `audit~trust-transition~${hash("a")}`,
-    status: "created",
-  });
+  assert.equal(result.ledgerKey, `audit~trust-transition~${hash("a")}`);
+  assert.equal(result.status, "created");
+  assert.equal(result.transactionId, transactionId);
+  assert.deepEqual(await result.waitForCommit(), { transactionId, validationCode: 0, successful: true,
+    blockNumber: "42", source: "gateway-status" });
   assert.deepEqual(fixture.calls[0], {
     mode: "writer",
     channelName: "tt-audit-alpha-v1",
@@ -86,6 +105,15 @@ test("submissions derive the tenant channel and use only the writer session", as
   });
   assert.equal(fixture.calls[1].mode, "writer");
   assert.equal(fixture.calls.some(({ mode }) => mode === "verifier"), false);
+});
+
+test("restart reconciliation reads transaction validation and block through QSCC", async () => {
+  const fixture = gatewayFixture();
+  assert.deepEqual(await fixture.client.queryTransactionStatus({ tenantId: alphaTenantId, transactionId }), {
+    transactionId, validationCode: 0, successful: true, blockNumber: "42", source: "qscc",
+  });
+  assert.equal(fixture.calls[0].chaincodeName, "qscc");
+  assert.equal(fixture.calls.filter(({ operation }) => operation === "evaluate").length, 2);
 });
 
 test("queries derive the other tenant channel and use only the verifier session", async () => {
@@ -158,7 +186,7 @@ test("invalid commitments and mismatched ledger results fail closed", async () =
 
 test("the public client surface contains operations and policy, never sessions or credentials", () => {
   const fixture = gatewayFixture();
-  assert.deepEqual(Object.keys(fixture.client).sort(), ["close", "policy", "readCommitment", "submitCommitment"]);
+  assert.deepEqual(Object.keys(fixture.client).sort(), ["close", "policy", "queryTransactionStatus", "readCommitment", "submitCommitment"]);
   assert.equal(JSON.stringify(fixture.client).includes("PRIVATE KEY"), false);
   assert.equal(JSON.stringify(fixture.client).includes("credentials"), false);
 

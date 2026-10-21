@@ -95,13 +95,16 @@ try {
     workerId: "audit-worker.verify-live",
     outbox: repository,
     gateway: {
+      async queryTransactionStatus() {
+        throw Object.assign(new Error("simulated Fabric outage"), { reasonCode: "TRANSACTION_STATUS_QUERY_FAILED" });
+      },
       async submitCommitment() {
         throw Object.assign(new Error("simulated Fabric outage"), { reasonCode: "SUBMISSION_FAILED" });
       },
     },
   });
   const failed = await unavailableWorker.runOnce();
-  assert.equal(failed.status, "retry-scheduled");
+  assert.equal(failed.status, "failed");
   const persistedFailure = await pool.query(
     `SELECT status, attempt_count, last_failure_code
      FROM audit.fabric_commitment_outbox
@@ -109,7 +112,7 @@ try {
     [tenantId, eventId],
   );
   assert.deepEqual(persistedFailure.rows[0], {
-    status: "pending",
+    status: "failed",
     attempt_count: 1,
     last_failure_code: "SUBMISSION_FAILED",
   });
@@ -118,36 +121,74 @@ try {
     `UPDATE audit.fabric_commitment_outbox
      SET next_attempt_at = created_at,
          updated_at = GREATEST(updated_at, clock_timestamp())
-     WHERE tenant_id = $1 AND event_id = $2 AND status = 'pending'`,
+     WHERE tenant_id = $1 AND event_id = $2 AND status = 'failed'`,
     [tenantId, eventId],
   );
-  const liveWorker = createAuditOutboxWorker({
+  const gapWorker = createAuditOutboxWorker({
     workerId: "audit-worker.verify-live",
     outbox: repository,
-    gateway,
+    gateway: {
+      queryTransactionStatus: gateway.queryTransactionStatus,
+      async submitCommitment(request) {
+        const submitted = await gateway.submitCommitment(request);
+        return {
+          ...submitted,
+          async waitForCommit() {
+            await submitted.waitForCommit();
+            throw Object.assign(new Error("simulated status response loss"), { reasonCode: "COMMIT_STATUS_UNAVAILABLE" });
+          },
+        };
+      },
+    },
   });
-  const delivered = await liveWorker.runOnce();
-  assert.equal(delivered.status, "submitted");
-  assert(new Set(["created", "duplicate"]).has(delivered.submissionStatus));
-  assert.equal(delivered.attemptCount, 2);
+  const gap = await gapWorker.runOnce();
+  assert.equal(gap.status, "confirmation-pending");
+  assert.equal(typeof gap.transactionId, "string");
+
+  const persistedGap = await pool.query(
+    `SELECT status, attempt_count, transaction_id, last_failure_code
+     FROM audit.fabric_commitment_outbox WHERE tenant_id = $1 AND event_id = $2`,
+    [tenantId, eventId],
+  );
+  assert.deepEqual(persistedGap.rows[0], {
+    status: "submitted",
+    attempt_count: 2,
+    transaction_id: gap.transactionId,
+    last_failure_code: "COMMIT_STATUS_UNAVAILABLE",
+  });
+
+  await pool.query(
+    `UPDATE audit.fabric_commitment_outbox SET next_confirmation_at = submitted_at,
+       updated_at = GREATEST(updated_at, clock_timestamp())
+     WHERE tenant_id = $1 AND event_id = $2 AND status = 'submitted'`,
+    [tenantId, eventId],
+  );
+  const restartedWorker = createAuditOutboxWorker({ workerId: "audit-worker.verify-restarted", outbox: repository, gateway });
+  const delivered = await restartedWorker.runOnce();
+  assert.equal(delivered.status, "committed");
+  assert.equal(delivered.transactionId, gap.transactionId);
+  assert.equal(delivered.confirmationSource, "qscc");
 
   const stored = await pool.query(
-    `SELECT status, attempt_count, submission_status, last_failure_code
+    `SELECT status, attempt_count, submission_status, transaction_id, validation_code,
+       block_number::text, confirmation_source, last_failure_code
      FROM audit.fabric_commitment_outbox
      WHERE tenant_id = $1 AND event_id = $2`,
     [tenantId, eventId],
   );
-  assert.deepEqual(stored.rows[0], {
-    status: "submitted",
-    attempt_count: 2,
-    submission_status: delivered.submissionStatus,
-    last_failure_code: null,
-  });
+  assert.equal(stored.rows[0].status, "committed");
+  assert.equal(stored.rows[0].attempt_count, 2);
+  assert(new Set(["created", "duplicate"]).has(stored.rows[0].submission_status));
+  assert.equal(stored.rows[0].transaction_id, gap.transactionId);
+  assert.equal(stored.rows[0].validation_code, 0);
+  assert.equal(stored.rows[0].block_number, delivered.blockNumber);
+  assert.equal(stored.rows[0].confirmation_source, "qscc");
+  assert.equal(stored.rows[0].last_failure_code, null);
   assert.deepEqual(
     await gateway.readCommitment({
       tenantId,
       recordType: "trust-transition",
-      eventKeyHashSha256: delivered.ledgerKey.slice(delivered.ledgerKey.lastIndexOf("~") + 1),
+      eventKeyHashSha256: queued.ledgerKey.slice(queued.ledgerKey.lastIndexOf("~") + 1),
     }),
     (await pool.query(
       "SELECT ledger_value FROM audit.fabric_commitment_outbox WHERE tenant_id = $1 AND event_id = $2",
@@ -155,7 +196,7 @@ try {
     )).rows[0].ledger_value,
   );
 
-  console.log("Audit outbox worker verified: a simulated ledger outage persisted a retry, then the live Fabric Gateway delivered the same commitment idempotently.");
+  console.log("Audit outbox reconciliation verified: a failed submission stayed visible, a lost commit response persisted its transaction ID, and a restarted worker reconciled it through QSCC before marking committed.");
 } finally {
   await pool.query(
     "DELETE FROM audit.fabric_commitment_outbox WHERE tenant_id = $1 AND event_id = $2",

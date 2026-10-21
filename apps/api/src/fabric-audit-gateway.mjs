@@ -3,6 +3,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import * as grpc from "@grpc/grpc-js";
 import { connect, hash, signers } from "@hyperledger/fabric-gateway";
+import fabricProtos from "@hyperledger/fabric-protos";
 import { assertAuditLedgerValue } from "@tenant-trust/contracts/audit-commitments";
 
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -12,6 +13,7 @@ const SERVER_NAME = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/u;
 const RESPONSE_STATUS = new Set(["created", "duplicate"]);
 const SUBMIT_FIELDS = ["ledgerValue", "tenantId"];
 const READ_FIELDS = ["eventKeyHashSha256", "recordType", "tenantId"];
+const STATUS_FIELDS = ["tenantId", "transactionId"];
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
 export const FABRIC_AUDIT_GATEWAY_POLICY = Object.freeze({
@@ -91,6 +93,24 @@ function expectedLedgerKey(ledgerValue) {
   return `audit~${ledgerValue.recordType}~${ledgerValue.eventKeyHashSha256}`;
 }
 
+function validatedCommitStatus(status, source, transactionId) {
+  const validationCode = Number(status?.code ?? status?.validationCode);
+  const blockNumber = status?.blockNumber;
+  if (status?.transactionId !== transactionId
+      || !Number.isSafeInteger(validationCode)
+      || validationCode < 0
+      || (typeof blockNumber !== "bigint" && !Number.isSafeInteger(blockNumber))) {
+    fail("COMMIT_STATUS_INVALID");
+  }
+  return Object.freeze({
+    transactionId,
+    validationCode,
+    successful: validationCode === 0,
+    blockNumber: blockNumber.toString(),
+    source,
+  });
+}
+
 export function createFabricAuditGateway({ topology, writerGateway, verifierGateway, closeTransport = () => {} } = {}) {
   if (!writerGateway || typeof writerGateway.getNetwork !== "function") {
     throw new TypeError("A Fabric Gateway writer session is required.");
@@ -102,6 +122,7 @@ export function createFabricAuditGateway({ topology, writerGateway, verifierGate
   const channels = buildChannelMap(topology);
   const writerContracts = new Map();
   const verifierContracts = new Map();
+  const verifierSystemContracts = new Map();
   let closed = false;
 
   function channelForTenant(tenantId) {
@@ -112,13 +133,23 @@ export function createFabricAuditGateway({ topology, writerGateway, verifierGate
     return channelName;
   }
 
-  function contractFor(gateway, cache, channelName) {
+  function contractFor(gateway, cache, channelName, chaincodeName = FABRIC_AUDIT_GATEWAY_POLICY.chaincodeName,
+    contractName = FABRIC_AUDIT_GATEWAY_POLICY.contractName) {
     let contract = cache.get(channelName);
     if (!contract) {
       contract = gateway
         .getNetwork(channelName)
-        .getContract(FABRIC_AUDIT_GATEWAY_POLICY.chaincodeName, FABRIC_AUDIT_GATEWAY_POLICY.contractName);
+        .getContract(chaincodeName, contractName);
       cache.set(channelName, contract);
+    }
+    return contract;
+  }
+
+  function systemContractFor(channelName) {
+    let contract = verifierSystemContracts.get(channelName);
+    if (!contract) {
+      contract = verifierGateway.getNetwork(channelName).getContract("qscc");
+      verifierSystemContracts.set(channelName, contract);
     }
     return contract;
   }
@@ -129,10 +160,11 @@ export function createFabricAuditGateway({ topology, writerGateway, verifierGate
     assertAuditLedgerValue(request.ledgerValue);
     const ledgerKey = expectedLedgerKey(request.ledgerValue);
     let response;
+    let submitted;
     try {
-      const result = await contractFor(writerGateway, writerContracts, channelName)
-        .submitTransaction("CommitCommitment", JSON.stringify(request.ledgerValue));
-      response = parseJsonResult(result, "SUBMISSION_RESULT_INVALID");
+      submitted = await contractFor(writerGateway, writerContracts, channelName)
+        .submitAsync("CommitCommitment", { arguments: [JSON.stringify(request.ledgerValue)] });
+      response = parseJsonResult(submitted.getResult(), "SUBMISSION_RESULT_INVALID");
     } catch (error) {
       if (error instanceof FabricAuditGatewayError) throw error;
       fail("SUBMISSION_FAILED", error);
@@ -145,7 +177,49 @@ export function createFabricAuditGateway({ topology, writerGateway, verifierGate
       || !RESPONSE_STATUS.has(response.status)) {
       fail("SUBMISSION_RESULT_INVALID");
     }
-    return Object.freeze({ ledgerKey, status: response.status });
+    const transactionId = submitted.getTransactionId();
+    if (!SHA256.test(transactionId ?? "")) fail("TRANSACTION_ID_INVALID");
+    let commitStatusPromise;
+    return Object.freeze({
+      ledgerKey,
+      status: response.status,
+      transactionId,
+      waitForCommit() {
+        commitStatusPromise ??= submitted.getStatus()
+          .then((status) => validatedCommitStatus(status, "gateway-status", transactionId))
+          .catch((error) => {
+            if (error instanceof FabricAuditGatewayError) throw error;
+            fail("COMMIT_STATUS_UNAVAILABLE", error);
+          });
+        return commitStatusPromise;
+      },
+    });
+  }
+
+  async function queryTransactionStatus(request) {
+    assertExactFields(request, STATUS_FIELDS, "transaction status query");
+    const channelName = channelForTenant(request.tenantId);
+    if (!SHA256.test(request.transactionId ?? "")) {
+      throw new TypeError("transactionId must be a lowercase SHA-256 digest.");
+    }
+    try {
+      const contract = systemContractFor(channelName);
+      const [processedBytes, blockBytes] = await Promise.all([
+        contract.evaluateTransaction("GetTransactionByID", channelName, request.transactionId),
+        contract.evaluateTransaction("GetBlockByTxID", channelName, request.transactionId),
+      ]);
+      const processed = fabricProtos.peer.ProcessedTransaction.deserializeBinary(processedBytes);
+      const block = fabricProtos.common.Block.deserializeBinary(blockBytes);
+      const blockNumber = block.getHeader()?.getNumber();
+      return validatedCommitStatus({
+        transactionId: request.transactionId,
+        validationCode: processed.getValidationcode(),
+        blockNumber,
+      }, "qscc", request.transactionId);
+    } catch (error) {
+      if (error instanceof FabricAuditGatewayError) throw error;
+      fail("TRANSACTION_STATUS_QUERY_FAILED", error);
+    }
   }
 
   async function readCommitment(request) {
@@ -182,6 +256,7 @@ export function createFabricAuditGateway({ topology, writerGateway, verifierGate
     closed = true;
     writerContracts.clear();
     verifierContracts.clear();
+    verifierSystemContracts.clear();
     try {
       writerGateway.close();
     } finally {
@@ -196,6 +271,7 @@ export function createFabricAuditGateway({ topology, writerGateway, verifierGate
   return Object.freeze({
     policy: FABRIC_AUDIT_GATEWAY_POLICY,
     submitCommitment,
+    queryTransactionStatus,
     readCommitment,
     close,
   });

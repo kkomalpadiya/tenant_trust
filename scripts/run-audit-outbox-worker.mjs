@@ -62,10 +62,12 @@ try {
   while (!stop.signal.aborted) {
     try {
       const result = await worker.runOnce();
-      if (result.status === "submitted") {
-        console.log(`Submitted audit event ${result.eventId} (${result.submissionStatus}).`);
-      } else if (result.status === "retry-scheduled") {
-        console.warn(`Audit event ${result.eventId} scheduled for retry (${result.failureCode}).`);
+      if (result.status === "committed") {
+        console.log(`Committed audit event ${result.eventId} in block ${result.blockNumber} (${result.confirmationSource}).`);
+      } else if (result.status === "confirmation-pending") {
+        console.warn(`Audit event ${result.eventId} awaits reconciliation (${result.failureCode}).`);
+      } else if (result.status === "failed") {
+        console.warn(`Audit event ${result.eventId} failed and is scheduled for retry (${result.failureCode ?? `validation-${result.validationCode}`}).`);
       } else {
         await delay(pollIntervalMilliseconds, undefined, { signal: stop.signal });
       }

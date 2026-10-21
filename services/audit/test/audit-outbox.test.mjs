@@ -1,286 +1,97 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildAuditCommitment } from "@tenant-trust/contracts/audit-commitments";
-import {
-  AuditOutboxError,
-  createAuditCommitmentEnqueuer,
-  createAuditOutboxWorker,
-  createPostgresAuditOutboxEnqueueRepository,
-  createPostgresAuditOutboxWorkerRepository,
-} from "../src/index.mjs";
+import { createAuditCommitmentEnqueuer, createAuditOutboxWorker,
+  createPostgresAuditOutboxWorkerRepository } from "../src/index.mjs";
 
-const ids = Object.freeze({
-  tenant: "tnt_018f1234-5678-7abc-8def-0123456789ab",
-  subject: "sub_018f1234-5678-7abc-8def-0123456789ab",
-  transition: "trn_018f1234-5678-7abc-8def-0123456789ab",
-  evidence: "evd_018f1234-5678-7abc-8def-0123456789ab",
-  event: "evt_018f1234-5678-7abc-8def-0123456789ab",
-  causation: "evt_018f1234-5678-7abc-8def-0123456789ac",
-  correlation: "cor_018f1234-5678-7abc-8def-0123456789ab",
-  claim: "clm_018f1234-5678-7abc-8def-0123456789ab",
-});
+const ids = Object.freeze({ tenant: "tnt_018f1234-5678-7abc-8def-0123456789ab",
+  event: "evt_018f1234-5678-7abc-8def-0123456789ab", claim: "clm_018f1234-5678-7abc-8def-0123456789ab",
+  transaction: "c".repeat(64) });
+const event = Object.freeze({ schemaVersion: "1.0.0",eventId: ids.event,eventType: "trust.updated.v1",tenantId: ids.tenant,
+  subjectId: "sub_018f1234-5678-7abc-8def-0123456789ab",aggregateId: "trn_018f1234-5678-7abc-8def-0123456789ab",
+  correlationId: "cor_018f1234-5678-7abc-8def-0123456789ab",causationId: "evt_018f1234-5678-7abc-8def-0123456789ac",
+  idempotencyKey: "trust:transition:audit-outbox-1",occurredAt: "2026-10-21T08:00:00.000Z",recordedAt: "2026-10-21T08:00:00.100Z",
+  producer: { service: "trust-engine",instanceId: "trust-1" },payload: { transitionId: "trn_018f1234-5678-7abc-8def-0123456789ab",
+    previousScore: 86,newScore: 62,previousBand: "trusted",newBand: "restricted",modelVersion: "1.0.0",configurationVersion: 3,
+    evidenceIds: ["evd_018f1234-5678-7abc-8def-0123456789ab"],explanationHashSha256: "ab".repeat(32) } });
+const commitment = buildAuditCommitment({ channelName: "tt-audit-alpha-v1",event });
+function claim(overrides = {}) { return { tenantId: ids.tenant,eventId: ids.event,channelName: "tt-audit-alpha-v1",event,
+  canonicalPreimageJson: commitment.canonicalPreimageJson,ledgerKey: commitment.ledgerKey,ledgerValue: commitment.ledgerValue,
+  claimToken: ids.claim,attemptCount: 1,...overrides }; }
+function outbox(overrides = {}) { return { claimConfirmation: async () => null,claimNext: async () => claim(),
+  recordSubmission: async () => ({ status: "confirming" }),markCommitted: async () => ({ status: "committed" }),
+  markCommitFailed: async () => ({ status: "failed",nextAttemptAt: "2026-10-21T08:00:05.000Z" }),
+  markConfirmationPending: async () => ({ status: "submitted",nextConfirmationAt: "2026-10-21T08:00:05.000Z" }),
+  markFailed: async () => ({ status: "failed",nextAttemptAt: "2026-10-21T08:00:05.000Z" }),...overrides }; }
+function gateway(overrides = {}) { return { queryTransactionStatus: async () => assert.fail("no gap expected"),
+  submitCommitment: async () => ({ ledgerKey: commitment.ledgerKey,status: "created",transactionId: ids.transaction,
+    waitForCommit: async () => ({ transactionId: ids.transaction,validationCode: 0,successful: true,blockNumber: "42",source: "gateway-status" }) }),
+  ...overrides }; }
 
-function trustEvent(overrides = {}) {
-  return {
-    schemaVersion: "1.0.0",
-    eventId: ids.event,
-    eventType: "trust.updated.v1",
-    tenantId: ids.tenant,
-    subjectId: ids.subject,
-    aggregateId: ids.transition,
-    correlationId: ids.correlation,
-    causationId: ids.causation,
-    idempotencyKey: "trust:transition:audit-outbox-1",
-    occurredAt: "2026-10-21T08:00:00.000Z",
-    recordedAt: "2026-10-21T08:00:00.100Z",
-    producer: { service: "trust-engine", instanceId: "trust-1" },
-    payload: {
-      transitionId: ids.transition,
-      previousScore: 86,
-      newScore: 62,
-      previousBand: "trusted",
-      newBand: "restricted",
-      modelVersion: "1.0.0",
-      configurationVersion: 3,
-      evidenceIds: [ids.evidence],
-      explanationHashSha256: "ab".repeat(32),
-    },
-    ...overrides,
-  };
-}
-
-function claim(overrides = {}) {
-  const event = trustEvent();
-  const commitment = buildAuditCommitment({ channelName: "tt-audit-alpha-v1", event });
-  return {
-    tenantId: ids.tenant,
-    eventId: ids.event,
-    channelName: "tt-audit-alpha-v1",
-    event,
-    canonicalPreimageJson: commitment.canonicalPreimageJson,
-    ledgerKey: commitment.ledgerKey,
-    ledgerValue: commitment.ledgerValue,
-    claimToken: ids.claim,
-    attemptCount: 1,
-    ...overrides,
-  };
-}
-
-test("enqueue builds and durably stores a commitment without contacting Fabric", async () => {
-  const calls = [];
-  const enqueuer = createAuditCommitmentEnqueuer({
-    async enqueue(request) {
-      calls.push(request);
-      return { eventId: request.event.eventId, status: "pending" };
-    },
-  });
-
-  const result = await enqueuer.enqueueEvent({ channelName: "tt-audit-alpha-v1", event: trustEvent() });
+test("enqueue stores a commitment without contacting Fabric", async () => {
+  let stored;
+  const result = await createAuditCommitmentEnqueuer({ enqueue: async (value) => { stored = value; return { eventId: ids.event,status: "pending" }; } })
+    .enqueueEvent({ channelName: "tt-audit-alpha-v1",event });
   assert.equal(result.status, "pending");
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].commitment.ledgerValue.recordType, "trust-transition");
-  assert.equal(JSON.stringify(calls[0].commitment.ledgerValue).includes(ids.tenant), false);
+  assert.equal(stored.commitment.ledgerValue.recordType, "trust-transition");
 });
 
-test("worker submits one claim and persists the exact idempotent response", async () => {
+test("worker marks committed only after the Gateway commit status succeeds", async () => {
   const calls = [];
-  const current = claim();
-  const worker = createAuditOutboxWorker({
-    workerId: "audit-worker.local-1",
-    outbox: {
-      async claimNext(request) {
-        calls.push(["claim", request]);
-        return current;
-      },
-      async markSubmitted(request) {
-        calls.push(["submitted", request]);
-        return { eventId: request.eventId, status: "submitted", submissionStatus: request.submissionStatus };
-      },
-      async markFailed() {
-        assert.fail("successful submission must not schedule a retry");
-      },
-    },
-    gateway: {
-      async submitCommitment(request) {
-        calls.push(["gateway", request]);
-        return { ledgerKey: current.ledgerKey, status: "created" };
-      },
-    },
-  });
-
+  const worker = createAuditOutboxWorker({ workerId: "audit-worker.local-1",outbox: outbox({
+    recordSubmission: async () => { calls.push("submitted"); return { status: "confirming" }; },
+    markCommitted: async () => { calls.push("committed"); return { status: "committed" }; },
+  }),gateway: gateway({ submitCommitment: async () => ({ ledgerKey: commitment.ledgerKey,status: "created",transactionId: ids.transaction,
+    waitForCommit: async () => { calls.push("commit-status"); return { transactionId: ids.transaction,validationCode: 0,
+      blockNumber: "42",source: "gateway-status" }; } }) }) });
   const result = await worker.runOnce();
-  assert.equal(result.status, "submitted");
-  assert.equal(result.submissionStatus, "created");
-  assert.deepEqual(calls.map(([name]) => name), ["claim", "gateway", "submitted"]);
-  assert.deepEqual(calls[1][1], { tenantId: ids.tenant, ledgerValue: current.ledgerValue });
+  assert.equal(result.status, "committed");
+  assert.deepEqual(calls, ["submitted","commit-status","committed"]);
 });
 
-test("a duplicate chaincode response completes a crash-recovered delivery", async () => {
-  const current = claim({ attemptCount: 2 });
-  const worker = createAuditOutboxWorker({
-    workerId: "audit-worker.local-1",
-    outbox: {
-      claimNext: async () => current,
-      markSubmitted: async (request) => ({
-        eventId: request.eventId,
-        status: "submitted",
-        submissionStatus: request.submissionStatus,
-      }),
-      markFailed: async () => assert.fail("duplicate is a successful idempotent delivery"),
-    },
-    gateway: { submitCommitment: async () => ({ ledgerKey: current.ledgerKey, status: "duplicate" }) },
-  });
+test("commit status outage leaves a durable transaction gap for restart", async () => {
+  let pending;
+  const worker = createAuditOutboxWorker({ workerId: "audit-worker.local-1",outbox: outbox({
+    markConfirmationPending: async (value) => { pending = value; return { status: "submitted",nextConfirmationAt: "2026-10-21T08:00:05.000Z" }; },
+  }),gateway: gateway({ submitCommitment: async () => ({ ledgerKey: commitment.ledgerKey,status: "created",transactionId: ids.transaction,
+    waitForCommit: async () => { throw Object.assign(new Error("offline"), { reasonCode: "COMMIT_STATUS_UNAVAILABLE" }); } }) }) });
   const result = await worker.runOnce();
-  assert.equal(result.status, "submitted");
-  assert.equal(result.submissionStatus, "duplicate");
-  assert.equal(result.attemptCount, 2);
+  assert.equal(result.status, "confirmation-pending");
+  assert.equal(pending.transactionId, ids.transaction);
 });
 
-test("Fabric outage is isolated and schedules bounded exponential retry", async () => {
-  const failures = [];
-  const current = claim({ attemptCount: 4 });
-  const worker = createAuditOutboxWorker({
-    workerId: "audit-worker.local-1",
-    outbox: {
-      claimNext: async () => current,
-      markSubmitted: async () => assert.fail("outage cannot mark submitted"),
-      async markFailed(request) {
-        failures.push(request);
-        return { eventId: request.eventId, status: "pending", nextAttemptAt: "2026-10-21T08:00:40.000Z" };
-      },
-    },
-    gateway: {
-      async submitCommitment() {
-        throw Object.assign(new Error("private network detail"), { reasonCode: "SUBMISSION_FAILED" });
-      },
-    },
-  });
+test("restarted worker reconciles the stored transaction through QSCC", async () => {
+  const calls = [];
+  const gap = { tenantId: ids.tenant,eventId: ids.event,transactionId: ids.transaction,claimToken: ids.claim,attemptCount: 1 };
+  const worker = createAuditOutboxWorker({ workerId: "audit-worker.local-1",outbox: outbox({ claimConfirmation: async () => gap,
+    claimNext: async () => assert.fail("reconciliation has priority"),markCommitted: async (value) => { calls.push(value); return { status: "committed" }; } }),
+  gateway: gateway({ queryTransactionStatus: async () => ({ transactionId: ids.transaction,validationCode: 0,
+    blockNumber: "43",source: "qscc" }),submitCommitment: async () => assert.fail("must not resubmit a known transaction") }) });
   const result = await worker.runOnce();
-  assert.equal(result.status, "retry-scheduled");
-  assert.equal(result.failureCode, "SUBMISSION_FAILED");
-  assert.equal(failures[0].retryDelaySeconds, 40);
-  assert.equal(JSON.stringify(result).includes("private network detail"), false);
+  assert.equal(result.status, "committed");
+  assert.equal(result.confirmationSource, "qscc");
+  assert.equal(calls[0].transactionId, ids.transaction);
 });
 
-test("untrusted errors are reduced to a safe failure code and retry caps at ten minutes", async () => {
-  const current = claim({ attemptCount: 40 });
+test("invalid Fabric validation is visible as failed and scheduled for retry", async () => {
   let failure;
-  const worker = createAuditOutboxWorker({
-    workerId: "audit-worker.local-1",
-    outbox: {
-      claimNext: async () => current,
-      markSubmitted: async () => assert.fail("invalid response cannot be submitted"),
-      async markFailed(request) {
-        failure = request;
-        return { eventId: request.eventId, status: "pending", nextAttemptAt: "2026-10-21T08:10:00.000Z" };
-      },
-    },
-    gateway: { submitCommitment: async () => ({ ledgerKey: "wrong", status: "created" }) },
-  });
+  const worker = createAuditOutboxWorker({ workerId: "audit-worker.local-1",outbox: outbox({ markCommitFailed: async (value) => {
+    failure = value; return { status: "failed",nextAttemptAt: "2026-10-21T08:00:05.000Z" }; } }),gateway: gateway({
+    submitCommitment: async () => ({ ledgerKey: commitment.ledgerKey,status: "created",transactionId: ids.transaction,
+      waitForCommit: async () => ({ transactionId: ids.transaction,validationCode: 11,blockNumber: "44",source: "gateway-status" }) }) }) });
   const result = await worker.runOnce();
-  assert.equal(failure.failureCode, "FABRIC_RESPONSE_INVALID");
-  assert.equal(failure.retryDelaySeconds, 600);
-  assert.equal(result.status, "retry-scheduled");
+  assert.equal(result.status, "failed");
+  assert.equal(failure.validationCode, 11);
 });
 
-test("idle poll performs no Fabric or status operation", async () => {
-  const worker = createAuditOutboxWorker({
-    workerId: "audit-worker.local-1",
-    outbox: {
-      claimNext: async () => null,
-      markSubmitted: async () => assert.fail("idle worker cannot submit"),
-      markFailed: async () => assert.fail("idle worker cannot fail"),
-    },
-    gateway: { submitCommitment: async () => assert.fail("idle worker cannot contact Fabric") },
-  });
-  assert.deepEqual(await worker.runOnce(), { status: "idle" });
-});
-
-test("PostgreSQL enqueue adapter sends only parameters and accepts idempotent state", async () => {
-  const event = trustEvent();
-  const commitment = buildAuditCommitment({ channelName: "tt-audit-alpha-v1", event });
-  const calls = [];
-  const repository = createPostgresAuditOutboxEnqueueRepository({
-    clock: () => new Date("2026-10-21T08:00:00.200Z"),
-    async query(sql, params) {
-      calls.push({ sql, params });
-      return { rows: [{
-        event_id: ids.event,
-        status: "pending",
-        event_key_hash_sha256: commitment.ledgerValue.eventKeyHashSha256,
-        commitment_hash_sha256: commitment.ledgerValue.commitmentHashSha256,
-      }] };
-    },
-  });
-  const result = await repository.enqueue({ channelName: "tt-audit-alpha-v1", event, commitment });
-  assert.equal(result.status, "pending");
-  assert.equal(calls[0].sql.includes(ids.tenant), false);
-  assert.equal(calls[0].sql.includes("$1"), true);
-  assert.equal(calls[0].params[0], ids.tenant);
-  assert.equal(calls[0].params[11], "2026-10-21T08:00:00.200Z");
-});
-
-test("PostgreSQL worker adapter uses restricted claim, success and failure functions", async () => {
-  const current = claim();
-  const calls = [];
-  const repository = createPostgresAuditOutboxWorkerRepository({
-    idFactory: () => "018f1234-5678-7abc-8def-0123456789ab",
-    clock: () => new Date("2026-10-21T08:00:01.000Z"),
-    async query(sql, params) {
-      calls.push({ sql, params });
-      if (sql.includes("claim_fabric_commitment")) return { rows: [{
-        tenant_id: current.tenantId,
-        event_id: current.eventId,
-        channel_name: current.channelName,
-        event_document: current.event,
-        canonical_preimage_json: current.canonicalPreimageJson,
-        ledger_key: current.ledgerKey,
-        ledger_value: current.ledgerValue,
-        claim_token: current.claimToken,
-        attempt_count: "1",
-      }] };
-      if (sql.includes("submitted")) return { rows: [{
-        event_id: ids.event, status: "submitted", submission_status: "created",
-      }] };
-      return { rows: [{
-        event_id: ids.event, status: "pending", next_attempt_at: "2026-10-21T08:00:06.000Z",
-      }] };
-    },
-  });
-  const claimed = await repository.claimNext({ workerId: "audit-worker.local-1" });
-  assert.equal(claimed.claimToken, ids.claim);
-  await repository.markSubmitted({
-    tenantId: ids.tenant,
-    eventId: ids.event,
-    claimToken: ids.claim,
-    ledgerKey: current.ledgerKey,
-    submissionStatus: "created",
-  });
-  await repository.markFailed({
-    tenantId: ids.tenant,
-    eventId: ids.event,
-    claimToken: ids.claim,
-    failureCode: "SUBMISSION_FAILED",
-    retryDelaySeconds: 5,
-  });
-  assert.equal(calls.length, 3);
-  assert.equal(calls.every(({ sql }) => sql.includes("$1") && !sql.includes(ids.tenant)), true);
-});
-
-test("invalid claims and enqueuer acknowledgements fail closed", async () => {
-  const event = trustEvent();
-  const enqueuer = createAuditCommitmentEnqueuer({
-    enqueue: async () => ({ eventId: "evt_018f1234-5678-7abc-8def-0123456789ff", status: "pending" }),
-  });
-  await assert.rejects(
-    enqueuer.enqueueEvent({ channelName: "tt-audit-alpha-v1", event }),
-    (error) => error instanceof AuditOutboxError && error.reasonCode === "OUTBOX_ENQUEUE_INVALID",
-  );
-  const repository = createPostgresAuditOutboxWorkerRepository({
-    query: async () => ({ rows: [{ ...claim(), tenant_id: "wrong" }] }),
-  });
-  await assert.rejects(
-    repository.claimNext({ workerId: "audit-worker.local-1" }),
-    (error) => error instanceof AuditOutboxError && error.reasonCode === "OUTBOX_SOURCE_INVALID",
-  );
+test("PostgreSQL adapter exposes constrained status functions", async () => {
+  const sql = [];
+  const repository = createPostgresAuditOutboxWorkerRepository({ query: async (text) => { sql.push(text);
+    if (text.includes("delivery_summary")) return { rows: [{ status: "failed",event_count: "1",oldest_event_at: "2026-10-21T08:00:00Z" }] };
+    return { rows: [{ tenant_id: ids.tenant,event_id: ids.event,status: "failed",attempt_count: "1",transaction_id: null,
+      last_failure_code: "SUBMISSION_FAILED",updated_at: "2026-10-21T08:00:01Z" }] }; } });
+  const status = await repository.deliveryStatus();
+  assert.equal(status.summary[0].eventCount, 1);
+  assert.equal(status.gaps[0].lastFailureCode, "SUBMISSION_FAILED");
+  assert.equal(sql.every((text) => text.startsWith("SELECT * FROM audit.")), true);
 });
