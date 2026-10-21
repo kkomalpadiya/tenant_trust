@@ -12,6 +12,22 @@ x-peer-common: &peer-common
   networks:
     - fabric
 
+x-audit-chaincode-common: &audit-chaincode-common
+  image: tenant-trust/audit-chaincode:0.1.0
+  profiles: ["chaincode", "tools"]
+  restart: unless-stopped
+  environment:
+    CORE_CHAINCODE_ID: ${FABRIC_AUDIT_CHAINCODE_PACKAGE_ID:-uninstalled}
+    CORE_CHAINCODE_ADDRESS: 0.0.0.0:9999
+  healthcheck:
+    test: ["CMD", "node", "-e", "const s=require('node:net').connect(9999,'127.0.0.1',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))"]
+    interval: 3s
+    timeout: 3s
+    retries: 30
+    start_period: 5s
+  networks:
+    - fabric
+
 services:
   ca-orderer:
     <<: *ca-common
@@ -196,6 +212,8 @@ services:
       CORE_PEER_TLS_CERT_FILE: /etc/hyperledger/fabric/tls/server.crt
       CORE_PEER_TLS_KEY_FILE: /etc/hyperledger/fabric/tls/server.key
       CORE_PEER_TLS_ROOTCERT_FILE: /etc/hyperledger/fabric/tls/ca.crt
+      CORE_CHAINCODE_EXTERNALBUILDERS: '[{"name":"ccaas_builder","path":"/opt/hyperledger/ccaas_builder","propagateEnvironment":["CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG"]}]'
+      CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG: '{"peername":"platform"}'
       CORE_LEDGER_STATE_STATEDATABASE: goleveldb
       CORE_OPERATIONS_LISTENADDRESS: 0.0.0.0:9444
       CORE_OPERATIONS_TLS_ENABLED: "false"
@@ -233,6 +251,8 @@ services:
       CORE_PEER_TLS_CERT_FILE: /etc/hyperledger/fabric/tls/server.crt
       CORE_PEER_TLS_KEY_FILE: /etc/hyperledger/fabric/tls/server.key
       CORE_PEER_TLS_ROOTCERT_FILE: /etc/hyperledger/fabric/tls/ca.crt
+      CORE_CHAINCODE_EXTERNALBUILDERS: '[{"name":"ccaas_builder","path":"/opt/hyperledger/ccaas_builder","propagateEnvironment":["CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG"]}]'
+      CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG: '{"peername":"alpha"}'
       CORE_LEDGER_STATE_STATEDATABASE: goleveldb
       CORE_OPERATIONS_LISTENADDRESS: 0.0.0.0:9444
       CORE_OPERATIONS_TLS_ENABLED: "false"
@@ -270,6 +290,8 @@ services:
       CORE_PEER_TLS_CERT_FILE: /etc/hyperledger/fabric/tls/server.crt
       CORE_PEER_TLS_KEY_FILE: /etc/hyperledger/fabric/tls/server.key
       CORE_PEER_TLS_ROOTCERT_FILE: /etc/hyperledger/fabric/tls/ca.crt
+      CORE_CHAINCODE_EXTERNALBUILDERS: '[{"name":"ccaas_builder","path":"/opt/hyperledger/ccaas_builder","propagateEnvironment":["CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG"]}]'
+      CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG: '{"peername":"beta"}'
       CORE_LEDGER_STATE_STATEDATABASE: goleveldb
       CORE_OPERATIONS_LISTENADDRESS: 0.0.0.0:9444
       CORE_OPERATIONS_TLS_ENABLED: "false"
@@ -307,6 +329,68 @@ services:
       - ./verify-network.sh:/scripts/verify-network.sh:ro
     networks:
       - fabric
+
+  chaincode-deploy:
+    image: ${FABRIC_TOOLS_IMAGE}
+    profiles: ["tools"]
+    depends_on:
+      orderer0.audit.tenant-trust.test:
+        condition: service_started
+      peer0.platform.audit.tenant-trust.test:
+        condition: service_healthy
+      peer0.alpha.audit.tenant-trust.test:
+        condition: service_healthy
+      peer0.beta.audit.tenant-trust.test:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/deploy-audit-chaincode.sh"]
+    volumes:
+      - ../../runtime/fabric:/fabric
+      - ./deploy-audit-chaincode.sh:/scripts/deploy-audit-chaincode.sh:ro
+    networks:
+      - fabric
+
+  chaincode-verify:
+    image: ${FABRIC_TOOLS_IMAGE}
+    profiles: ["tools"]
+    depends_on:
+      audit-chaincode-platform:
+        condition: service_healthy
+      audit-chaincode-alpha:
+        condition: service_healthy
+      audit-chaincode-beta:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/verify-audit-chaincode.sh"]
+    volumes:
+      - ../../runtime/fabric:/fabric:ro
+      - ./verify-audit-chaincode.sh:/scripts/verify-audit-chaincode.sh:ro
+    networks:
+      - fabric
+
+  audit-chaincode-platform:
+    <<: *audit-chaincode-common
+    hostname: audit-chaincode-platform
+    build:
+      context: ../..
+      dockerfile: chaincode/audit/Dockerfile
+      args:
+        FABRIC_CHAINCODE_NODE_IMAGE: ${FABRIC_CHAINCODE_NODE_IMAGE}
+    depends_on:
+      peer0.platform.audit.tenant-trust.test:
+        condition: service_healthy
+
+  audit-chaincode-alpha:
+    <<: *audit-chaincode-common
+    hostname: audit-chaincode-alpha
+    depends_on:
+      peer0.alpha.audit.tenant-trust.test:
+        condition: service_healthy
+
+  audit-chaincode-beta:
+    <<: *audit-chaincode-common
+    hostname: audit-chaincode-beta
+    depends_on:
+      peer0.beta.audit.tenant-trust.test:
+        condition: service_healthy
 
 volumes:
   orderer-data:

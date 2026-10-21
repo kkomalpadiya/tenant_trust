@@ -1,0 +1,23 @@
+{
+  "name": "@tenant-trust/audit-chaincode",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "fabric-chaincode-node server",
+    "test": "npm run build && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "fabric-contract-api": "2.5.8",
+    "fabric-shim": "2.5.8"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22 <25"
+  }
+}

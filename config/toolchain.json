@@ -12,6 +12,7 @@
   "fabric": "2.5.16",
   "fabricNodeChaincode": "2.5.8",
   "fabricChaincodeNodeMajor": 22,
+  "fabricChaincodeNodeImage": "node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94",
   "postgresql": "17.11",
   "natsServer": "2.14.6",
   "natsJetStreamClient": "3.4.0",

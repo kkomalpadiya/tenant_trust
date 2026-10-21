@@ -1,0 +1,12 @@
+.git
+.codex
+.claude
+.local
+.env
+runtime
+node_modules
+**/node_modules
+**/dist
+**/coverage
+*.xlsx
+*.log

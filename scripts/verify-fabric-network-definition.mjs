@@ -15,6 +15,7 @@ const expectedImages = new Map([
   ["FABRIC_ORDERER_IMAGE", `hyperledger/fabric-orderer:${toolchain.fabric}@sha256:e322c57331d37e0a35ffae3cb3d3265a0e852211c0f801f2514cc15b964ffc93`],
   ["FABRIC_TOOLS_IMAGE", `hyperledger/fabric-tools:${toolchain.fabric}@sha256:1d163b2513453637c2eb8ffe00bfb367f6edb2fb824604818f30646f552c9f42`],
   ["FABRIC_CA_IMAGE", "hyperledger/fabric-ca:1.5.17@sha256:fac0c4a70afc2fe6ae291ffb3c6d27db87ac638ecf5b5418841c7363588e568a"],
+  ["FABRIC_CHAINCODE_NODE_IMAGE", toolchain.fabricChaincodeNodeImage],
 ]);
 
 const parsedExample = new Map(
@@ -38,6 +39,9 @@ for (const service of [
   "peer0.platform.audit.tenant-trust.test",
   "peer0.alpha.audit.tenant-trust.test",
   "peer0.beta.audit.tenant-trust.test",
+  "audit-chaincode-platform",
+  "audit-chaincode-alpha",
+  "audit-chaincode-beta",
 ]) {
   assert.match(compose, new RegExp(`^  ${service.replaceAll(".", "\\.")}:`, "mu"), `missing Fabric service ${service}`);
 }
@@ -50,6 +54,10 @@ assert.match(bootstrap, /tenantTrust\.role=audit-commit-listener:ecert/u);
 assert.equal((bootstrap.match(/tenantTrust\.role=tenant-auditor:ecert/gu) ?? []).length, 1, "tenant auditor role must be registered through the shared tenant-org function");
 assert.match(channelConfig, /TenantAlphaAuditChannel:[\s\S]*PlatformAuditOrg[\s\S]*TenantAlphaAuditOrg/u);
 assert.match(channelConfig, /TenantBetaAuditChannel:[\s\S]*PlatformAuditOrg[\s\S]*TenantBetaAuditOrg/u);
+assert.match(compose, /CORE_CHAINCODE_EXTERNALBUILDERS:[\s\S]*ccaas_builder/u, "peers must use the embedded external chaincode builder");
+assert.match(compose, /FABRIC_AUDIT_CHAINCODE_PACKAGE_ID:-uninstalled/u, "chaincode services must require the generated package identity");
+assert.equal(toolchain.fabricNodeChaincode, "2.5.8");
+assert.equal(toolchain.fabricChaincodeNodeMajor, 22);
 
 const trackedRuntime = spawnSync("git", ["ls-files", "runtime", "**/peerOrganizations", "**/ordererOrganizations", "**/channel-artifacts"], {
   cwd: root,

@@ -15,6 +15,7 @@ function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
     encoding: "utf8",
+    env: { ...process.env, ...(options.env ?? {}) },
     stdio: options.capture ? "pipe" : "inherit",
     timeout: options.timeout ?? 300_000,
     windowsHide: true,
@@ -31,6 +32,10 @@ function run(command, args, options = {}) {
 
 function compose(...args) {
   return run("docker", [...composeArgs, ...args]);
+}
+
+function composeWithEnvironment(environment, ...args) {
+  return run("docker", [...composeArgs, ...args], { env: environment });
 }
 
 function ensureRuntimeDirectories() {
@@ -77,6 +82,36 @@ function verifyDefinition() {
   run(process.execPath, ["scripts/verify-fabric-topology.mjs"]);
 }
 
+function readChaincodePackageId() {
+  const packageId = readFileSync(new URL("../runtime/fabric/chaincode/tenant-trust-audit.package-id", import.meta.url), "utf8").trim();
+  if (!/^tenant-trust-audit_0\.1\.0:[0-9a-f]{64}$/u.test(packageId)) {
+    throw new Error("The generated audit chaincode package ID is missing or malformed.");
+  }
+  return packageId;
+}
+
+function deployAuditChaincode() {
+  compose("--profile", "tools", "run", "--rm", "chaincode-deploy");
+  const packageId = readChaincodePackageId();
+  const environment = { FABRIC_AUDIT_CHAINCODE_PACKAGE_ID: packageId };
+  composeWithEnvironment(environment, "build", "audit-chaincode-platform");
+  composeWithEnvironment(
+    environment,
+    "up", "-d", "--wait",
+    "audit-chaincode-platform",
+    "audit-chaincode-alpha",
+    "audit-chaincode-beta",
+  );
+}
+
+function verifyAuditChaincode() {
+  const packageId = readChaincodePackageId();
+  composeWithEnvironment(
+    { FABRIC_AUDIT_CHAINCODE_PACKAGE_ID: packageId },
+    "--profile", "tools", "run", "--rm", "chaincode-verify",
+  );
+}
+
 try {
   if (action === "down") {
     compose("down", "--remove-orphans");
@@ -87,6 +122,7 @@ try {
     verifyDefinition();
     assertLocalSecrets();
     compose("--profile", "tools", "run", "--rm", "network-verify");
+    verifyAuditChaincode();
   } else {
     verifyDefinition();
     showMemoryWarning();
@@ -97,7 +133,9 @@ try {
     compose("--profile", "tools", "run", "--rm", "ca-bootstrap");
     compose("up", "-d", "--wait", "orderer0.audit.tenant-trust.test", "peer0.platform.audit.tenant-trust.test", "peer0.alpha.audit.tenant-trust.test", "peer0.beta.audit.tenant-trust.test");
     compose("--profile", "tools", "run", "--rm", "channel-bootstrap");
+    deployAuditChaincode();
     compose("--profile", "tools", "run", "--rm", "network-verify");
+    verifyAuditChaincode();
     console.log("Tenant Trust Fabric network is running with both tenant audit channels joined.");
   }
 } catch (error) {
