@@ -5,9 +5,15 @@
   "type": "module",
   "files": [
     "schemas",
+    "src",
     "README.md"
   ],
   "exports": {
+    "./audit-commitments": "./src/audit-commitments.mjs",
     "./schemas/*": "./schemas/*"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
   }
 }

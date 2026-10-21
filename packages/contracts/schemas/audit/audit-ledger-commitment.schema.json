@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant-trust.local/contracts/audit/audit-ledger-commitment.schema.json",
+  "title": "Tenant Trust public audit ledger commitment",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "recordType": {
+      "enum": [
+        "access-decision",
+        "certificate-lifecycle",
+        "policy-change",
+        "security-action",
+        "trust-transition"
+      ]
+    },
+    "eventKeyHashSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "commitmentHashSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "canonicalizationProfile": { "const": "tenant-trust-audit-commitment-json-v1" },
+    "digestAlgorithm": { "const": "sha256" }
+  },
+  "required": [
+    "schemaVersion",
+    "recordType",
+    "eventKeyHashSha256",
+    "commitmentHashSha256",
+    "canonicalizationProfile",
+    "digestAlgorithm"
+  ],
+  "additionalProperties": false
+}

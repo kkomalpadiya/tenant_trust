@@ -84,6 +84,7 @@
     "adaptive-authorization-scenario:verify": "node scripts/verify-adaptive-authorization-scenario.mjs",
     "context-aware-authorization:verify": "node scripts/verify-context-aware-authorization-phase.mjs",
     "fabric-topology:verify": "node scripts/verify-fabric-topology.mjs",
+    "audit-commitments:verify": "npm run test:contracts && node scripts/verify-audit-commitment-contract.mjs",
     "fabric:up": "node scripts/fabric-network.mjs up",
     "fabric:verify": "node scripts/fabric-network.mjs verify",
     "fabric:status": "node scripts/fabric-network.mjs status",
