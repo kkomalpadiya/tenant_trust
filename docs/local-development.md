@@ -122,6 +122,7 @@ npm run policy-matrix:verify
 npm run policy-provenance:verify
 npm run adaptive-authorization-scenario:verify
 npm run context-aware-authorization:verify
+npm run security-action-state-machine:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -214,6 +215,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run trust-evidence-consumer:verify` is the T6.5 consumption gate. It verifies the signed accepted-evidence boundary before component normalization, then runs a rolled-back PostgreSQL scenario covering incomplete staging, complete snapshot creation, exact redelivery suppression, older-event withholding, successive subject updates, least-privilege access and cross-tenant denial. Migration `021_validated_evidence_trust_consumption.sql` must be applied first. See [Concurrency-safe validated evidence consumption](architecture/validated-evidence-trust-consumption.md).
 
 `npm run trust-controls:verify` is the T6.6 transition-safety gate. It checks exact low, medium and high boundaries; hysteresis around both band boundaries; immediate deterioration; two-source, two-evaluation recovery; one-band recovery steps; accepted-receipt influence caps; and the closed downward-only critical-evidence overrides. See [Trust transition controls](architecture/trust-transition-controls.md).
+
+`npm run security-action-state-machine:verify` is the T9.1 definition gate. It checks the shared OPA outcome and action-event contracts, exact QUARANTINE obligation mapping, reversible restriction/suspension/renewal blocking, irreversible certificate revocation, replacement-before-recovery ordering, idempotent repeats and fail-closed invalid states. It does not execute or persist actions. See [Security action state machine](architecture/security-action-state-machine.md).
 
 `npm run trust-configuration:verify` is the T6.7 versioned-configuration gate. It checks tenant-administrator authority, complete range and weight validation, direct-write denial, serialized version allocation, atomic activation, immutable lifecycle history and rollback by copying historical values into a new active version. Migration `022_versioned_trust_configuration_lifecycle.sql` must be applied first. See [Versioned trust configuration lifecycle](architecture/versioned-trust-configuration.md).
 

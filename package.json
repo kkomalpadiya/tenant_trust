@@ -91,6 +91,7 @@
     "causal-audit:verify": "npm run test:audit && node scripts/verify-causal-audit-reader.mjs && node scripts/verify-causal-audit.mjs",
     "ledger-privacy:verify": "npm run test:contracts && npm run test:audit-chaincode && npm run test:audit && npm run fabric:verify && node scripts/verify-ledger-privacy.mjs",
     "fabric-outage-recovery:verify": "node scripts/verify-fabric-outage-recovery.mjs",
+    "security-action-state-machine:verify": "npm run test:orchestrator && node scripts/verify-security-action-state-machine.mjs",
     "audit-outbox:worker": "node scripts/run-audit-outbox-worker.mjs",
     "audit-outbox:status": "node scripts/show-audit-outbox-status.mjs",
     "fabric:up": "node scripts/fabric-network.mjs up",
@@ -101,6 +102,7 @@
     "test:review-demo": "node --test apps/review-demo/test/*.test.mjs",
     "test:audit-chaincode": "npm test --workspace @tenant-trust/audit-chaincode",
     "test:audit": "npm test --workspace @tenant-trust/audit",
+    "test:orchestrator": "npm test --workspace @tenant-trust/orchestrator",
     "role-action-matrix:verify": "npm run test:authorization",
     "foundation:check": "node scripts/verify-foundation.mjs",
     "foundation:clean": "node scripts/verify-clean-foundation.mjs",
@@ -124,7 +126,7 @@
     "test:gateway-identity": "npm test --workspace @tenant-trust/gateway-identity",
     "test:policy": "npm test --workspace @tenant-trust/policy",
     "test:api": "npm test --workspace @tenant-trust/api",
-    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:evidence-sources && npm run test:evidence-simulators && npm run test:evidence && npm run test:evidence-events && npm run test:evidence-pipeline && npm run test:trust-model && npm run test:trust && npm run test:trust-calibration && npm run test:gateway-identity && npm run test:policy && npm run test:audit && npm run test:api && npm run test:review-demo"
+    "test": "npm run test:contracts && npm run test:messaging && npm run test:tenant-context && npm run test:authorization && npm run test:certificate-inventory && npm run test:certificate-issuance && npm run test:certificate-status && npm run test:certificate-revocation && npm run test:certificate-events && npm run test:evidence-sources && npm run test:evidence-simulators && npm run test:evidence && npm run test:evidence-events && npm run test:evidence-pipeline && npm run test:trust-model && npm run test:trust && npm run test:trust-calibration && npm run test:gateway-identity && npm run test:policy && npm run test:audit && npm run test:orchestrator && npm run test:api && npm run test:review-demo"
   },
   "engines": {
     "node": "24.20.0",
