@@ -91,13 +91,13 @@ The shared platform peer and orderer are broad trust boundaries for commitment m
 
 This sequence is a design contract for later tasks. T8.1 does not implement or verify the transaction flow.
 
-## Handoff to the remaining Phase 8 tasks
+## Phase 8 implementation status
 
 - T8.2 will pin image digests and Fabric CA tooling, generate ignored identities, create both channels and prove the selected nodes start reproducibly.
 - T8.3 will define selected event types, canonical commitment bytes, identifiers and disclosure-minimizing fields.
 - T8.4 will implement duplicate protection, channel binding, MSP and role checks, query authorization and the two-organization endorsement policy.
 - T8.5 will create the least-privilege Gateway clients and the closed tenant-to-channel adapter.
-- T8.6 through T8.10 will add durable delivery, commit reconciliation, causal verification, privacy/tamper tests and outage recovery.
+- T8.6 through T8.10 implement durable delivery, commit reconciliation, causal verification, privacy/tamper tests and a real peer-outage recovery gate. See [Fabric outage and recovery](fabric-outage-recovery.md).
 
 ## Verification
 

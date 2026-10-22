@@ -90,6 +90,7 @@
     "audit-outbox:verify": "npm run test:audit && node scripts/verify-fabric-audit-outbox.mjs && node scripts/verify-audit-outbox-worker.mjs",
     "causal-audit:verify": "npm run test:audit && node scripts/verify-causal-audit-reader.mjs && node scripts/verify-causal-audit.mjs",
     "ledger-privacy:verify": "npm run test:contracts && npm run test:audit-chaincode && npm run test:audit && npm run fabric:verify && node scripts/verify-ledger-privacy.mjs",
+    "fabric-outage-recovery:verify": "node scripts/verify-fabric-outage-recovery.mjs",
     "audit-outbox:worker": "node scripts/run-audit-outbox-worker.mjs",
     "audit-outbox:status": "node scripts/show-audit-outbox-status.mjs",
     "fabric:up": "node scripts/fabric-network.mjs up",
