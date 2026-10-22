@@ -92,6 +92,7 @@
     "ledger-privacy:verify": "npm run test:contracts && npm run test:audit-chaincode && npm run test:audit && npm run fabric:verify && node scripts/verify-ledger-privacy.mjs",
     "fabric-outage-recovery:verify": "node scripts/verify-fabric-outage-recovery.mjs",
     "security-action-state-machine:verify": "npm run test:orchestrator && node scripts/verify-security-action-state-machine.mjs",
+    "security-action-rules:verify": "npm run test:orchestrator && node scripts/verify-security-action-trigger-rules.mjs",
     "audit-outbox:worker": "node scripts/run-audit-outbox-worker.mjs",
     "audit-outbox:status": "node scripts/show-audit-outbox-status.mjs",
     "fabric:up": "node scripts/fabric-network.mjs up",

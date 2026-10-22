@@ -47,7 +47,7 @@ Device and compliance signals may come from deterministic simulators in this pro
 
 The policy engine returns `ALLOW`, `STEP_UP`, `DENY` or `QUARANTINE` using trust, role, tenant policy and request context. Additional authentication must use a real selected second factor, with proof bound to the subject, tenant, session and requested action. A frontend confirmation button alone does not satisfy this requirement.
 
-Low trust may restrict sensitive operations. Permanent certificate revocation requires explicit severity and corroboration rules; it must not follow automatically from every small score decrease.
+Low trust may restrict sensitive operations. The tested [security action trigger rules](architecture/security-action-trigger-recovery-rules.md) require fresh evidence from two sources and two critical kinds plus a matching critical trust transition before permanent certificate revocation; no score decrease alone can revoke.
 
 ## Audit scope
 

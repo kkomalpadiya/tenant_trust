@@ -46,7 +46,7 @@ for (const actionType of ["revoke-certificate", "block-renewal", "restore-access
     (error) => error instanceof SecurityActionStateMachineError,
   );
 }
-console.log("PASS escalation and recovery actions require later governed rules");
+console.log("PASS escalation and recovery actions require separate governed rules");
 
 const restricted = transitionSecurityActionState({
   currentState: INITIAL_SECURITY_ACTION_STATE,

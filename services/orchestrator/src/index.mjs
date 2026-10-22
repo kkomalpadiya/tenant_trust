@@ -1,3 +1,8 @@
+import {
+  CRITICAL_EVIDENCE_OVERRIDE_RULES,
+  DEFAULT_TRUST_TRANSITION_CONFIGURATION,
+} from "@tenant-trust/trust";
+
 export const POLICY_OUTCOMES = Object.freeze([
   "ALLOW",
   "STEP_UP",
@@ -82,6 +87,106 @@ const REPLACEMENT_STATES = new Set(["not-required", "required", "issued"]);
 const STATE_KEYS = new Set(["access", "renewal", "targetCertificate", "replacement"]);
 const POLICY_MAPPING_KEYS = new Set(["outcome", "quarantineActionType"]);
 const TRANSITION_KEYS = new Set(["currentState", "actionType"]);
+const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const SUBJECT_ID = /^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const EVIDENCE_ID = /^evd_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const SOURCE_ID = /^src_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const TRUST_BANDS = new Set(["low", "medium", "high"]);
+const TRUST_TRANSITIONS = new Set(["held", "deteriorated", "recovered", "critical-override"]);
+const TRIGGER_INPUT_KEYS = new Set([
+  "target",
+  "policyDecision",
+  "trustTransition",
+  "severeEvidence",
+  "evaluatedAt",
+]);
+const TARGET_KEYS = new Set(["tenantId", "subjectId"]);
+const TRUST_TRANSITION_KEYS = new Set(["score", "band", "transition", "criticalOverride"]);
+const CRITICAL_OVERRIDE_KEYS = new Set(["kind", "componentId"]);
+const SEVERE_EVIDENCE_KEYS = new Set([
+  "evidenceId",
+  "sourceId",
+  "tenantId",
+  "subjectId",
+  "kind",
+  "componentId",
+  "observedAt",
+]);
+const RECOVERY_INPUT_KEYS = new Set([
+  "target",
+  "currentState",
+  "checkpoint",
+  "activeSevereEvidence",
+  "evaluatedAt",
+  "severeCauseResolved",
+]);
+const RECOVERY_CHECKPOINT_KEYS = new Set([
+  "score",
+  "band",
+  "transition",
+  "consecutiveQualifyingEvaluations",
+  "sourceIds",
+]);
+
+function deepFreeze(value) {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) deepFreeze(child);
+  }
+  return value;
+}
+
+const ACTIONABLE_SEVERE_EVIDENCE = Object.fromEntries(
+  Object.entries(CRITICAL_EVIDENCE_OVERRIDE_RULES)
+    .filter(([kind]) => kind !== "certificate-revoked")
+    .map(([kind, rule]) => [kind, {
+      componentId: rule.componentId,
+      scoreCeiling: rule.scoreCeiling,
+    }]),
+);
+
+export const SECURITY_ACTION_TRIGGER_POLICY = deepFreeze({
+  policyQuarantine: {
+    severity: "low-trust",
+    actions: [...POLICY_OUTCOME_ACTION_MAPPING.QUARANTINE],
+    reversibleOnly: true,
+  },
+  severeEvidence: {
+    actionableKinds: ACTIONABLE_SEVERE_EVIDENCE,
+    terminalNonTriggerKinds: ["certificate-revoked"],
+    maximumAgeSeconds: 300,
+    requiredDistinctSourcesForRevocation: 2,
+    requiredDistinctKindsForRevocation: 2,
+    pendingAction: "block-renewal",
+    corroboratedAction: "revoke-certificate",
+    requireLowCriticalTrustTransition: true,
+    scoreOnlyCanRevoke: false,
+  },
+});
+
+export const SECURITY_ACTION_RECOVERY_POLICY = deepFreeze({
+  authorizationClass: "recovery-authorization",
+  requireNoActiveSevereEvidence: true,
+  requireResolvedCauseForReplacement: true,
+  requireRecoveredTrustTransition: true,
+  restricted: {
+    minimumBand: "medium",
+    minimumScore: DEFAULT_TRUST_TRANSITION_CONFIGURATION.bands.low.recoveryThreshold,
+  },
+  suspendedOrRenewalBlocked: {
+    minimumBand: "high",
+    minimumScore: DEFAULT_TRUST_TRANSITION_CONFIGURATION.bands.medium.recoveryThreshold,
+  },
+  revoked: {
+    minimumBand: "high",
+    minimumScore: DEFAULT_TRUST_TRANSITION_CONFIGURATION.bands.medium.recoveryThreshold,
+    targetCertificateReactivated: false,
+  },
+  requiredDistinctSources:
+    DEFAULT_TRUST_TRANSITION_CONFIGURATION.recovery.distinctSourceCount,
+  requiredConsecutiveQualifyingEvaluations:
+    DEFAULT_TRUST_TRANSITION_CONFIGURATION.recovery.consecutiveQualifyingEvaluations,
+});
 
 export class SecurityActionStateMachineError extends Error {
   constructor(reasonCode) {
@@ -104,6 +209,116 @@ function isPlainObject(value) {
 
 function hasOnlyKeys(value, allowedKeys) {
   return isPlainObject(value) && Object.keys(value).every((key) => allowedKeys.has(key));
+}
+
+function hasExactKeys(value, expectedKeys) {
+  return isPlainObject(value)
+    && Object.keys(value).length === expectedKeys.size
+    && Object.keys(value).every((key) => expectedKeys.has(key));
+}
+
+function canonicalUtc(value) {
+  if (typeof value !== "string" || !value.endsWith("Z")) return false;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString() === value;
+}
+
+function validScore(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
+function normalizeTarget(value) {
+  if (!hasExactKeys(value, TARGET_KEYS)
+    || !TENANT_ID.test(value.tenantId ?? "")
+    || !SUBJECT_ID.test(value.subjectId ?? "")) {
+    fail("SECURITY_ACTION_TARGET_INVALID");
+  }
+  return Object.freeze({ tenantId: value.tenantId, subjectId: value.subjectId });
+}
+
+function normalizeCriticalOverride(value) {
+  if (value === null) return null;
+  if (!hasExactKeys(value, CRITICAL_OVERRIDE_KEYS)) fail("TRUST_TRANSITION_INVALID");
+  const rule = CRITICAL_EVIDENCE_OVERRIDE_RULES[value.kind];
+  if (!rule || rule.componentId !== value.componentId) fail("TRUST_TRANSITION_INVALID");
+  return Object.freeze({ kind: value.kind, componentId: value.componentId, rule });
+}
+
+function normalizeTrustTransition(value) {
+  if (!hasExactKeys(value, TRUST_TRANSITION_KEYS)
+    || !validScore(value.score)
+    || !TRUST_BANDS.has(value.band)
+    || !TRUST_TRANSITIONS.has(value.transition)) {
+    fail("TRUST_TRANSITION_INVALID");
+  }
+  const criticalOverride = normalizeCriticalOverride(value.criticalOverride);
+  if ((value.transition === "critical-override") !== (criticalOverride !== null)) {
+    fail("TRUST_TRANSITION_INVALID");
+  }
+  if ((value.band === "high"
+      && value.score < DEFAULT_TRUST_TRANSITION_CONFIGURATION.bands.high.deteriorationThreshold)
+    || (value.band === "medium"
+      && value.score < DEFAULT_TRUST_TRANSITION_CONFIGURATION.bands.medium.deteriorationThreshold)
+    || (criticalOverride !== null
+      && (value.band !== criticalOverride.rule.forcedBand
+        || value.score > criticalOverride.rule.scoreCeiling))) {
+    fail("TRUST_TRANSITION_INVALID");
+  }
+  return Object.freeze({
+    score: value.score,
+    band: value.band,
+    transition: value.transition,
+    criticalOverride,
+  });
+}
+
+function normalizeSevereEvidence(value, target, evaluatedAt) {
+  if (!Array.isArray(value)) fail("SEVERE_EVIDENCE_INVALID");
+  const evaluatedTime = new Date(evaluatedAt).getTime();
+  const evidence = value.map((entry) => {
+    if (!hasExactKeys(entry, SEVERE_EVIDENCE_KEYS)
+      || !EVIDENCE_ID.test(entry.evidenceId ?? "")
+      || !SOURCE_ID.test(entry.sourceId ?? "")
+      || entry.tenantId !== target.tenantId
+      || entry.subjectId !== target.subjectId
+      || !canonicalUtc(entry.observedAt)) {
+      fail("SEVERE_EVIDENCE_INVALID");
+    }
+    const rule = SECURITY_ACTION_TRIGGER_POLICY.severeEvidence.actionableKinds[entry.kind];
+    if (!rule || rule.componentId !== entry.componentId) fail("SEVERE_EVIDENCE_NOT_ACTIONABLE");
+    const ageSeconds = (evaluatedTime - new Date(entry.observedAt).getTime()) / 1000;
+    if (ageSeconds < 0 || ageSeconds > SECURITY_ACTION_TRIGGER_POLICY.severeEvidence.maximumAgeSeconds) {
+      fail("SEVERE_EVIDENCE_STALE");
+    }
+    return Object.freeze({ ...entry });
+  });
+  if (new Set(evidence.map(({ evidenceId }) => evidenceId)).size !== evidence.length) {
+    fail("SEVERE_EVIDENCE_DUPLICATE");
+  }
+  return Object.freeze(evidence);
+}
+
+function normalizePolicyDecision(value) {
+  if (!isPlainObject(value)) fail("POLICY_OUTCOME_INVALID");
+  return mapPolicyOutcomeToSecurityAction(value);
+}
+
+function summarizeSevereEvidence(evidence) {
+  return {
+    evidenceIds: [...evidence.map(({ evidenceId }) => evidenceId)].sort(),
+    sourceIds: [...new Set(evidence.map(({ sourceId }) => sourceId))].sort(),
+    kinds: [...new Set(evidence.map(({ kind }) => kind))].sort(),
+  };
+}
+
+function trustConfirmsSevereEvidence(trustTransition, severeKinds) {
+  return trustTransition.band === "low"
+    && trustTransition.transition === "critical-override"
+    && trustTransition.criticalOverride !== null
+    && severeKinds.includes(trustTransition.criticalOverride.kind)
+    && trustTransition.score <= ACTIONABLE_SEVERE_EVIDENCE[
+      trustTransition.criticalOverride.kind
+    ].scoreCeiling;
 }
 
 function statesEqual(left, right) {
@@ -224,5 +439,158 @@ export function transitionSecurityActionState(input = {}) {
     changed: !statesEqual(currentState, state),
     targetCertificateReactivated: false,
     state,
+  });
+}
+
+export function evaluateSecurityActionTriggers(input = {}) {
+  if (!hasExactKeys(input, TRIGGER_INPUT_KEYS) || !canonicalUtc(input.evaluatedAt)) {
+    fail("SECURITY_ACTION_TRIGGER_INPUT_INVALID");
+  }
+  const target = normalizeTarget(input.target);
+  const policyAction = normalizePolicyDecision(input.policyDecision);
+  const trustTransition = normalizeTrustTransition(input.trustTransition);
+  const severeEvidence = normalizeSevereEvidence(
+    input.severeEvidence,
+    target,
+    input.evaluatedAt,
+  );
+  const summary = summarizeSevereEvidence(severeEvidence);
+  const enoughSources = summary.sourceIds.length
+    >= SECURITY_ACTION_TRIGGER_POLICY.severeEvidence.requiredDistinctSourcesForRevocation;
+  const enoughKinds = summary.kinds.length
+    >= SECURITY_ACTION_TRIGGER_POLICY.severeEvidence.requiredDistinctKindsForRevocation;
+  const trustConfirmed = trustConfirmsSevereEvidence(trustTransition, summary.kinds);
+  const revocationAuthorized = enoughSources && enoughKinds && trustConfirmed;
+
+  let severity = "none";
+  let actionTypes = [];
+  let reasonCode = "NO_DURABLE_ACTION";
+  if (revocationAuthorized) {
+    severity = "severe-corroborated";
+    actionTypes = [SECURITY_ACTION_TRIGGER_POLICY.severeEvidence.corroboratedAction];
+    reasonCode = "CORROBORATED_SEVERE_EVIDENCE";
+  } else if (severeEvidence.length > 0) {
+    severity = "severe-pending-corroboration";
+    actionTypes = policyAction ? [policyAction.actionType] : [];
+    if (policyAction?.actionType !== "suspend-subject") {
+      actionTypes.push(SECURITY_ACTION_TRIGGER_POLICY.severeEvidence.pendingAction);
+    }
+    reasonCode = "SEVERE_EVIDENCE_NOT_CORROBORATED";
+  } else if (policyAction) {
+    severity = SECURITY_ACTION_TRIGGER_POLICY.policyQuarantine.severity;
+    actionTypes = [policyAction.actionType];
+    reasonCode = "POLICY_QUARANTINE";
+  }
+
+  return deepFreeze({
+    target,
+    severity,
+    actionTypes,
+    reasonCode,
+    revocationAuthorized,
+    scoreOnlyCanRevoke: false,
+    corroboration: {
+      evidenceIds: summary.evidenceIds,
+      sourceIds: summary.sourceIds,
+      kinds: summary.kinds,
+      enoughSources,
+      enoughKinds,
+      trustConfirmed,
+    },
+  });
+}
+
+function normalizeRecoveryCheckpoint(value) {
+  if (!hasExactKeys(value, RECOVERY_CHECKPOINT_KEYS)
+    || !validScore(value.score)
+    || !TRUST_BANDS.has(value.band)
+    || !TRUST_TRANSITIONS.has(value.transition)
+    || !Number.isSafeInteger(value.consecutiveQualifyingEvaluations)
+    || value.consecutiveQualifyingEvaluations < 0
+    || !Array.isArray(value.sourceIds)
+    || value.sourceIds.some((sourceId) => !SOURCE_ID.test(sourceId))
+    || new Set(value.sourceIds).size !== value.sourceIds.length) {
+    fail("RECOVERY_CHECKPOINT_INVALID");
+  }
+  if (value.transition === "recovered"
+    && (value.band === "low"
+      || (value.band === "medium"
+        && value.score < DEFAULT_TRUST_TRANSITION_CONFIGURATION.bands.low.recoveryThreshold)
+      || (value.band === "high"
+        && value.score < DEFAULT_TRUST_TRANSITION_CONFIGURATION.bands.medium.recoveryThreshold))) {
+    fail("RECOVERY_CHECKPOINT_INVALID");
+  }
+  return Object.freeze({
+    score: value.score,
+    band: value.band,
+    transition: value.transition,
+    consecutiveQualifyingEvaluations: value.consecutiveQualifyingEvaluations,
+    sourceIds: Object.freeze([...value.sourceIds].sort()),
+  });
+}
+
+function recoveryTrustReady(checkpoint, requirement) {
+  const bandRank = { low: 0, medium: 1, high: 2 };
+  return checkpoint.transition === "recovered"
+    && bandRank[checkpoint.band] >= bandRank[requirement.minimumBand]
+    && checkpoint.score >= requirement.minimumScore
+    && checkpoint.consecutiveQualifyingEvaluations
+      >= SECURITY_ACTION_RECOVERY_POLICY.requiredConsecutiveQualifyingEvaluations
+    && checkpoint.sourceIds.length
+      >= SECURITY_ACTION_RECOVERY_POLICY.requiredDistinctSources;
+}
+
+export function evaluateSecurityActionRecovery(input = {}) {
+  if (!hasExactKeys(input, RECOVERY_INPUT_KEYS)
+    || !canonicalUtc(input.evaluatedAt)
+    || typeof input.severeCauseResolved !== "boolean") {
+    fail("SECURITY_ACTION_RECOVERY_INPUT_INVALID");
+  }
+  const target = normalizeTarget(input.target);
+  const currentState = defineSecurityActionState(input.currentState);
+  const checkpoint = normalizeRecoveryCheckpoint(input.checkpoint);
+  const activeSevereEvidence = normalizeSevereEvidence(
+    input.activeSevereEvidence,
+    target,
+    input.evaluatedAt,
+  );
+
+  let requirement = SECURITY_ACTION_RECOVERY_POLICY.restricted;
+  if (currentState.targetCertificate === "revoked") {
+    requirement = SECURITY_ACTION_RECOVERY_POLICY.revoked;
+  } else if (currentState.access === "suspended" || currentState.renewal === "blocked") {
+    requirement = SECURITY_ACTION_RECOVERY_POLICY.suspendedOrRenewalBlocked;
+  }
+
+  let nextActionType = null;
+  let reasonCode = "NO_RECOVERY_NEEDED";
+  const recoveryNeeded = currentState.targetCertificate === "revoked"
+    || currentState.access !== "normal"
+    || currentState.renewal !== "allowed";
+  if (!recoveryNeeded) {
+    reasonCode = "NO_RECOVERY_NEEDED";
+  } else if (activeSevereEvidence.length > 0) {
+    reasonCode = "ACTIVE_SEVERE_EVIDENCE";
+  } else if (!recoveryTrustReady(checkpoint, requirement)) {
+    reasonCode = "TRUST_RECOVERY_INCOMPLETE";
+  } else if (currentState.targetCertificate === "revoked" && !input.severeCauseResolved) {
+    reasonCode = "SEVERE_CAUSE_UNRESOLVED";
+  } else if (currentState.targetCertificate === "revoked"
+    && currentState.replacement === "required") {
+    nextActionType = "issue-replacement-certificate";
+    reasonCode = "REPLACEMENT_ELIGIBLE";
+  } else if (currentState.access !== "normal" || currentState.renewal !== "allowed") {
+    nextActionType = "restore-access";
+    reasonCode = "ACCESS_RECOVERY_ELIGIBLE";
+  }
+
+  return deepFreeze({
+    target,
+    eligible: nextActionType !== null,
+    nextActionType,
+    reasonCode,
+    authorizationRequired: SECURITY_ACTION_RECOVERY_POLICY.authorizationClass,
+    targetCertificateReactivated: false,
+    checkpoint,
   });
 }
