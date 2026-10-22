@@ -58,6 +58,13 @@ export {
   createTrustScoreLookupService,
 } from "./score-lookup.mjs";
 
+export {
+  CERTIFICATE_LIFECYCLE_FEEDBACK_POLICY,
+  CertificateLifecycleFeedbackError,
+  createCertificateLifecycleTrustFeedbackConsumer,
+  createPostgresCertificateLifecycleFeedbackRepository,
+} from "./certificate-lifecycle-feedback.mjs";
+
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SUBJECT_ID = /^sub_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const EVIDENCE_ID = /^evd_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;

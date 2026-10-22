@@ -2,7 +2,7 @@
 
 ## Boundary
 
-T9.1 defines the closed-loop security-action state machine without executing actions. The model consumes only a contract-valid policy outcome or a separately authorized escalation or recovery command. It returns a deterministic next posture and rejects invalid combinations. Persistence, retries, certificate-authority calls, session invalidation, feedback evidence and audit delivery remain later Phase 9 tasks.
+T9.1 defines the closed-loop security-action state machine without executing actions. The model consumes only a contract-valid policy outcome or a separately authorized escalation or recovery command. It returns a deterministic next posture and rejects invalid combinations. T9.3 now supplies persistence, retries and certificate-authority confirmation, while T9.4 records authenticated lifecycle outcomes as non-recursive trust feedback. Session invalidation, governed recovery and action audit delivery remain later Phase 9 tasks.
 
 The state is composite because access, renewal eligibility and certificate validity are different controls. A subject can have restricted access while renewal remains allowed, or normal access while renewal is explicitly blocked. Collapsing these facts into one linear status would lose enforcement information.
 

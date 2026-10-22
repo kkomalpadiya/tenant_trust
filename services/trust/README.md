@@ -20,6 +20,8 @@ T6.9 exposes that current transition through a context-bound internal lookup. Po
 
 T6.10 adds a versioned deterministic calibration-fixture catalog and the Phase 6 completion gate. The fixtures exercise normalized and band boundaries, exact freshness, missing/stale behavior, corroborated recovery, replay, flood suspension and tenant scoping. They are machine-labelled as unvalidated regression data and make no claim about real-world accuracy or optimal weights and thresholds.
 
+T9.4 adds a separate authenticated feedback bridge for signed certificate lifecycle events. It deterministically derives certificate evidence, independently confirms the published outbox sequence and digest, retains the immediate lifecycle parent and matching T9.3 action when present, and applies the trust callback in the same transaction as its exactly-once receipt. Every lifecycle-derived record is explicitly ineligible to trigger another security action, preventing self-amplifying revocation loops.
+
 This service does not define raw-claim normalization rules or make the final authorization decision. Those responsibilities belong to the trusted evidence resolvers and policy layer.
 
 Run `npm run trust-state:verify` from the repository root. The focused gate runs unit tests and a rolled-back PostgreSQL scenario.
@@ -31,3 +33,4 @@ Run `npm run trust-configuration:verify` for authorization, validation, atomic a
 Run `npm run trust-explanations:verify` for contract-valid events, canonical digests, exact component/evidence binding, atomic transition storage, idempotency and append-only history.
 Run `npm run trust-score-lookup:verify` for actor binding, fresh score/version output, exact freshness-boundary behavior, stale score withholding and conservative missing/stale denial.
 Run `npm run trust-engine:verify` for the complete Phase 6 test and database gate. Local infrastructure must be running and current migrations applied.
+Run `npm run certificate-trust-feedback:verify` for signed lifecycle validation, causal/action binding, transactional trust effects, duplicate suppression and loop prevention.
