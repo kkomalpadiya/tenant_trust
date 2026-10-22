@@ -36,10 +36,11 @@ T8.2 adds a separately managed Fabric Compose project. Run the Fabric resource c
 npm run check:environment -- --profile=fabric
 npm run fabric:up
 npm run fabric:verify
+npm run ledger-privacy:verify
 npm run fabric:status
 ```
 
-`fabric:up` uses digest-pinned Fabric 2.5.16 peer, orderer and tools images plus Fabric CA 1.5.17. It creates ignored organization identities and channel blocks under `runtime/fabric`, preserves them on repeated starts, and joins the platform peer to both tenant channels while each tenant peer joins only its own. Fabric enrollment and TLS certificates are issued by four Fabric CAs and never reuse the step-ca SaaS certificate hierarchy. See [Reproducible private Fabric network](architecture/reproducible-private-fabric-network.md).
+`fabric:up` uses digest-pinned Fabric 2.5.16 peer, orderer and tools images plus Fabric CA 1.5.17. It creates ignored organization identities and channel blocks under `runtime/fabric`, preserves them on repeated starts, and joins the platform peer to both tenant channels while each tenant peer joins only its own. Fabric enrollment and TLS certificates are issued by four Fabric CAs and never reuse the step-ca SaaS certificate hierarchy. `ledger-privacy:verify` adds live cross-tenant auditor probes and off-chain tamper tests after the normal network gate. See [Reproducible private Fabric network](architecture/reproducible-private-fabric-network.md) and [Fabric ledger privacy and tamper detection](security/fabric-ledger-privacy-and-tamper-detection.md).
 
 Stop only the Fabric services while retaining their identities and ledgers:
 

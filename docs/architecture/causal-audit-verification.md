@@ -31,3 +31,5 @@ Duplicate selected event IDs, incomplete chains and ambiguous references are rej
 ## Verification command
 
 Run `npm run causal-audit:verify` after `npm run infra:migrate` and `npm run fabric:up`. It runs the audit unit suite, proves the restricted database role and tenant/correlation bounds inside a rolled-back transaction, writes or idempotently reuses five deterministic commitments on Tenant Alpha's local channel, rereads them with the separate Fabric verifier identity, validates the full evidence-to-action chain and confirms that an off-chain score change is rejected.
+
+Run `npm run ledger-privacy:verify` for the T8.9 adversarial boundary. It proves tenant-auditor channel separation and tests both simple raw-record tampering and coordinated off-chain record/hash replacement against the immutable Fabric value. The exact security claims and limitations are documented in [Fabric ledger privacy and tamper detection](../security/fabric-ledger-privacy-and-tamper-detection.md).

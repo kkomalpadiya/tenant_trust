@@ -366,6 +366,16 @@ services:
     networks:
       - fabric
 
+  ledger-privacy-verify:
+    image: ${FABRIC_TOOLS_IMAGE}
+    profiles: ["tools"]
+    entrypoint: ["/bin/sh", "/scripts/verify-ledger-privacy.sh"]
+    volumes:
+      - ../../runtime/fabric:/fabric:ro
+      - ./verify-ledger-privacy.sh:/scripts/verify-ledger-privacy.sh:ro
+    networks:
+      - fabric
+
   audit-chaincode-platform:
     <<: *audit-chaincode-common
     hostname: audit-chaincode-platform

@@ -104,6 +104,14 @@ test("rejects a changed off-chain event even when stored hashes remain unchanged
     expectReason("OFFCHAIN_COMMITMENT_MISMATCH"));
 });
 
+test("rejects coordinated off-chain tampering after local commitments are recomputed", async () => {
+  const bundle = fixture();
+  const ledgerByKey = new Map(bundle.records.map(({ ledgerValue }) => [ledgerValue.eventKeyHashSha256,ledgerValue]));
+  bundle.records[1] = rebuild(bundle.records[1], { newScore: 61 });
+  await assert.rejects(verifier(bundle, async ({ eventKeyHashSha256 }) => ledgerByKey.get(eventKeyHashSha256))
+    .verify({ tenantId: ids.tenant,correlationId: ids.correlation }), expectReason("LEDGER_COMMITMENT_MISMATCH"));
+});
+
 test("rejects a ledger value that does not match the recomputed commitment", async () => {
   const bundle = fixture();
   await assert.rejects(verifier(bundle, async () => ({ ...bundle.records[0].ledgerValue,
