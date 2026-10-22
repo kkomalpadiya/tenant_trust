@@ -14,6 +14,8 @@ Workers claim due work with `FOR UPDATE SKIP LOCKED`. A claim has a 300-second l
 
 Completion locks the target posture and compares its version with the version captured at claim time. The database independently derives the permitted next state and rejects a mismatched result. Certificate revocation additionally requires the T3.7 inventory to already report the exact target certificate as `revoked`; an external event reference is retained with the action. Recovery actions remain non-executable until T9.6 supplies authenticated recovery authorization.
 
+Successful suspension or revocation also queues one [session and cached security-state invalidation](security-state-invalidation.md) in the same transaction. Redis work remains asynchronous and retryable, while the action-success timestamp provides the origin for the measured enforcement delay.
+
 Direct table access is denied to the application, requester and worker roles. The requester can only enqueue severity actions through its validated function. The worker can only claim, complete, fail and read a tenant/action-bounded status through security-definer functions.
 
 ## Verification

@@ -126,6 +126,7 @@ npm run security-action-state-machine:verify
 npm run security-action-rules:verify
 npm run security-action-orchestration:verify
 npm run certificate-trust-feedback:verify
+npm run security-state-invalidation:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -226,6 +227,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run security-action-orchestration:verify` is the T9.3 durable execution gate. It runs the orchestrator unit tests, applies pending migrations and exercises a rollback-only PostgreSQL scenario covering stable action IDs, exact replay, lease ownership, retry state, attempt history and versioned terminal success. Run `npm run infra:migrate` separately when deploying the schema to another environment. See [Idempotent security-action orchestration](architecture/idempotent-security-action-orchestration.md).
 
 `npm run certificate-trust-feedback:verify` is the T9.4 feedback gate. It verifies signed certificate lifecycle events before deriving trust evidence, independently requires the matching published outbox sequence and digest, retains lifecycle causation and a matching successful revocation action, and proves redelivery cannot apply a second trust effect. The evidence and trust callback share one transaction, and every derived lifecycle fact is ineligible to trigger another security action. See [Certificate lifecycle trust feedback](architecture/certificate-lifecycle-trust-feedback.md).
+
+`npm run security-state-invalidation:verify` is the T9.5 invalidation gate. It proves successful suspension or revocation atomically queues one durable invalidation, uses leased function-only retries, atomically removes every registered subject session and security-cache key, preserves neighboring tenant/subject state, suppresses exact Redis replay and records action-to-invalidation delay against a five-second target. Run `npm run infra:migrate` in each other environment before starting an invalidation worker. See [Session and cached security-state invalidation](architecture/security-state-invalidation.md).
 
 `npm run trust-configuration:verify` is the T6.7 versioned-configuration gate. It checks tenant-administrator authority, complete range and weight validation, direct-write denial, serialized version allocation, atomic activation, immutable lifecycle history and rollback by copying historical values into a new active version. Migration `022_versioned_trust_configuration_lifecycle.sql` must be applied first. See [Versioned trust configuration lifecycle](architecture/versioned-trust-configuration.md).
 

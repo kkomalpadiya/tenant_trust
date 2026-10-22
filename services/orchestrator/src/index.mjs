@@ -11,6 +11,17 @@ export {
   createSecurityActionExecutor,
 } from "./action-orchestration.mjs";
 
+export {
+  SECURITY_STATE_INVALIDATION_POLICY,
+  SecurityStateInvalidationError,
+  createPostgresSecurityStateInvalidationRepository,
+  createRedisSecurityStateStore,
+  createSecurityStateInvalidationWorker,
+  securitySessionRedisKey,
+  securityStateRedisKeys,
+  subjectSecurityCacheRedisKey,
+} from "./security-state-invalidation.mjs";
+
 export const POLICY_OUTCOMES = Object.freeze([
   "ALLOW",
   "STEP_UP",
