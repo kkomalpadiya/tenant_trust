@@ -60,6 +60,6 @@ Revocation is never reversed. Recovery issues a distinct certificate and leaves 
 
 ## Scope and verification
 
-`services/orchestrator/src/index.mjs` exports immutable trigger/recovery policies and pure evaluators. The evaluators return candidate action types, corroboration details and stable reason codes. They do not call the CA, write state, invalidate sessions, ingest feedback evidence or submit audit commitments.
+`services/orchestrator/src/index.mjs` exports immutable trigger/recovery policies and pure evaluators. The evaluators return candidate action types, corroboration details and stable reason codes. T9.3 consumes authorized actions through the durable queue described in [Idempotent security-action orchestration](idempotent-security-action-orchestration.md); the evaluators themselves remain free of side effects.
 
 Run `npm run security-action-rules:verify` for the orchestrator unit suite and the independent T9.2 gate. The gate proves that score-only deterioration cannot revoke, corroborated severe evidence can authorize revocation, recovery inherits T6.6 safeguards and a revoked target can recover only through replacement.

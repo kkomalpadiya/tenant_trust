@@ -123,6 +123,8 @@ npm run policy-provenance:verify
 npm run adaptive-authorization-scenario:verify
 npm run context-aware-authorization:verify
 npm run security-action-state-machine:verify
+npm run security-action-rules:verify
+npm run security-action-orchestration:verify
 npm run test:tenant-context
 npm run messaging:verify
 npm run runtime-isolation:verify
@@ -218,7 +220,9 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 
 `npm run security-action-state-machine:verify` is the T9.1 definition gate. It checks the shared OPA outcome and action-event contracts, exact QUARANTINE obligation mapping, reversible restriction/suspension/renewal blocking, irreversible certificate revocation, replacement-before-recovery ordering, idempotent repeats and fail-closed invalid states. It does not execute or persist actions. See [Security action state machine](architecture/security-action-state-machine.md).
 
-`npm run security-action-rules:verify` is the T9.2 severity and recovery-rule gate. It proves that policy quarantine causes only reversible containment, a score dip alone can never revoke, uncorroborated severe evidence only blocks renewal, two fresh sources and two critical kinds plus a matching critical trust transition are required for revocation, and recovery inherits the T6.6 two-source/two-evaluation thresholds. It defines eligibility only; T9.3 persistence/execution and T9.6 recovery authorization remain separate. See [Security action trigger severity and recovery rules](architecture/security-action-trigger-recovery-rules.md).
+`npm run security-action-rules:verify` is the T9.2 severity and recovery-rule gate. It proves that policy quarantine causes only reversible containment, a score dip alone can never revoke, uncorroborated severe evidence only blocks renewal, two fresh sources and two critical kinds plus a matching critical trust transition are required for revocation, and recovery inherits the T6.6 two-source/two-evaluation thresholds. It defines eligibility only; T9.3 consumes authorized actions and T9.6 still governs recovery authorization. See [Security action trigger severity and recovery rules](architecture/security-action-trigger-recovery-rules.md).
+
+`npm run security-action-orchestration:verify` is the T9.3 durable execution gate. It runs the orchestrator unit tests, applies pending migrations and exercises a rollback-only PostgreSQL scenario covering stable action IDs, exact replay, lease ownership, retry state, attempt history and versioned terminal success. Run `npm run infra:migrate` separately when deploying the schema to another environment. See [Idempotent security-action orchestration](architecture/idempotent-security-action-orchestration.md).
 
 `npm run trust-configuration:verify` is the T6.7 versioned-configuration gate. It checks tenant-administrator authority, complete range and weight validation, direct-write denial, serialized version allocation, atomic activation, immutable lifecycle history and rollback by copying historical values into a new active version. Migration `022_versioned_trust_configuration_lifecycle.sql` must be applied first. See [Versioned trust configuration lifecycle](architecture/versioned-trust-configuration.md).
 

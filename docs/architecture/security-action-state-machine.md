@@ -51,4 +51,4 @@ Repeated application of the same action is idempotent. A stronger existing contr
 
 ## Executable contract
 
-`services/orchestrator/src/index.mjs` exports the stable outcomes, action catalog, policy mapping, composite-state validator and pure transition function. `npm run security-action-state-machine:verify` runs unit tests plus an independent gate that checks the model against the shared OPA and action-event schemas and exercises reversible and irreversible paths.
+`services/orchestrator/src/index.mjs` exports the stable outcomes, action catalog, policy mapping, composite-state validator and pure transition function. T9.3 applies that function through the [durable idempotent orchestrator](idempotent-security-action-orchestration.md). `npm run security-action-state-machine:verify` runs unit tests plus an independent gate that checks the model against the shared OPA and action-event schemas and exercises reversible and irreversible paths.

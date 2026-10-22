@@ -2,6 +2,14 @@ import {
   CRITICAL_EVIDENCE_OVERRIDE_RULES,
   DEFAULT_TRUST_TRANSITION_CONFIGURATION,
 } from "@tenant-trust/trust";
+import { createSecurityActionWorker as createSecurityActionWorkerBase } from "./action-orchestration.mjs";
+
+export {
+  SECURITY_ACTION_ORCHESTRATION_POLICY,
+  SecurityActionOrchestrationError,
+  createPostgresSecurityActionRepository,
+  createSecurityActionExecutor,
+} from "./action-orchestration.mjs";
 
 export const POLICY_OUTCOMES = Object.freeze([
   "ALLOW",
@@ -592,5 +600,12 @@ export function evaluateSecurityActionRecovery(input = {}) {
     authorizationRequired: SECURITY_ACTION_RECOVERY_POLICY.authorizationClass,
     targetCertificateReactivated: false,
     checkpoint,
+  });
+}
+
+export function createSecurityActionWorker(options = {}) {
+  return createSecurityActionWorkerBase({
+    ...options,
+    transitionState: transitionSecurityActionState,
   });
 }
