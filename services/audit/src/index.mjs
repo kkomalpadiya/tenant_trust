@@ -5,6 +5,15 @@ export {
   createCausalAuditVerifier,
   createPostgresCausalAuditVerificationRepository,
 } from "./verification.mjs";
+export {
+  SECURITY_ACTION_AUDIT_POLICY,
+  SecurityActionAuditError,
+  buildSecurityActionAuditEvent,
+  createPostgresSecurityActionAuditRepository,
+  createPostgresSecurityActionAuditVerificationRepository,
+  createSecurityActionAuditProjector,
+  createSecurityActionAuditVerifier,
+} from "./security-action-anchoring.mjs";
 
 const TENANT_ID = /^tnt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const EVENT_ID = /^evt_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;

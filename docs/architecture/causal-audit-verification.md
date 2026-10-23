@@ -23,7 +23,9 @@ A successful report requires all of these links:
 2. Each decision names one trust transition for the same subject and exact score, and that transition cannot occur after the decision.
 3. Each decision names an active policy version committed no later than the decision.
 4. Each decision names an active certificate for the same subject committed no later than the decision.
-5. Each security action names the exact decision as both its decision reference and immediate cause. Its target certificate must equal the decision certificate and resolve to a committed certificate lifecycle record.
+5. Each policy/severity action names the exact decision as both its decision reference and immediate cause. Governed recovery instead names the exact recovered trust transition and authorization metadata. Terminal action events name the requested action event, and successful revocation or replacement names the exact certificate lifecycle event.
+
+T9.7 adds an authoritative expectation set alongside correlation lookup. The action verifier starts from immutable database-captured lifecycle points rather than only the records that happen to exist in the audit outbox. It therefore rejects a missing action commitment, altered governance metadata, a broken requested-to-terminal link or a mismatched certificate outcome. See [Security-action and recovery audit anchoring](security-action-audit-anchoring.md).
 6. Every other non-null causation ID resolves to either another committed event in the bundle or a durable evidence delivery event, and a committed cause cannot occur after its effect.
 
 Duplicate selected event IDs, incomplete chains and ambiguous references are rejected. The verification result contains counts and Fabric transaction/block metadata, but no raw evidence or credentials.

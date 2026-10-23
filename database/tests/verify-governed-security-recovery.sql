@@ -414,7 +414,17 @@ BEGIN
       AND state = 'active'
   ) OR (SELECT count(*) FROM audit.step_up_proofs
         WHERE tenant_id = 'tnt_018f1234-5678-7abc-8def-012345678af0'
-          AND consumed_at IS NOT NULL) <> 2 THEN
+          AND consumed_at IS NOT NULL) <> 2
+     OR (SELECT count(*) FROM audit.security_action_audit_events
+         WHERE tenant_id = 'tnt_018f1234-5678-7abc-8def-012345678af0'
+           AND action_id IN (
+             'act_018f1234-5678-7abc-8def-012345678b01',
+             'act_018f1234-5678-7abc-8def-012345678b15'
+           )
+           AND authority_class = 'recovery-authorization'
+           AND recovery_authorization_id IS NOT NULL
+           AND recovery_trust_transition_id = 'trn_018f1234-5678-7abc-8def-012345678af9'
+           AND recovery_authorized_by_subject_id = 'sub_018f1234-5678-7abc-8def-012345678af1') <> 4 THEN
     RAISE EXCEPTION 'governed recovery did not preserve revocation and fresh issuance';
   END IF;
 END
