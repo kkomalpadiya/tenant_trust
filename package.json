@@ -102,6 +102,7 @@
     "security-action-operations:verify": "npm run test:orchestrator && npm run infra:migrate && node scripts/verify-security-action-operational-failures.mjs",
     "security-action-operations:status": "node scripts/show-security-action-operations.mjs",
     "security-action-operations:recover": "node scripts/show-security-action-operations.mjs --recover-expired",
+    "security-feedback-loop:verify": "node scripts/verify-security-action-feedback-loop.mjs",
     "security-action-audit:projector": "node scripts/run-security-action-audit-projector.mjs",
     "audit-outbox:worker": "node scripts/run-audit-outbox-worker.mjs",
     "audit-outbox:status": "node scripts/show-audit-outbox-status.mjs",
