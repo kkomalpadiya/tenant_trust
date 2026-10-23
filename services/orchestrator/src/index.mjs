@@ -3,6 +3,7 @@ import {
   DEFAULT_TRUST_TRANSITION_CONFIGURATION,
 } from "@tenant-trust/trust";
 import { createSecurityActionWorker as createSecurityActionWorkerBase } from "./action-orchestration.mjs";
+import { createGovernedRecoveryService as createGovernedRecoveryServiceBase } from "./governed-recovery.mjs";
 
 export {
   SECURITY_ACTION_ORCHESTRATION_POLICY,
@@ -21,6 +22,12 @@ export {
   securityStateRedisKeys,
   subjectSecurityCacheRedisKey,
 } from "./security-state-invalidation.mjs";
+
+export {
+  GOVERNED_RECOVERY_POLICY,
+  GovernedRecoveryError,
+  createPostgresGovernedRecoveryRepository,
+} from "./governed-recovery.mjs";
 
 export const POLICY_OUTCOMES = Object.freeze([
   "ALLOW",
@@ -618,5 +625,12 @@ export function createSecurityActionWorker(options = {}) {
   return createSecurityActionWorkerBase({
     ...options,
     transitionState: transitionSecurityActionState,
+  });
+}
+
+export function createGovernedRecoveryService(options = {}) {
+  return createGovernedRecoveryServiceBase({
+    ...options,
+    evaluateRecovery: evaluateSecurityActionRecovery,
   });
 }

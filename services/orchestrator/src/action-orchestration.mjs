@@ -7,6 +7,7 @@ const ACTION_ID = /^act_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{
 const DECISION_ID = /^dec_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const CORRELATION_ID = /^cor_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const CLAIM_TOKEN = /^clm_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const RECOVERY_AUTHORIZATION_ID = /^rca_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const WORKER_ID = /^[a-z0-9][a-z0-9._:-]{2,127}$/u;
 const REASON_CODE = /^[A-Z][A-Z0-9_]{2,63}$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
@@ -125,6 +126,12 @@ function mapClaim(row) {
     attemptCount: Number(row.attempt_count),
     expectedStateVersion: Number(row.expected_state_version),
     currentState: mapState(row),
+    recoveryAuthorizationId: row.recovery_authorization_id ?? null,
+    recoveryAuthorizedBySubjectId: row.recovery_authorized_by_subject_id ?? null,
+    recoveryAuthorizedUntil: row.recovery_authorized_until
+      ? iso(row.recovery_authorized_until)
+      : null,
+    causeResolutionReference: row.cause_resolution_reference ?? null,
   };
   validateActionIdentity(claim, true);
   if (!DECISION_ID.test(claim.decisionId ?? "")
@@ -138,7 +145,18 @@ function mapClaim(row) {
     || !Number.isSafeInteger(claim.attemptCount)
     || claim.attemptCount < 1
     || !Number.isSafeInteger(claim.expectedStateVersion)
-    || claim.expectedStateVersion < 1) {
+    || claim.expectedStateVersion < 1
+    || (claim.authorityClass === "recovery-authorization"
+      && (!RECOVERY_AUTHORIZATION_ID.test(claim.recoveryAuthorizationId ?? "")
+        || !SUBJECT_ID.test(claim.recoveryAuthorizedBySubjectId ?? "")
+        || claim.recoveryAuthorizedUntil === null
+        || (claim.actionType === "issue-replacement-certificate"
+          && !EXTERNAL_REFERENCE.test(claim.causeResolutionReference ?? ""))))
+    || (claim.authorityClass !== "recovery-authorization"
+      && (claim.recoveryAuthorizationId !== null
+        || claim.recoveryAuthorizedBySubjectId !== null
+        || claim.recoveryAuthorizedUntil !== null
+        || claim.causeResolutionReference !== null))) {
     fail("SECURITY_ACTION_SOURCE_INVALID");
   }
   return Object.freeze(claim);
@@ -268,10 +286,19 @@ export function createPostgresSecurityActionRepository({
   });
 }
 
-export function createSecurityActionExecutor({ revokeCertificate } = {}) {
+export function createSecurityActionExecutor({
+  revokeCertificate,
+  issueReplacementCertificate,
+  clock = () => new Date(),
+} = {}) {
   if (revokeCertificate !== undefined && typeof revokeCertificate !== "function") {
     throw new TypeError("The optional certificate revocation executor must be a function.");
   }
+  if (issueReplacementCertificate !== undefined
+    && typeof issueReplacementCertificate !== "function") {
+    throw new TypeError("The optional replacement-certificate executor must be a function.");
+  }
+  if (typeof clock !== "function") throw new TypeError("The executor clock must be a function.");
   return Object.freeze({
     async execute(action, options) {
       if (!action || !ACTION_TYPES.has(action.actionType) || !ACTION_ID.test(action.actionId ?? "")) {
@@ -299,7 +326,33 @@ export function createSecurityActionExecutor({ revokeCertificate } = {}) {
           externalReference: result.eventId,
         });
       }
-      fail("RECOVERY_EXECUTION_NOT_GOVERNED");
+      if (action.authorityClass !== "recovery-authorization"
+        || !RECOVERY_AUTHORIZATION_ID.test(action.recoveryAuthorizationId ?? "")
+        || !SUBJECT_ID.test(action.recoveryAuthorizedBySubjectId ?? "")
+        || new Date(action.recoveryAuthorizedUntil).getTime() < new Date(clock()).getTime()) {
+        fail("RECOVERY_AUTHORIZATION_INVALID");
+      }
+      if (action.actionType === "restore-access") {
+        return Object.freeze({
+          actionId: action.actionId,
+          status: "succeeded",
+          externalReference: null,
+        });
+      }
+      if (!issueReplacementCertificate) fail("REPLACEMENT_EXECUTOR_UNAVAILABLE");
+      const result = await issueReplacementCertificate(action, options);
+      if (!result
+        || result.targetCertificateId !== action.targetCertificateId
+        || !CERTIFICATE_ID.test(result.replacementCertificateId ?? "")
+        || result.replacementCertificateId === action.targetCertificateId
+        || result.state !== "active") {
+        fail("REPLACEMENT_ISSUANCE_UNCONFIRMED");
+      }
+      return Object.freeze({
+        actionId: action.actionId,
+        status: "succeeded",
+        externalReference: result.replacementCertificateId,
+      });
     },
   });
 }

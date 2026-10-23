@@ -96,6 +96,7 @@
     "security-action-orchestration:verify": "npm run test:orchestrator && npm run infra:migrate && node scripts/verify-security-action-orchestration.mjs",
     "certificate-trust-feedback:verify": "npm run test:certificate-events && npm run test:trust && npm run infra:migrate && node scripts/verify-certificate-lifecycle-trust-feedback.mjs",
     "security-state-invalidation:verify": "npm run test:orchestrator && npm run infra:migrate && node scripts/verify-security-state-invalidation.mjs",
+    "security-recovery:verify": "npm run test:orchestrator && npm run infra:migrate && node scripts/verify-governed-security-recovery.mjs",
     "audit-outbox:worker": "node scripts/run-audit-outbox-worker.mjs",
     "audit-outbox:status": "node scripts/show-audit-outbox-status.mjs",
     "fabric:up": "node scripts/fabric-network.mjs up",

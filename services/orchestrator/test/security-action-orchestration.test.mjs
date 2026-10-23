@@ -185,34 +185,92 @@ test("certificate revocation requires an exact external confirmation", async () 
   );
 });
 
-test("recovery actions remain blocked until governed recovery is implemented", async () => {
-  let failure;
+test("recovery execution requires a live governed authorization", async () => {
+  const authorization = {
+    recoveryAuthorizationId: "rca_018f1234-5678-7abc-8def-0123456789e6",
+    recoveryAuthorizedBySubjectId: ids.targetSubjectId,
+    recoveryAuthorizedUntil: "2026-10-22T10:05:00.000Z",
+    causeResolutionReference: null,
+  };
+  let stored;
   const worker = createSecurityActionWorker({
     workerId: "orchestrator.test-4",
     repository: {
       claimNext: async () => claim({
         actionType: "restore-access",
         authorityClass: "recovery-authorization",
+        ...authorization,
         currentState: Object.freeze({
           access: "restricted", renewal: "blocked",
           targetCertificate: "active", replacement: "not-required",
         }),
       }),
-      markSucceeded: async () => assert.fail("ungoverned recovery must not succeed"),
-      markFailed: async (value) => {
-        failure = value;
+      markSucceeded: async (value) => {
+        stored = value;
         return {
-          tenantId: ids.tenantId, actionId: ids.actionId, status: "failed",
-          attemptCount: 1, lastFailureCode: value.failureCode,
-          nextAttemptAt: "2026-10-22T10:00:05.000Z", succeededAt: null,
+          tenantId: ids.tenantId, actionId: ids.actionId, status: "succeeded",
+          attemptCount: 1, lastFailureCode: null, nextAttemptAt: null,
+          succeededAt: "2026-10-22T10:00:01.000Z",
         };
       },
+      markFailed: async () => assert.fail("authorized recovery must not fail"),
     },
-    executor: createSecurityActionExecutor(),
+    executor: createSecurityActionExecutor({
+      clock: () => new Date("2026-10-22T10:00:00.000Z"),
+    }),
   });
 
-  await worker.runOnce();
-  assert.equal(failure.failureCode, "RECOVERY_EXECUTION_NOT_GOVERNED");
+  const result = await worker.runOnce();
+  assert.equal(result.status, "succeeded");
+  assert.deepEqual(stored.resultState, {
+    access: "normal", renewal: "allowed",
+    targetCertificate: "active", replacement: "not-required",
+  });
+
+  await assert.rejects(
+    createSecurityActionExecutor({
+      clock: () => new Date("2026-10-22T10:00:00.000Z"),
+    }).execute(claim({
+      actionType: "restore-access",
+      authorityClass: "recovery-authorization",
+    })),
+    (error) => error instanceof SecurityActionOrchestrationError
+      && error.reasonCode === "RECOVERY_AUTHORIZATION_INVALID",
+  );
+});
+
+test("replacement execution confirms a fresh distinct certificate", async () => {
+  const action = claim({
+    actionType: "issue-replacement-certificate",
+    authorityClass: "recovery-authorization",
+    recoveryAuthorizationId: "rca_018f1234-5678-7abc-8def-0123456789e6",
+    recoveryAuthorizedBySubjectId: ids.targetSubjectId,
+    recoveryAuthorizedUntil: "2026-10-22T10:05:00.000Z",
+    causeResolutionReference: "case:resolved:123",
+  });
+  const replacementCertificateId = "crt_018f1234-5678-7abc-8def-0123456789e7";
+  const executor = createSecurityActionExecutor({
+    clock: () => new Date("2026-10-22T10:00:00.000Z"),
+    issueReplacementCertificate: async () => ({
+      targetCertificateId: ids.targetCertificateId,
+      replacementCertificateId,
+      state: "active",
+    }),
+  });
+  assert.equal((await executor.execute(action)).externalReference, replacementCertificateId);
+
+  await assert.rejects(
+    createSecurityActionExecutor({
+      clock: () => new Date("2026-10-22T10:00:00.000Z"),
+      issueReplacementCertificate: async () => ({
+        targetCertificateId: ids.targetCertificateId,
+        replacementCertificateId: ids.targetCertificateId,
+        state: "active",
+      }),
+    }).execute(action),
+    (error) => error instanceof SecurityActionOrchestrationError
+      && error.reasonCode === "REPLACEMENT_ISSUANCE_UNCONFIRMED",
+  );
 });
 
 test("repository fails closed on malformed claimed work", async () => {

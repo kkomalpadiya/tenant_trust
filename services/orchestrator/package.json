@@ -8,6 +8,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "@tenant-trust/tenant-context": "0.1.0",
     "@tenant-trust/trust": "0.1.0"
   }
 }

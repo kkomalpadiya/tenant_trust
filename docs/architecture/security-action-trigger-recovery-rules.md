@@ -2,7 +2,7 @@
 
 ## Boundary
 
-T9.2 defines the pure decision rules that sit between validated trust/policy inputs and the T9.1 security-action state machine. The rules select candidate actions; they do not persist, execute or authorize them. T9.3 will provide durable idempotent orchestration, and T9.6 will authenticate the recovery actor and execute the governed recovery workflow.
+T9.2 defines the pure decision rules that sit between validated trust/policy inputs and the T9.1 security-action state machine. The rules select candidate actions; they do not persist, execute or authorize them. T9.3 provides durable idempotent orchestration, and T9.6 authenticates the recovery actor and executes the workflow described in [Governed security recovery and re-enrollment](governed-security-recovery.md).
 
 Inputs must come from trusted internal records: a schema-valid policy decision, the persisted T6.6 trust transition, and accepted evidence receipts already bound to the same tenant and subject. Public callers cannot declare evidence accepted, choose a severity or supply a score ceiling.
 
@@ -43,7 +43,7 @@ If any revocation condition is missing, the most severe evidence-driven action i
 
 ## Recovery eligibility
 
-Recovery eligibility is separate from recovery authorization. Every eligible result still names the `recovery-authorization` authority class, which T9.6 must enforce before any action executes. An `ALLOW` policy result never restores durable state.
+Recovery eligibility is separate from recovery authorization. Every eligible result still names the `recovery-authorization` authority class. T9.6 enforces that class with a current tenant administrator, single-use step-up proof, current trust transition and exact state version before any action executes. An `ALLOW` policy result never restores durable state.
 
 The recovery checkpoint is derived from persisted T6.6 transition history. It must record a completed `recovered` transition, at least two consecutive qualifying evaluations and at least two distinct enrolled sources. Active severe evidence blocks every recovery path.
 

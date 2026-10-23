@@ -12,11 +12,13 @@ An `AFTER INSERT` trigger mirrors each append-only `audit.security_action_reques
 
 Workers claim due work with `FOR UPDATE SKIP LOCKED`. A claim has a 300-second lease and a unique token. Only that token can finish the attempt. Expired leases become visible failures and can be reclaimed. Failures retain the same action ID and use exponential delays starting at five seconds, capped at ten minutes.
 
-Completion locks the target posture and compares its version with the version captured at claim time. The database independently derives the permitted next state and rejects a mismatched result. Certificate revocation additionally requires the T3.7 inventory to already report the exact target certificate as `revoked`; an external event reference is retained with the action. Recovery actions remain non-executable until T9.6 supplies authenticated recovery authorization.
+Completion locks the target posture and compares its version with the version captured at claim time. The database independently derives the permitted next state and rejects a mismatched result. Certificate revocation additionally requires the T3.7 inventory to already report the exact target certificate as `revoked`; an external event reference is retained with the action. T9.6 recovery work is claimable only while a matching short-lived authorization remains current. Replacement completion requires a newly issued active certificate for the same subject, and restore completion never changes the revoked target certificate.
 
 Successful suspension or revocation also queues one [session and cached security-state invalidation](security-state-invalidation.md) in the same transaction. Redis work remains asynchronous and retryable, while the action-success timestamp provides the origin for the measured enforcement delay.
 
 Direct table access is denied to the application, requester and worker roles. The requester can only enqueue severity actions through its validated function. The worker can only claim, complete, fail and read a tenant/action-bounded status through security-definer functions.
+
+[Governed security recovery and re-enrollment](governed-security-recovery.md) documents the administrator step-up, current trust/state binding and two-stage replacement/restore flow.
 
 ## Verification
 
