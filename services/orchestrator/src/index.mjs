@@ -13,6 +13,13 @@ export {
 } from "./action-orchestration.mjs";
 
 export {
+  SECURITY_ACTION_OPERATIONS_POLICY,
+  SecurityActionOperationsError,
+  createPostgresSecurityActionOperationsRepository,
+  createSecurityActionOperationsMonitor,
+} from "./action-operations.mjs";
+
+export {
   SECURITY_STATE_INVALIDATION_POLICY,
   SecurityStateInvalidationError,
   createPostgresSecurityStateInvalidationRepository,
