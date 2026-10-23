@@ -98,6 +98,7 @@
     "security-state-invalidation:verify": "npm run test:orchestrator && npm run infra:migrate && node scripts/verify-security-state-invalidation.mjs",
     "security-recovery:verify": "npm run test:orchestrator && npm run infra:migrate && node scripts/verify-governed-security-recovery.mjs",
     "security-action-audit:verify": "npm run test:contracts && npm run test:audit && npm run infra:migrate && node scripts/verify-security-action-audit-anchoring.mjs && node scripts/verify-governed-security-recovery.mjs",
+    "security-action-adversarial:verify": "node scripts/verify-security-action-adversarial.mjs",
     "security-action-audit:projector": "node scripts/run-security-action-audit-projector.mjs",
     "audit-outbox:worker": "node scripts/run-audit-outbox-worker.mjs",
     "audit-outbox:status": "node scripts/show-audit-outbox-status.mjs",

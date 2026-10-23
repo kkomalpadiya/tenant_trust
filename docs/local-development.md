@@ -125,6 +125,7 @@ npm run context-aware-authorization:verify
 npm run security-action-state-machine:verify
 npm run security-action-rules:verify
 npm run security-action-orchestration:verify
+npm run security-action-adversarial:verify
 npm run certificate-trust-feedback:verify
 npm run security-state-invalidation:verify
 npm run test:tenant-context
@@ -227,6 +228,8 @@ Platform tenant lifecycle operations use the separate `tenant_trust_platform_adm
 `npm run security-recovery:verify` is the T9.6 governed recovery gate. It proves tenant-admin and single-use step-up authorization, current trust and security-state binding, exact replay, fresh distinct replacement issuance, a separately authorized access restoration and permanent revocation of the original target certificate. The database scenario rolls back. Production wiring must provide the active severe-evidence loader and a T3.3 issuance adapter that verifies a new subject key/CSR. See [Governed security recovery and re-enrollment](architecture/governed-security-recovery.md).
 
 `npm run security-action-audit:verify` is the T9.7 action/recovery anchoring gate. It checks the extended event contract and audit verifier, applies migrations, proves automatic immutable request/terminal capture and function-only projector privileges in a rollback-only database scenario, and confirms the two-stage recovery creates four authorization-bound expectations. Run `npm run security-action-audit:projector` with `npm run audit-outbox:worker` in deployed environments: the first process projects ready action events into PostgreSQL's Fabric outbox and the second submits and reconciles them on Fabric. See [Security-action and recovery audit anchoring](architecture/security-action-audit-anchoring.md).
+
+`npm run security-action-adversarial:verify` is the T9.8 integrated safety gate. It tests trust oscillation, one-source compromise, repeated action triggers, certificate-feedback and Redis redelivery, competing recovery authorization and stale recovery state. Migration `040_security_action_conflict_safeguards.sql` makes redundant or stale work visible without allowing an external executor to reapply it. See [Security-action adversarial verification](architecture/security-action-adversarial-verification.md).
 
 `npm run security-action-orchestration:verify` is the T9.3 durable execution gate. It runs the orchestrator unit tests, applies pending migrations and exercises a rollback-only PostgreSQL scenario covering stable action IDs, exact replay, lease ownership, retry state, attempt history and versioned terminal success. Run `npm run infra:migrate` separately when deploying the schema to another environment. See [Idempotent security-action orchestration](architecture/idempotent-security-action-orchestration.md).
 

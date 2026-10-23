@@ -109,6 +109,23 @@ BEGIN
     'revoke-certificate', 'severity-rule', 'CORROBORATED_CRITICAL_EVIDENCE',
     repeat('c', 64), v_now
   );
+  UPDATE orchestration.subject_security_states SET
+    access_state = 'suspended', renewal_state = 'blocked',
+    target_certificate_state = 'revoked', replacement_state = 'required',
+    state_version = 2, last_action_id = v_action.action_id, updated_at = v_now
+  WHERE tenant_id = v_action.tenant_id
+    AND subject_id = v_action.target_subject_id
+    AND certificate_id = v_action.target_certificate_id;
+  UPDATE orchestration.security_actions SET attempt_count = 1
+  WHERE tenant_id = v_action.tenant_id AND action_id = v_action.action_id;
+  INSERT INTO orchestration.security_action_attempts (
+    tenant_id, action_id, attempt_number, claim_token, worker_id,
+    status, started_at, completed_at, external_reference
+  ) VALUES (
+    v_action.tenant_id, v_action.action_id, 1,
+    'clm_018f1234-5678-7abc-8def-0123456789d5', 'feedback.verify',
+    'succeeded', v_now, v_now, 'evt_018f1234-5678-7abc-8def-0123456789d1'
+  );
   UPDATE orchestration.security_actions SET
     status = 'succeeded', external_reference = 'evt_018f1234-5678-7abc-8def-0123456789d1',
     result_state = '{"access":"suspended","renewal":"blocked","targetCertificate":"revoked","replacement":"required"}',

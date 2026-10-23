@@ -156,6 +156,13 @@ BEGIN
       'suf_018f1234-5678-7abc-8def-012345678afd', 'tenant:admin',
       'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC', repeat('4', 64),
       'verified', v_now - interval '30 seconds', v_now + interval '90 seconds',
+      v_now - interval '20 seconds'),
+    ('tnt_018f1234-5678-7abc-8def-012345678af0',
+      'sub_018f1234-5678-7abc-8def-012345678af1',
+      'suc_018f1234-5678-7abc-8def-012345678b20',
+      'suf_018f1234-5678-7abc-8def-012345678afd', 'tenant:admin',
+      'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD', repeat('4', 64),
+      'verified', v_now - interval '30 seconds', v_now + interval '90 seconds',
       v_now - interval '20 seconds');
   INSERT INTO audit.step_up_proofs (
     tenant_id, subject_id, proof_id_hash_sha256, challenge_id, action,
@@ -168,6 +175,10 @@ BEGIN
     ('tnt_018f1234-5678-7abc-8def-012345678af0',
       'sub_018f1234-5678-7abc-8def-012345678af1', repeat('6', 64),
       'suc_018f1234-5678-7abc-8def-012345678aff', 'tenant:admin', repeat('4', 64),
+      v_now - interval '20 seconds', v_now + interval '4 minutes'),
+    ('tnt_018f1234-5678-7abc-8def-012345678af0',
+      'sub_018f1234-5678-7abc-8def-012345678af1', repeat('a', 64),
+      'suc_018f1234-5678-7abc-8def-012345678b20', 'tenant:admin', repeat('4', 64),
       v_now - interval '20 seconds', v_now + interval '4 minutes');
 END
 $fixture$;
@@ -258,6 +269,26 @@ BEGIN
      OR v_replay.action_id <> v_authorization.action_id THEN
     RAISE EXCEPTION 'exact recovery replay did not return the original authorization';
   END IF;
+
+  BEGIN
+    PERFORM orchestration.authorize_security_recovery(
+      'rca_018f1234-5678-7abc-8def-012345678b20',
+      'act_018f1234-5678-7abc-8def-012345678b21',
+      'dec_018f1234-5678-7abc-8def-012345678b22',
+      'req_018f1234-5678-7abc-8def-012345678b23',
+      'cor_018f1234-5678-7abc-8def-012345678b24',
+      'governed-recovery-concurrent',
+      'sub_018f1234-5678-7abc-8def-012345678af2',
+      'crt_018f1234-5678-7abc-8def-012345678af4',
+      'issue-replacement-certificate',
+      'trn_018f1234-5678-7abc-8def-012345678af9', 7,
+      'REPLACEMENT_ELIGIBLE', repeat('b', 64), repeat('a', 64), repeat('4', 64),
+      'case:resolved:123', clock_timestamp()
+    );
+    RAISE EXCEPTION 'a concurrent recovery authorization reused one state checkpoint';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN
+    IF SQLERRM <> 'RECOVERY_ALREADY_AUTHORIZED' THEN RAISE; END IF;
+  END;
 END
 $authorize_replacement$;
 
@@ -267,6 +298,14 @@ BEGIN
   IF (SELECT count(*) FROM orchestration.security_recovery_authorizations
       WHERE idempotency_key = 'governed-recovery-replacement') <> 1 THEN
     RAISE EXCEPTION 'exact recovery replay created a duplicate authorization';
+  ELSIF EXISTS (
+    SELECT 1 FROM orchestration.security_actions
+    WHERE action_id = 'act_018f1234-5678-7abc-8def-012345678b21'
+  ) OR EXISTS (
+    SELECT 1 FROM audit.step_up_proofs
+    WHERE proof_id_hash_sha256 = repeat('a', 64) AND consumed_at IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'rejected concurrent recovery retained an action or consumed its proof';
   END IF;
 END
 $verify_replay_count$;
@@ -392,6 +431,59 @@ END
 $complete_restore$;
 
 RESET ROLE;
+DO $stale_recovery_fixture$
+DECLARE v_now timestamptz := clock_timestamp();
+BEGIN
+  PERFORM orchestration.enqueue_security_action_internal(
+    'tnt_018f1234-5678-7abc-8def-012345678af0',
+    'act_018f1234-5678-7abc-8def-012345678b25',
+    'dec_018f1234-5678-7abc-8def-012345678b26',
+    'cor_018f1234-5678-7abc-8def-012345678b27',
+    'sub_018f1234-5678-7abc-8def-012345678af2',
+    'crt_018f1234-5678-7abc-8def-012345678af4',
+    'restore-access', 'recovery-authorization', 'ACCESS_RECOVERY_ELIGIBLE',
+    repeat('c', 64), v_now
+  );
+  INSERT INTO orchestration.security_recovery_authorizations (
+    tenant_id, authorization_id, action_id, decision_id, request_id,
+    correlation_id, idempotency_key, authorized_by_subject_id,
+    target_subject_id, target_certificate_id, action_type, trust_transition_id,
+    expected_state_version, reason_code, eligibility_hash_sha256,
+    step_up_proof_id_hash_sha256, cause_resolution_reference,
+    authorized_at, expires_at
+  ) VALUES (
+    'tnt_018f1234-5678-7abc-8def-012345678af0',
+    'rca_018f1234-5678-7abc-8def-012345678b28',
+    'act_018f1234-5678-7abc-8def-012345678b25',
+    'dec_018f1234-5678-7abc-8def-012345678b26',
+    'req_018f1234-5678-7abc-8def-012345678b29',
+    'cor_018f1234-5678-7abc-8def-012345678b27',
+    'governed-recovery-stale-state',
+    'sub_018f1234-5678-7abc-8def-012345678af1',
+    'sub_018f1234-5678-7abc-8def-012345678af2',
+    'crt_018f1234-5678-7abc-8def-012345678af4',
+    'restore-access', 'trn_018f1234-5678-7abc-8def-012345678af9', 7,
+    'ACCESS_RECOVERY_ELIGIBLE', repeat('c', 64), repeat('d', 64),
+    'case:resolved:stale', v_now, v_now + interval '300 seconds'
+  );
+END
+$stale_recovery_fixture$;
+
+SET LOCAL ROLE tenant_trust_security_action_worker;
+DO $reject_stale_recovery$
+DECLARE v_claim record;
+BEGIN
+  SELECT * INTO v_claim FROM orchestration.claim_security_action(
+    'orchestrator.recovery-stale',
+    'clm_018f1234-5678-7abc-8def-012345678b30', clock_timestamp()
+  );
+  IF v_claim.action_id IS NOT NULL THEN
+    RAISE EXCEPTION 'stale recovery authorization reached execution';
+  END IF;
+END
+$reject_stale_recovery$;
+RESET ROLE;
+
 DO $verify_terminal_state$
 BEGIN
   IF NOT EXISTS (
@@ -426,9 +518,17 @@ BEGIN
            AND recovery_trust_transition_id = 'trn_018f1234-5678-7abc-8def-012345678af9'
            AND recovery_authorized_by_subject_id = 'sub_018f1234-5678-7abc-8def-012345678af1') <> 4 THEN
     RAISE EXCEPTION 'governed recovery did not preserve revocation and fresh issuance';
+  ELSIF NOT EXISTS (
+    SELECT 1 FROM orchestration.security_actions
+    WHERE tenant_id = 'tnt_018f1234-5678-7abc-8def-012345678af0'
+      AND action_id = 'act_018f1234-5678-7abc-8def-012345678b25'
+      AND status = 'failed' AND last_failure_code = 'RECOVERY_STATE_CHANGED'
+      AND next_attempt_at = 'infinity'::timestamptz AND attempt_count = 1
+  ) THEN
+    RAISE EXCEPTION 'stale recovery action did not fail closed before execution';
   END IF;
 END
 $verify_terminal_state$;
 
 ROLLBACK;
-\echo 'Verified tenant-admin step-up, current trust binding, two-stage recovery and permanent revocation.'
+\echo 'Verified tenant-admin step-up, current trust binding, concurrent-request suppression, two-stage recovery and permanent revocation.'

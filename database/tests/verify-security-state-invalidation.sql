@@ -54,13 +54,13 @@ BEGIN
   INSERT INTO orchestration.security_actions (
     tenant_id, action_id, decision_id, correlation_id, target_subject_id,
     target_certificate_id, action_type, authority_class, reason_code,
-    trigger_context_hash_sha256, expected_state_version,
+    trigger_context_hash_sha256, attempt_count, expected_state_version,
     next_attempt_at, requested_at
   ) VALUES (
     v_tenant, v_action, 'dec_018f1234-5678-7abc-8def-0123456789d1',
     'cor_018f1234-5678-7abc-8def-0123456789d2', v_subject, v_certificate,
     'suspend-subject', 'policy-quarantine', 'TRUST_SCORE_QUARANTINE',
-    repeat('3', 64), 1, v_now, v_now
+    repeat('3', 64), 1, 1, v_now, v_now
   );
 
   UPDATE orchestration.subject_security_states SET
@@ -68,6 +68,14 @@ BEGIN
     state_version = 2, last_action_id = v_action, updated_at = v_now
   WHERE tenant_id = v_tenant AND subject_id = v_subject
     AND certificate_id = v_certificate;
+  INSERT INTO orchestration.security_action_attempts (
+    tenant_id, action_id, attempt_number, claim_token, worker_id,
+    status, started_at, completed_at
+  ) VALUES (
+    v_tenant, v_action, 1,
+    'clm_018f1234-5678-7abc-8def-0123456789d6', 'invalidation.fixture',
+    'succeeded', v_now, v_now
+  );
   UPDATE orchestration.security_actions SET
     status = 'succeeded', result_state = jsonb_build_object(
       'access', 'suspended', 'renewal', 'blocked',

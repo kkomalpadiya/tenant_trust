@@ -303,5 +303,168 @@ BEGIN
 END
 $verify_history_and_state$;
 
+DO $queue_repeated_trigger$
+DECLARE v_action orchestration.security_actions%ROWTYPE;
+BEGIN
+  v_action := orchestration.enqueue_security_action_internal(
+    'tnt_018f1234-5678-7abc-8def-0123456789f0',
+    'act_018f1234-5678-7abc-8def-0123456789fa',
+    'dec_018f1234-5678-7abc-8def-0123456789fb',
+    'cor_018f1234-5678-7abc-8def-0123456789fc',
+    'sub_018f1234-5678-7abc-8def-0123456789f0',
+    'crt_018f1234-5678-7abc-8def-0123456789f0',
+    'restrict-access', 'policy-quarantine', 'TRUST_SCORE_QUARANTINE',
+    repeat('b', 64), clock_timestamp()
+  );
+  IF v_action.status <> 'pending' OR v_action.attempt_count <> 0 THEN
+    RAISE EXCEPTION 'repeated trigger fixture was not queued';
+  END IF;
+END
+$queue_repeated_trigger$;
+
+SET LOCAL ROLE tenant_trust_security_action_worker;
+DO $suppress_repeated_trigger$
+DECLARE v_claim record;
+BEGIN
+  SELECT * INTO v_claim FROM orchestration.claim_security_action(
+    'orchestrator.verify-replay',
+    'clm_018f1234-5678-7abc-8def-0123456789fd',
+    clock_timestamp()
+  );
+  IF v_claim.action_id IS NOT NULL THEN
+    RAISE EXCEPTION 'an already-satisfied repeated trigger reached execution';
+  END IF;
+END
+$suppress_repeated_trigger$;
+RESET ROLE;
+
+DO $verify_repeated_trigger_suppression$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM orchestration.security_actions
+    WHERE tenant_id = 'tnt_018f1234-5678-7abc-8def-0123456789f0'
+      AND action_id = 'act_018f1234-5678-7abc-8def-0123456789fa'
+      AND status = 'failed'
+      AND last_failure_code = 'ACTION_ALREADY_SATISFIED'
+      AND next_attempt_at = 'infinity'::timestamptz
+      AND attempt_count = 1
+  ) OR NOT EXISTS (
+    SELECT 1 FROM orchestration.subject_security_states
+    WHERE tenant_id = 'tnt_018f1234-5678-7abc-8def-0123456789f0'
+      AND subject_id = 'sub_018f1234-5678-7abc-8def-0123456789f0'
+      AND certificate_id = 'crt_018f1234-5678-7abc-8def-0123456789f0'
+      AND access_state = 'restricted' AND state_version = 2
+  ) THEN
+    RAISE EXCEPTION 'repeated trigger suppression changed state or remained retryable';
+  END IF;
+END
+$verify_repeated_trigger_suppression$;
+
+DO $queue_conflicting_recovery_and_severity$
+DECLARE
+  v_now timestamptz := clock_timestamp();
+BEGIN
+  PERFORM orchestration.enqueue_security_action_internal(
+    'tnt_018f1234-5678-7abc-8def-0123456789f0',
+    'act_018f1234-5678-7abc-8def-012345678a00',
+    'dec_018f1234-5678-7abc-8def-012345678a01',
+    'cor_018f1234-5678-7abc-8def-012345678a02',
+    'sub_018f1234-5678-7abc-8def-0123456789f0',
+    'crt_018f1234-5678-7abc-8def-0123456789f0',
+    'restore-access', 'recovery-authorization', 'ACCESS_RECOVERY_ELIGIBLE',
+    repeat('c', 64), v_now
+  );
+  INSERT INTO orchestration.security_recovery_authorizations (
+    tenant_id, authorization_id, action_id, decision_id, request_id,
+    correlation_id, idempotency_key, authorized_by_subject_id,
+    target_subject_id, target_certificate_id, action_type, trust_transition_id,
+    expected_state_version, reason_code, eligibility_hash_sha256,
+    step_up_proof_id_hash_sha256, cause_resolution_reference,
+    authorized_at, expires_at
+  ) VALUES (
+    'tnt_018f1234-5678-7abc-8def-0123456789f0',
+    'rca_018f1234-5678-7abc-8def-012345678a03',
+    'act_018f1234-5678-7abc-8def-012345678a00',
+    'dec_018f1234-5678-7abc-8def-012345678a01',
+    'req_018f1234-5678-7abc-8def-012345678a04',
+    'cor_018f1234-5678-7abc-8def-012345678a02',
+    'orchestration-conflicting-recovery',
+    'sub_018f1234-5678-7abc-8def-0123456789f0',
+    'sub_018f1234-5678-7abc-8def-0123456789f0',
+    'crt_018f1234-5678-7abc-8def-0123456789f0',
+    'restore-access', 'trn_018f1234-5678-7abc-8def-0123456789f0', 2,
+    'ACCESS_RECOVERY_ELIGIBLE', repeat('c', 64), repeat('d', 64),
+    NULL, v_now, v_now + interval '300 seconds'
+  );
+  PERFORM orchestration.enqueue_security_action_internal(
+    'tnt_018f1234-5678-7abc-8def-0123456789f0',
+    'act_018f1234-5678-7abc-8def-012345678a05',
+    'dec_018f1234-5678-7abc-8def-012345678a06',
+    'cor_018f1234-5678-7abc-8def-012345678a07',
+    'sub_018f1234-5678-7abc-8def-0123456789f0',
+    'crt_018f1234-5678-7abc-8def-0123456789f0',
+    'block-renewal', 'severity-rule', 'SEVERE_EVIDENCE_NOT_CORROBORATED',
+    repeat('e', 64), v_now + interval '1 millisecond'
+  );
+END
+$queue_conflicting_recovery_and_severity$;
+
+SET LOCAL ROLE tenant_trust_security_action_worker;
+DO $severity_precedes_recovery$
+DECLARE v_claim record; v_status record;
+BEGIN
+  SELECT * INTO v_claim FROM orchestration.claim_security_action(
+    'orchestrator.verify-conflict',
+    'clm_018f1234-5678-7abc-8def-012345678a08', clock_timestamp()
+  );
+  IF v_claim.action_id <> 'act_018f1234-5678-7abc-8def-012345678a05'
+     OR v_claim.action_type <> 'block-renewal' THEN
+    RAISE EXCEPTION 'older recovery action overtook pending severity work';
+  END IF;
+  SELECT * INTO v_status FROM orchestration.mark_security_action_succeeded(
+    v_claim.tenant_id, v_claim.action_id, v_claim.claim_token,
+    '{"access":"restricted","renewal":"blocked","targetCertificate":"active","replacement":"not-required"}',
+    NULL, clock_timestamp()
+  );
+  IF v_status.status <> 'succeeded' THEN
+    RAISE EXCEPTION 'precedent severity action did not complete';
+  END IF;
+END
+$severity_precedes_recovery$;
+
+DO $stale_recovery_after_severity$
+DECLARE v_claim record;
+BEGIN
+  SELECT * INTO v_claim FROM orchestration.claim_security_action(
+    'orchestrator.verify-conflict',
+    'clm_018f1234-5678-7abc-8def-012345678a09', clock_timestamp()
+  );
+  IF v_claim.action_id IS NOT NULL THEN
+    RAISE EXCEPTION 'recovery authorized before severity execution remained executable';
+  END IF;
+END
+$stale_recovery_after_severity$;
+RESET ROLE;
+
+DO $verify_conflict_resolution$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM orchestration.security_actions
+    WHERE action_id = 'act_018f1234-5678-7abc-8def-012345678a00'
+      AND status = 'failed' AND last_failure_code = 'RECOVERY_STATE_CHANGED'
+      AND next_attempt_at = 'infinity'::timestamptz AND attempt_count = 1
+  ) OR NOT EXISTS (
+    SELECT 1 FROM orchestration.subject_security_states
+    WHERE tenant_id = 'tnt_018f1234-5678-7abc-8def-0123456789f0'
+      AND subject_id = 'sub_018f1234-5678-7abc-8def-0123456789f0'
+      AND certificate_id = 'crt_018f1234-5678-7abc-8def-0123456789f0'
+      AND access_state = 'restricted' AND renewal_state = 'blocked'
+      AND state_version = 3
+  ) THEN
+    RAISE EXCEPTION 'conflicting severity and recovery actions did not fail closed';
+  END IF;
+END
+$verify_conflict_resolution$;
+
 ROLLBACK;
-\echo 'Verified stable IDs, leases, retry visibility, claim ownership and persisted success state.'
+\echo 'Verified stable IDs, retries, repeated-trigger suppression and severity-before-recovery conflict handling.'
