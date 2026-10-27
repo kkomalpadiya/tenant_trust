@@ -5,7 +5,7 @@ import {
 } from "@tenant-trust/authorization";
 import { resolveTenantContext } from "@tenant-trust/tenant-context";
 
-const ids = Object.freeze({
+export const reviewIds = Object.freeze({
   alphaTenant: "tnt_018f1234-5678-7abc-8def-0123456789ab",
   betaTenant: "tnt_018f1234-5678-7abc-8def-0123456789ac",
   alice: "sub_018f1234-5678-7abc-8def-0123456789ab",
@@ -13,6 +13,8 @@ const ids = Object.freeze({
   bob: "sub_018f1234-5678-7abc-8def-0123456789ad",
   betaAdmin: "sub_018f1234-5678-7abc-8def-0123456789ae",
 });
+
+const ids = reviewIds;
 
 const tenants = Object.freeze({
   alpha: Object.freeze({
@@ -43,7 +45,7 @@ export const personas = Object.freeze({
     certificateId: "crt_018f1234-5678-7abc-8def-0123456789c1",
     serial: "7A:31:9C:EF:08:A1",
     fingerprint: "9F:4B:3A:10:7D:61:2C:88",
-    expiresOn: "2026-12-16T10:30:00.000Z",
+    expiresOn: "2027-01-16T10:30:00.000Z",
   }),
   "alpha-admin": Object.freeze({
     key: "alpha-admin",
@@ -152,7 +154,7 @@ const scenarioDefinitions = Object.freeze([
 
 const baselineMode = selectAuthorizationMode(AUTHORIZATION_MODE_IDS.PKI_RBAC_BASELINE);
 
-function personaFor(personaKey) {
+export function getReviewPersona(personaKey) {
   return personas[personaKey] ?? personas["alpha-member"];
 }
 
@@ -176,6 +178,10 @@ function contextFor(persona) {
       roles: persona.roles,
     },
   });
+}
+
+export function resolveReviewContext(personaKey = "alpha-member") {
+  return contextFor(getReviewPersona(personaKey));
 }
 
 function visibleRecords(persona) {
@@ -223,7 +229,7 @@ function auditEvent({ persona, scenario, outcome, statusCode, reasonCode, clock 
 }
 
 export function getReviewState(personaKey = "alpha-member") {
-  const persona = personaFor(personaKey);
+  const persona = getReviewPersona(personaKey);
   const context = contextFor(persona);
   const actionDecisions = ["profile:read", "record:read", "record:write", "record:export", "tenant:admin"]
     .map((action) => {
@@ -240,11 +246,11 @@ export function getReviewState(personaKey = "alpha-member") {
     generatedAt: new Date().toISOString(),
     environment: "Read-only review environment",
     project: {
-      completedPhases: 4,
+      completedPhases: 9,
       totalPhases: 10,
-      completedTasks: 40,
+      completedTasks: 91,
       totalTasks: 100,
-      verifiedTests: 150,
+      currentTask: "T10.1",
       tenantCount: 2,
       apiOperations: 5,
       vulnerabilities: 0,
@@ -274,7 +280,7 @@ export function getReviewState(personaKey = "alpha-member") {
 }
 
 export function runReviewScenario({ personaKey = "alpha-member", scenarioId, clock = () => new Date() } = {}) {
-  const persona = personaFor(personaKey);
+  const persona = getReviewPersona(personaKey);
   const scenario = scenarioDefinitions.find((candidate) => candidate.id === scenarioId);
   if (!scenario) throw new RangeError("Unknown review scenario.");
 

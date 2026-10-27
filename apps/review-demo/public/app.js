@@ -17,6 +17,7 @@ const state = {
 
 const pageTitles = {
   overview: "Security overview",
+  certificates: "Certificates",
   records: "Tenant data",
   lab: "Access boundary lab",
   audit: "Audit trail",
@@ -36,8 +37,14 @@ function escapeHtml(value) {
 
 async function fetchJson(url, options) {
   const response = await fetch(url, options);
-  if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
-  return response.json();
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.error ?? `Request failed with status ${response.status}`);
+    error.reasonCode = payload.error ?? "REQUEST_FAILED";
+    error.statusCode = response.status;
+    throw error;
+  }
+  return payload;
 }
 
 function setView(view) {
@@ -67,12 +74,12 @@ function metricIcon(kind) {
   return map[kind];
 }
 
-function renderMetrics(project) {
+function renderMetrics(project, certificateSummary) {
   const metrics = [
     { value: `${project.completedPhases}/${project.totalPhases}`, label: "Phases complete", detail: `${project.completedTasks} verified tasks`, kind: "phases", color: "#2f7df4" },
-    { value: project.verifiedTests, label: "Repository tests", detail: "Protected baseline", kind: "tests", color: "#15856c" },
+    { value: `${project.completedTasks}/${project.totalTasks}`, label: "Tasks complete", detail: `${project.currentTask} in progress`, kind: "tests", color: "#15856c" },
     { value: project.tenantCount, label: "Isolated tenants", detail: "Alpha + Beta", kind: "tenants", color: "#8b5cf6" },
-    { value: project.vulnerabilities, label: "Known dependency issues", detail: "npm audit", kind: "shield", color: "#d47d27" },
+    { value: certificateSummary.permittedOperations, label: "Permitted controls", detail: "Issue + renew + revoke", kind: "shield", color: "#d47d27" },
   ];
   document.querySelector("#metric-grid").innerHTML = metrics.map((metric) => `
     <article class="metric-card" style="--metric-color:${metric.color}">
@@ -95,6 +102,9 @@ function renderPersona(data) {
   document.querySelector("#certificate-serial").textContent = certificate.serial;
   document.querySelector("#certificate-expiry").textContent = dateFormatter.format(new Date(certificate.expiresOn));
   document.querySelector("#certificate-fingerprint").textContent = certificate.fingerprint;
+  const certificateStatus = document.querySelector("#certificate-status");
+  certificateStatus.className = `status-pill ${certificate.state === "active" ? "success" : "danger"}`;
+  certificateStatus.innerHTML = `<span></span> ${escapeHtml(certificate.state)}`;
   document.querySelector("#boundary-context").textContent = `Tenant v${context.versions.tenant} · membership v${context.versions.membership}`;
   document.querySelector("#scope-tenant").textContent = persona.tenant.name;
   document.querySelector("#scope-role").textContent = persona.roleLabel;
@@ -105,6 +115,61 @@ function renderPersona(data) {
   const exportButton = document.querySelector("#export-button");
   exportButton.dataset.allowed = exportDecision.outcome === "requires-controls" ? "true" : "false";
   exportButton.title = exportDecision.outcome === "requires-controls" ? "Run the controlled export scenario" : "This role is not eligible for export";
+}
+
+function operationReason(reasonCode) {
+  const reasons = {
+    SELF_ENROLLMENT_ALLOWED: "Self enrollment allowed",
+    TENANT_ADMIN_ENROLLMENT_ALLOWED: "Tenant administrator scope",
+    SELF_OPERATION_ALLOWED: "Own certificate",
+    TENANT_ADMIN_OPERATION_ALLOWED: "Tenant administrator scope",
+    RENEWAL_WINDOW_CLOSED: "Renewal window is closed",
+    CERTIFICATE_NOT_ACTIVE: "Certificate is not active",
+    SUBJECT_ENROLLMENT_UNAUTHORIZED: "Role is not permitted",
+    CERTIFICATE_OPERATION_UNAUTHORIZED: "Role is not permitted",
+  };
+  return reasons[reasonCode] ?? reasonCode.replaceAll("_", " ").toLowerCase();
+}
+
+function operationButton({ operation, subjectId, certificateId = "", decision }) {
+  const label = operation[0].toUpperCase() + operation.slice(1);
+  return `<button class="control-button ${operation}" type="button"
+    data-certificate-operation="${operation}"
+    data-subject-id="${escapeHtml(subjectId)}"
+    data-certificate-id="${escapeHtml(certificateId)}"
+    title="${escapeHtml(operationReason(decision.reasonCode))}"
+    ${decision.allowed ? "" : "disabled"}>${label}</button>`;
+}
+
+function renderCertificateDashboard(data) {
+  const summary = data.certificateSummary;
+  document.querySelector("#subject-total").textContent = summary.subjectCount;
+  document.querySelector("#certificate-total").textContent = summary.certificateCount;
+  document.querySelector("#active-certificate-total").textContent = summary.activeCertificateCount;
+  document.querySelector("#permitted-operation-total").textContent = summary.permittedOperations;
+
+  document.querySelector("#subject-grid").innerHTML = data.subjects.map((subject) => `
+    <article class="subject-card ${subject.isCurrentSubject ? "current" : ""}">
+      <span class="subject-avatar">${escapeHtml(subject.initials)}</span>
+      <div class="subject-copy">
+        <span>${subject.isCurrentSubject ? "Current subject" : "Tenant subject"}</span>
+        <strong>${escapeHtml(subject.displayName)}</strong>
+        <small>${escapeHtml(subject.roleLabel)} · ${escapeHtml(subject.subjectId)}</small>
+      </div>
+      ${operationButton({ operation: "issue", subjectId: subject.subjectId, decision: subject.operations.issue })}
+    </article>
+  `).join("");
+
+  document.querySelector("#certificate-rows").innerHTML = data.certificates.length ? data.certificates.map((certificate) => `
+    <tr>
+      <td><strong class="certificate-owner">${escapeHtml(certificate.subjectName)}</strong>${certificate.isCurrentCertificate ? '<small class="current-label">Current login certificate</small>' : ""}</td>
+      <td><div class="certificate-id"><strong>${escapeHtml(certificate.serial)}</strong><small>${escapeHtml(certificate.certificateId)}</small></div></td>
+      <td><span class="certificate-state ${escapeHtml(certificate.state)}">${escapeHtml(certificate.state)}</span></td>
+      <td>${dateFormatter.format(new Date(certificate.expiresOn))}</td>
+      <td>${operationButton({ operation: "renew", subjectId: certificate.subjectId, certificateId: certificate.certificateId, decision: certificate.operations.renew })}</td>
+      <td>${operationButton({ operation: "revoke", subjectId: certificate.subjectId, certificateId: certificate.certificateId, decision: certificate.operations.revoke })}</td>
+    </tr>
+  `).join("") : '<tr class="empty-row"><td colspan="6">No certificates are visible in this tenant scope.</td></tr>';
 }
 
 function renderPersonaPicker(data) {
@@ -219,13 +284,42 @@ async function loadState() {
   const data = await fetchJson(`/api/demo/state?persona=${encodeURIComponent(state.personaKey)}`);
   state.data = data;
   state.auditEvents = data.auditEvents;
-  renderMetrics(data.project);
+  renderMetrics(data.project, data.certificateSummary);
   renderPersonaPicker(data);
   renderPersona(data);
+  renderCertificateDashboard(data);
   renderRecords(data.records, document.querySelector("#record-search").value);
   renderScenarios(data.scenarios);
   renderActivity();
   renderAudit();
+}
+
+async function runCertificateOperation(button) {
+  const operation = button.dataset.certificateOperation;
+  const subjectId = button.dataset.subjectId;
+  const certificateId = button.dataset.certificateId || null;
+  button.disabled = true;
+  button.classList.add("working");
+  try {
+    const result = await fetchJson("/api/demo/certificates/operations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ personaKey: state.personaKey, operation, subjectId, certificateId }),
+    });
+    await loadState();
+    const resultPanel = document.querySelector("#certificate-operation-result");
+    resultPanel.classList.add("operation-success");
+    resultPanel.innerHTML = `${icons.check}<div><strong>${escapeHtml(result.headline)}</strong><span>${escapeHtml(result.summary)} The server recorded ${escapeHtml(result.reasonCode)}.</span></div>`;
+    showToast(result.headline);
+  } catch (error) {
+    const resultPanel = document.querySelector("#certificate-operation-result");
+    resultPanel.classList.remove("operation-success");
+    resultPanel.innerHTML = `${icons.close}<div><strong>Certificate operation denied</strong><span>${escapeHtml(operationReason(error.reasonCode ?? "REQUEST_FAILED"))}. The server made no inventory change.</span></div>`;
+    showToast(`Operation denied · ${error.reasonCode ?? "REQUEST_FAILED"}`);
+  } finally {
+    button.classList.remove("working");
+    if (document.body.contains(button)) button.disabled = false;
+  }
 }
 
 async function runScenario(scenarioId) {
@@ -263,6 +357,9 @@ document.addEventListener("click", (event) => {
 
   const scenarioButton = event.target.closest("[data-run-scenario]");
   if (scenarioButton) runScenario(scenarioButton.dataset.runScenario);
+
+  const certificateButton = event.target.closest("[data-certificate-operation]");
+  if (certificateButton && !certificateButton.disabled) runCertificateOperation(certificateButton);
 });
 
 document.querySelector("#persona-picker").addEventListener("change", async (event) => {

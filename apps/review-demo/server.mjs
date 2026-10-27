@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CertificateDashboardError, createCertificateDashboard } from "./certificate-dashboard.mjs";
 import { getReviewState, runReviewScenario } from "./demo-domain.mjs";
 
 const host = process.env.REVIEW_DEMO_HOST ?? "127.0.0.1";
@@ -10,6 +11,7 @@ const port = Number(process.env.REVIEW_DEMO_PORT ?? 4173);
 const appDirectory = path.dirname(fileURLToPath(import.meta.url));
 const publicDirectory = path.join(appDirectory, "public");
 const auditEvents = [];
+const certificateDashboard = createCertificateDashboard();
 const contentTypes = new Map([
   [".css", "text/css; charset=utf-8"],
   [".html", "text/html; charset=utf-8"],
@@ -70,13 +72,32 @@ const server = createServer(async (request, response) => {
       return;
     }
     if (request.method === "GET" && requestUrl.pathname === "/api/demo/state") {
-      const state = getReviewState(requestUrl.searchParams.get("persona") ?? undefined);
-      sendJson(response, 200, { ...state, auditEvents: auditEvents.slice(0, 12) });
+      const personaKey = requestUrl.searchParams.get("persona") ?? undefined;
+      const state = getReviewState(personaKey);
+      const dashboard = certificateDashboard.getState(personaKey);
+      sendJson(response, 200, {
+        ...state,
+        ...dashboard,
+        certificate: dashboard.currentCertificate ?? state.certificate,
+        auditEvents: auditEvents.slice(0, 12),
+      });
       return;
     }
     if (request.method === "POST" && requestUrl.pathname === "/api/demo/scenarios") {
       const body = await readJson(request);
       const result = runReviewScenario({ personaKey: body.personaKey, scenarioId: body.scenarioId });
+      auditEvents.unshift(result.event);
+      sendJson(response, 200, result);
+      return;
+    }
+    if (request.method === "POST" && requestUrl.pathname === "/api/demo/certificates/operations") {
+      const body = await readJson(request);
+      const result = certificateDashboard.execute({
+        personaKey: body.personaKey,
+        operation: body.operation,
+        subjectId: body.subjectId,
+        certificateId: body.certificateId,
+      });
       auditEvents.unshift(result.event);
       sendJson(response, 200, result);
       return;
@@ -91,8 +112,13 @@ const server = createServer(async (request, response) => {
     }
     await serveStatic(requestUrl, response);
   } catch (error) {
-    sendJson(response, error instanceof RangeError || error instanceof SyntaxError ? 400 : 500, {
-      error: error instanceof RangeError || error instanceof SyntaxError ? "INVALID_REQUEST" : "INTERNAL_FAILURE",
+    if (error instanceof CertificateDashboardError) {
+      sendJson(response, error.statusCode, { error: error.reasonCode });
+      return;
+    }
+    const invalidRequest = error instanceof RangeError || error instanceof SyntaxError;
+    sendJson(response, invalidRequest ? 400 : 500, {
+      error: invalidRequest ? "INVALID_REQUEST" : "INTERNAL_FAILURE",
     });
   }
 });

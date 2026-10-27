@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Tenant Trust implementation review console">
-    <title>Tenant Trust · Review Console</title>
+    <meta name="description" content="Tenant Trust tenant security dashboard">
+    <title>Tenant Trust · Security Dashboard</title>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
@@ -19,7 +19,7 @@
           </span>
           <span>
             <strong>Tenant Trust</strong>
-            <small>Review console</small>
+            <small>Security dashboard</small>
           </span>
         </a>
 
@@ -27,6 +27,10 @@
           <button class="nav-item active" type="button" data-view="overview">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"/></svg>
             Overview
+          </button>
+          <button class="nav-item" type="button" data-view="certificates">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.4 8 11 4.6-1.6 8-5.9 8-11V5l-8-3Zm0 2.1L18 6v5c0 3.9-2.4 7.4-6 8.8C8.4 18.4 6 14.9 6 11V6l6-1.9ZM9 9h6v2H9V9Zm0 4h6v2H9v-2Z"/></svg>
+            Certificates
           </button>
           <button class="nav-item" type="button" data-view="records">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm1 4h12V6H6v2Zm0 4h5v-2H6v2Zm0 4h8v-2H6v2Z"/></svg>
@@ -46,8 +50,8 @@
         <div class="sidebar-card">
           <span class="pulse-dot" aria-hidden="true"></span>
           <div>
-            <strong>Phase 4 verified</strong>
-            <span>Protected SaaS baseline</span>
+            <strong>Phase 10 active</strong>
+            <span>Dashboard and evaluation</span>
           </div>
         </div>
 
@@ -64,7 +68,7 @@
             <h1 id="page-title">Security overview</h1>
           </div>
           <div class="topbar-actions">
-            <div class="environment-badge"><span></span> Read-only review environment</div>
+            <div class="environment-badge"><span></span> Local review environment</div>
             <label class="persona-select">
               <span class="sr-only">Active review persona</span>
               <span class="avatar" id="persona-avatar">AM</span>
@@ -101,7 +105,7 @@
                     <p class="eyebrow">Active credential</p>
                     <h3>Certificate identity</h3>
                   </div>
-                  <span class="status-pill success"><span></span> Verified</span>
+                  <span class="status-pill success" id="certificate-status"><span></span> Active</span>
                 </div>
                 <div class="certificate-main">
                   <div class="certificate-shield" aria-hidden="true">
@@ -159,15 +163,15 @@
                     <p class="eyebrow">Roadmap</p>
                     <h3>Implementation progress</h3>
                   </div>
-                  <strong class="progress-value">40%</strong>
+                  <strong class="progress-value">90%</strong>
                 </div>
-                <div class="progress-track"><span style="width:40%"></span></div>
+                <div class="progress-track"><span style="width:90%"></span></div>
                 <div class="phase-list">
-                  <div><span class="phase-number complete">1</span><span><strong>Foundation</strong><small>Repository + Docker</small></span><b>Complete</b></div>
-                  <div><span class="phase-number complete">2</span><span><strong>Tenant isolation</strong><small>Identity + data boundaries</small></span><b>Complete</b></div>
-                  <div><span class="phase-number complete">3</span><span><strong>PKI lifecycle</strong><small>Issue + renew + revoke</small></span><b>Complete</b></div>
-                  <div><span class="phase-number complete">4</span><span><strong>Protected SaaS API</strong><small>mTLS + RBAC + audit</small></span><b>Complete</b></div>
-                  <div><span class="phase-number next">5</span><span><strong>Signed evidence</strong><small>Next implementation phase</small></span><b class="next-label">Next</b></div>
+                  <div><span class="phase-number complete">6</span><span><strong>Adaptive trust</strong><small>Scoring + transition controls</small></span><b>Complete</b></div>
+                  <div><span class="phase-number complete">7</span><span><strong>Authorization</strong><small>OPA + step-up enforcement</small></span><b>Complete</b></div>
+                  <div><span class="phase-number complete">8</span><span><strong>Audit ledger</strong><small>Fabric + causal verification</small></span><b>Complete</b></div>
+                  <div><span class="phase-number complete">9</span><span><strong>Security orchestration</strong><small>Actions + governed recovery</small></span><b>Complete</b></div>
+                  <div><span class="phase-number next">10</span><span><strong>Dashboard and evaluation</strong><small>Current implementation phase</small></span><b class="next-label">Active</b></div>
                 </div>
               </article>
 
@@ -181,6 +185,48 @@
                 </div>
                 <div class="activity-list" id="overview-activity"></div>
               </article>
+            </div>
+          </section>
+
+          <section class="view" id="view-certificates" aria-labelledby="certificates-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Tenant-scoped identity inventory</p>
+                <h2 id="certificates-title">Subjects and certificates</h2>
+                <p>Only subjects and credentials permitted by the certificate-derived tenant context are returned.</p>
+              </div>
+              <span class="logic-badge"><span></span> Server-authorized controls</span>
+            </div>
+
+            <div class="certificate-summary">
+              <div><span>Visible subjects</span><strong id="subject-total">0</strong></div>
+              <div><span>Visible certificates</span><strong id="certificate-total">0</strong></div>
+              <div><span>Active certificates</span><strong id="active-certificate-total">0</strong></div>
+              <div><span>Permitted operations</span><strong id="permitted-operation-total">0</strong></div>
+            </div>
+
+            <article class="card subject-card-panel">
+              <div class="table-toolbar">
+                <div><h3>Tenant subjects</h3><span>Self scope for members; tenant scope for administrators</span></div>
+              </div>
+              <div class="subject-grid" id="subject-grid"></div>
+            </article>
+
+            <article class="card table-card certificate-table-card">
+              <div class="table-toolbar">
+                <div><h3>Certificate inventory</h3><span>Lifecycle state is evaluated again when an operation is submitted</span></div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Subject</th><th>Certificate</th><th>Status</th><th>Expires</th><th>Renew</th><th>Revoke</th></tr></thead>
+                  <tbody id="certificate-rows"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <div class="inline-callout certificate-control-note" id="certificate-operation-result">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.4 8 11 4.6-1.6 8-5.9 8-11V5l-8-3Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
+              <div><strong>Controls are protected on the server.</strong><span>The browser sends only the requested operation and target identifiers. Tenant and role are resolved again from the selected certificate persona. Changes remain in memory and reset when the local server restarts.</span></div>
             </div>
           </section>
 
