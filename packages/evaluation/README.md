@@ -8,8 +8,11 @@ Baseline A accepts only compact EdDSA JWTs with an exact `typ`, `alg` and `kid`.
 
 This is deliberately a JWT plus RBAC comparator: an eligible tenant administrator can perform export or tenant administration based on the signed role and tenant scope alone. It does not use adaptive trust, certificates, OPA, step-up or Fabric audit. Signed roles remain valid until token expiry, although tenant, subject and membership suspension is checked for every evaluation call. No HTTP route or production API authentication path accepts these tokens.
 
+`tenant-trust-evaluation-protocol-v1` pre-registers the separate calibration and evaluation partitions, ten evaluation scenarios, closed ground-truth labels, exact sample counts, concurrency levels, mode rotation, reference hardware, metric denominators and source-slide map. Unsupported baseline controls stay visible and count as security misses rather than disappearing from denominators. The protocol defines the future experiment; it does not contain benchmark results.
+
 Run the focused gate with:
 
 ```text
 npm run jwt-rbac-baseline:verify
+npm run evaluation-protocol:verify
 ```

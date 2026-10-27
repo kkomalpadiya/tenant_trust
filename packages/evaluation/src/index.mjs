@@ -17,3 +17,16 @@ export {
   createJwtRbacEvaluationTokenIssuer,
   jwtRbacSafeDenial,
 } from "./jwt-rbac-baseline.mjs";
+
+export {
+  CALIBRATION_SCENARIOS,
+  EVALUATION_LABELS,
+  EVALUATION_METRICS,
+  EVALUATION_PROTOCOL,
+  EVALUATION_PROTOCOL_ID,
+  EVALUATION_REFERENCE_HOST,
+  EVALUATION_SAMPLE_PLAN,
+  EVALUATION_SCENARIOS,
+  EVALUATION_SOURCE_CITATIONS,
+  classifyAccessObservation,
+} from "./evaluation-protocol.mjs";

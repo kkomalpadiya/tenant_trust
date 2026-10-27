@@ -12,6 +12,8 @@ T10.3 adds a tenant-scoped audit-operations view for Fabric delivery, causal-cha
 
 T10.4 adds evaluation-only Baseline A: bounded EdDSA JWT authentication plus the existing RBAC matrix, with one immutable two-tenant workload catalog shared by Baseline A, Baseline B and the proposed framework. The production SaaS API remains mTLS-only.
 
+T10.5 pre-registers a reproducible comparison protocol with separate calibration and evaluation partitions, closed ground-truth labels, fixed sample counts and repetitions, three concurrency levels, rotating mode order, exact reference hardware and failure-preserving metric denominators. The verified Review 2 slide map is bound to the source deck hash, and no benchmark result is claimed yet.
+
 ## Planned capabilities
 
 - Issue, renew and revoke certificates through tenant-specific issuing authorities.
@@ -93,6 +95,7 @@ T10.4 adds evaluation-only Baseline A: bounded EdDSA JWT authentication plus the
 - [Tenant trust and decision history dashboard](docs/architecture/tenant-trust-decision-dashboard.md)
 - [Tenant audit verification and operations dashboard](docs/architecture/tenant-audit-operations-dashboard.md)
 - [JWT plus RBAC evaluation baseline](docs/architecture/jwt-rbac-evaluation-baseline.md)
+- [Reproducible evaluation protocol and labels](docs/architecture/reproducible-evaluation-protocol.md)
 - [Adaptive trust-engine verification and calibration fixtures](docs/architecture/trust-engine-verification.md)
 - [Phase 6 adaptive trust-engine implementation report](docs/reports/phase-6-adaptive-trust-engine-report.md)
 
@@ -117,3 +120,5 @@ Synthetic test fixtures may live under `tests/fixtures/`. Never copy real tenant
 ## Evaluation
 
 Compare the proposed framework with JWT plus RBAC and tenant-scoped X.509 PKI plus RBAC on equivalent workloads. Measure decision latency, security outcomes, false restrictions, revocation enforcement, tenant isolation and audit verification. Trust weights and thresholds are initial design choices until evaluated.
+
+Run `npm run evaluation-protocol:verify` to check the pre-registered partitions, labels, sample plan, hardware declaration, metric denominators and verified source-slide map.
