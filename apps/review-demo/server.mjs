@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createAuditOperationsDashboard } from "./audit-operations-dashboard.mjs";
 import { CertificateDashboardError, createCertificateDashboard } from "./certificate-dashboard.mjs";
 import { getReviewState, runReviewScenario } from "./demo-domain.mjs";
 import { createTrustDashboard } from "./trust-dashboard.mjs";
@@ -12,6 +13,7 @@ const port = Number(process.env.REVIEW_DEMO_PORT ?? 4173);
 const appDirectory = path.dirname(fileURLToPath(import.meta.url));
 const publicDirectory = path.join(appDirectory, "public");
 const auditEvents = [];
+const auditOperationsDashboard = createAuditOperationsDashboard();
 const certificateDashboard = createCertificateDashboard();
 const trustDashboard = createTrustDashboard();
 const contentTypes = new Map([
@@ -78,10 +80,12 @@ const server = createServer(async (request, response) => {
       const state = getReviewState(personaKey);
       const dashboard = certificateDashboard.getState(personaKey);
       const trust = trustDashboard.getState(personaKey);
+      const auditOperations = auditOperationsDashboard.getState(personaKey);
       sendJson(response, 200, {
         ...state,
         ...dashboard,
         ...trust,
+        ...auditOperations,
         certificate: dashboard.currentCertificate ?? state.certificate,
         auditEvents: auditEvents.slice(0, 12),
       });

@@ -22,7 +22,7 @@ const pageTitles = {
   trust: "Trust decisions",
   records: "Tenant data",
   lab: "Access boundary lab",
-  audit: "Audit trail",
+  audit: "Audit operations",
 };
 
 const dateFormatter = new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric" });
@@ -317,15 +317,56 @@ function renderActivity() {
 }
 
 function renderAudit() {
+  const operations = state.data.auditOperations;
+  const { ledger, causal, actions } = operations.summary;
   const total = state.auditEvents.length;
-  const allowed = state.auditEvents.filter((event) => event.outcome === "allow").length;
-  document.querySelector("#audit-count").textContent = total;
+  document.querySelector("#audit-count").textContent = actions.critical;
   document.querySelector("#audit-total").textContent = total;
-  document.querySelector("#audit-allowed").textContent = allowed;
-  document.querySelector("#audit-denied").textContent = total - allowed;
+  document.querySelector("#audit-committed").textContent = ledger.committed;
+  document.querySelector("#audit-pending").textContent = ledger.pending;
+  document.querySelector("#audit-failed").textContent = ledger.failed;
+  document.querySelector("#audit-verified").textContent = causal.verified;
+  document.querySelector("#audit-scope").textContent = operations.scope.mode === "tenant"
+    ? `${operations.scope.tenantName} · tenant scope`
+    : `${operations.scope.tenantName} · self scope`;
+
+  document.querySelector("#ledger-delivery-list").innerHTML = operations.ledgerDeliveries.map((delivery) => {
+    const detail = delivery.deliveryStatus === "committed"
+      ? `Block ${delivery.blockNumber} · ${delivery.transactionReference}`
+      : delivery.deliveryStatus === "failed"
+        ? `${delivery.failureCode} · retry ${timeFormatter.format(new Date(delivery.nextAttemptAt))}`
+        : `Queued · next check ${timeFormatter.format(new Date(delivery.nextAttemptAt))}`;
+    return `<div class="operation-row">
+      <span class="operation-state ${escapeHtml(delivery.deliveryStatus)}">${delivery.deliveryStatus === "committed" ? icons.check : delivery.deliveryStatus === "failed" ? icons.close : icons.document}</span>
+      <div class="operation-copy"><span>${escapeHtml(delivery.recordReference)} · ${escapeHtml(delivery.recordType)}</span><strong>${escapeHtml(delivery.eventType)}</strong><small>${escapeHtml(detail)}</small></div>
+      <span class="state-pill ${escapeHtml(delivery.deliveryStatus)}">${escapeHtml(delivery.deliveryStatus)}</span>
+    </div>`;
+  }).join("");
+
+  document.querySelector("#causal-verification-list").innerHTML = operations.causalChecks.map((check) => `
+    <div class="operation-row">
+      <span class="operation-state ${escapeHtml(check.result)}">${check.result === "verified" ? icons.check : check.result === "failed" ? icons.close : icons.document}</span>
+      <div class="operation-copy"><span>${escapeHtml(check.correlationReference)} · ${check.eventCount} events</span><strong>${escapeHtml(check.reasonCode)}</strong><small>${escapeHtml(check.verifiedLinks.join(" → "))}</small></div>
+      <span class="state-pill ${escapeHtml(check.result)}">${escapeHtml(check.result)}</span>
+    </div>
+  `).join("");
+
+  const actionHealth = document.querySelector("#action-health");
+  actionHealth.className = `health-pill ${escapeHtml(operations.summary.health)}`;
+  actionHealth.textContent = `${operations.summary.health} · ${actions.critical} critical`;
+  document.querySelector("#security-action-list").innerHTML = operations.securityActions.map((action) => {
+    const retry = action.nextAttemptAt ? `Retry ${timeFormatter.format(new Date(action.nextAttemptAt))}` : "No retry required";
+    return `<div class="action-operation-row">
+      <span class="severity-marker ${escapeHtml(action.severity)}"></span>
+      <div class="operation-copy"><span>${escapeHtml(action.actionReference)} · ${escapeHtml(action.authority)}</span><strong>${escapeHtml(formatAction(action.actionType))}</strong><small>${escapeHtml(action.issueCode)} · ${escapeHtml(retry)}</small></div>
+      <div class="action-state"><span class="state-pill ${escapeHtml(action.status)}">${escapeHtml(action.status)}</span><small>Audit ${escapeHtml(action.auditDeliveryStatus)}</small></div>
+      <div class="attempt-count"><strong>${action.attemptCount}</strong><span>attempts</span></div>
+    </div>`;
+  }).join("");
+
   const container = document.querySelector("#audit-list");
   if (!total) {
-    container.innerHTML = `<div class="audit-empty">${icons.document}<div><strong>No review events yet</strong><span>Run a scenario to create a sanitized request outcome.</span></div></div>`;
+    container.innerHTML = `<div class="audit-empty">${icons.document}<div><strong>No session events yet</strong><span>Run an access-lab scenario to add a sanitized request outcome.</span></div></div>`;
     return;
   }
   container.innerHTML = state.auditEvents.map((event) => `

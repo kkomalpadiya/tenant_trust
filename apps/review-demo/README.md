@@ -1,6 +1,6 @@
 # Tenant Trust security dashboard
 
-This local frontend presents the implemented Tenant Trust security boundaries, tenant certificate controls and explainable trust-decision history.
+This local frontend presents the implemented Tenant Trust security boundaries, tenant certificate controls, explainable trust-decision history and audit operations.
 
 Start it from the repository root:
 
@@ -12,6 +12,8 @@ Open `http://127.0.0.1:4173`. Switch among the deterministic Alpha and Beta pers
 
 The Trust decisions view calculates the five weighted components with `@tenant-trust/trust`, uses the validated tenant-bound policy shape from `@tenant-trust/policy`, and shows freshness, immutable trust/configuration versions, policy bundle provenance, decision reasons and historical transitions. Stale state keeps its last-known score for explanation but withholds the policy-usable score.
 
+The Audit operations view projects the production audit-outbox and security-action operations contracts into deterministic review data. It separates pending, committed and failed ledger delivery, shows verified, waiting and failed causal chains, and makes quarantine, retry and audit-anchor failures actionable. Members receive self scope and administrators receive same-tenant scope. Only review references and operational metadata are returned; evidence content, canonical preimages, credentials and private keys are excluded.
+
 The controls demonstrate the application authorization and lifecycle state transitions without loading a private key or contacting a certificate authority. Their state resets when the local server restarts. Production certificate issuance, renewal and revocation remain implemented and verified in the dedicated PKI packages and Docker-backed verification commands.
 
 Run the focused dashboard gate with:
@@ -19,4 +21,5 @@ Run the focused dashboard gate with:
 ```text
 npm run tenant-dashboard:verify
 npm run trust-dashboard:verify
+npm run audit-operations-dashboard:verify
 ```

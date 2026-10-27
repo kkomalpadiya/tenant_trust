@@ -46,7 +46,7 @@
           </button>
           <button class="nav-item" type="button" data-view="audit">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v2h2a2 2 0 0 1 2 2v13H3V7a2 2 0 0 1 2-2h2V3Zm2 4h6V5H9v2Zm-2 4v2h10v-2H7Zm0 4v2h7v-2H7Z"/></svg>
-            Audit trail
+            Audit operations
             <span class="nav-count" id="audit-count">0</span>
           </button>
         </nav>
@@ -167,9 +167,9 @@
                     <p class="eyebrow">Roadmap</p>
                     <h3>Implementation progress</h3>
                   </div>
-                  <strong class="progress-value">92%</strong>
+                  <strong class="progress-value">93%</strong>
                 </div>
-                <div class="progress-track"><span style="width:92%"></span></div>
+                <div class="progress-track"><span style="width:93%"></span></div>
                 <div class="phase-list">
                   <div><span class="phase-number complete">6</span><span><strong>Adaptive trust</strong><small>Scoring + transition controls</small></span><b>Complete</b></div>
                   <div><span class="phase-number complete">7</span><span><strong>Authorization</strong><small>OPA + step-up enforcement</small></span><b>Complete</b></div>
@@ -185,7 +185,7 @@
                     <p class="eyebrow">Review activity</p>
                     <h3>Recent decisions</h3>
                   </div>
-                  <button class="text-button" type="button" data-view-link="audit">View audit trail</button>
+                  <button class="text-button" type="button" data-view-link="audit">View audit operations</button>
                 </div>
                 <div class="activity-list" id="overview-activity"></div>
               </article>
@@ -391,25 +391,53 @@
           <section class="view" id="view-audit" aria-labelledby="audit-title">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">Sanitized request outcomes</p>
-                <h2 id="audit-title">Audit trail</h2>
-                <p>Scenario results capture correlation, actor, tenant, action and decision without payloads or raw resource IDs.</p>
+                <p class="eyebrow">Ledger verification and recovery</p>
+                <h2 id="audit-title">Audit operations</h2>
+                <p>Inspect tenant-scoped delivery, causal verification and quarantine failures without revealing evidence content or credentials.</p>
               </div>
-              <button class="button button-secondary" type="button" data-open-lab>Generate event</button>
+              <span class="scope-badge" id="audit-scope">Self scope</span>
             </div>
             <div class="audit-summary">
-              <div><span>Total review events</span><strong id="audit-total">0</strong></div>
-              <div><span>Allowed</span><strong class="allow-text" id="audit-allowed">0</strong></div>
-              <div><span>Denied</span><strong class="deny-text" id="audit-denied">0</strong></div>
-              <div><span>Payload fields stored</span><strong>0</strong></div>
+              <div><span>Committed</span><strong class="allow-text" id="audit-committed">0</strong></div>
+              <div><span>Pending</span><strong class="pending-text" id="audit-pending">0</strong></div>
+              <div><span>Failed</span><strong class="deny-text" id="audit-failed">0</strong></div>
+              <div><span>Causal verified</span><strong id="audit-verified">0</strong></div>
             </div>
-            <article class="card audit-card">
+
+            <div class="audit-operations-grid">
+              <article class="card audit-card">
+                <div class="audit-table-head">
+                  <div><p class="eyebrow">Fabric outbox</p><h3>Ledger delivery</h3></div>
+                  <span>Commit-reconciled</span>
+                </div>
+                <div id="ledger-delivery-list" class="operations-list"></div>
+              </article>
+              <article class="card audit-card">
+                <div class="audit-table-head">
+                  <div><p class="eyebrow">End-to-end lineage</p><h3>Causal verification</h3></div>
+                  <span>Off-chain ↔ ledger</span>
+                </div>
+                <div id="causal-verification-list" class="operations-list"></div>
+              </article>
+            </div>
+
+            <article class="card action-operations-card">
               <div class="audit-table-head">
-                <h3>Request outcomes</h3>
-                <span>Newest first</span>
+                <div><p class="eyebrow">Quarantine and recovery</p><h3>Security-action operations</h3></div>
+                <span class="health-pill" id="action-health">Healthy</span>
               </div>
-              <div id="audit-list" class="audit-list"></div>
+              <div id="security-action-list" class="action-operations-list"></div>
+              <div class="privacy-strip">
+                <span><strong>0</strong> evidence-content fields</span>
+                <span><strong>0</strong> secret fields</span>
+                <span>Review references only</span>
+              </div>
             </article>
+
+            <details class="card request-outcomes-card">
+              <summary>Session request outcomes <span id="audit-total">0</span></summary>
+              <div id="audit-list" class="audit-list"></div>
+            </details>
           </section>
         </div>
       </main>

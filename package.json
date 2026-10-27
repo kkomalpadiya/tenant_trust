@@ -113,6 +113,7 @@
     "demo:review": "node apps/review-demo/server.mjs",
     "tenant-dashboard:verify": "npm run test:review-demo && node --check apps/review-demo/server.mjs && node --check apps/review-demo/public/app.js",
     "trust-dashboard:verify": "npm run test:review-demo && node --check apps/review-demo/server.mjs && node --check apps/review-demo/public/app.js",
+    "audit-operations-dashboard:verify": "npm run test:review-demo && node --check apps/review-demo/server.mjs && node --check apps/review-demo/public/app.js",
     "test:review-demo": "node --test apps/review-demo/test/*.test.mjs",
     "test:audit-chaincode": "npm test --workspace @tenant-trust/audit-chaincode",
     "test:audit": "npm test --workspace @tenant-trust/audit",

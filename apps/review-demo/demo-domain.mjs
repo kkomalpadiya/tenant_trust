@@ -248,10 +248,10 @@ export function getReviewState(personaKey = "alpha-member") {
     project: {
       completedPhases: 9,
       totalPhases: 10,
-      completedTasks: 92,
+      completedTasks: 93,
       totalTasks: 100,
-      currentTask: "T10.2",
-      nextTask: "T10.3",
+      currentTask: "T10.3",
+      nextTask: "T10.4",
       tenantCount: 2,
       apiOperations: 5,
       vulnerabilities: 0,
