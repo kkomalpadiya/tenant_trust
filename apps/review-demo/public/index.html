@@ -32,6 +32,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.4 8 11 4.6-1.6 8-5.9 8-11V5l-8-3Zm0 2.1L18 6v5c0 3.9-2.4 7.4-6 8.8C8.4 18.4 6 14.9 6 11V6l6-1.9ZM9 9h6v2H9V9Zm0 4h6v2H9v-2Z"/></svg>
             Certificates
           </button>
+          <button class="nav-item" type="button" data-view="trust">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16v2H4v-2Zm1-3 4-5 3 3 5-7 2 1.2-6.6 9.2-3.2-3.2L6.6 17 5 16Zm0-12h2v6H5V4Zm6 0h2v6h-2V4Zm6 0h2v6h-2V4Z"/></svg>
+            Trust decisions
+          </button>
           <button class="nav-item" type="button" data-view="records">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm1 4h12V6H6v2Zm0 4h5v-2H6v2Zm0 4h8v-2H6v2Z"/></svg>
             Tenant data
@@ -163,9 +167,9 @@
                     <p class="eyebrow">Roadmap</p>
                     <h3>Implementation progress</h3>
                   </div>
-                  <strong class="progress-value">90%</strong>
+                  <strong class="progress-value">92%</strong>
                 </div>
-                <div class="progress-track"><span style="width:90%"></span></div>
+                <div class="progress-track"><span style="width:92%"></span></div>
                 <div class="phase-list">
                   <div><span class="phase-number complete">6</span><span><strong>Adaptive trust</strong><small>Scoring + transition controls</small></span><b>Complete</b></div>
                   <div><span class="phase-number complete">7</span><span><strong>Authorization</strong><small>OPA + step-up enforcement</small></span><b>Complete</b></div>
@@ -227,6 +231,95 @@
             <div class="inline-callout certificate-control-note" id="certificate-operation-result">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.4 8 11 4.6-1.6 8-5.9 8-11V5l-8-3Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
               <div><strong>Controls are protected on the server.</strong><span>The browser sends only the requested operation and target identifiers. Tenant and role are resolved again from the selected certificate persona. Changes remain in memory and reset when the local server restarts.</span></div>
+            </div>
+          </section>
+
+          <section class="view" id="view-trust" aria-labelledby="trust-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Explainable adaptive authorization</p>
+                <h2 id="trust-title">Trust and decision history</h2>
+                <p>Inspect the current score, evidence contributions, freshness, policy provenance and historical outcomes permitted by the active tenant context.</p>
+              </div>
+              <span class="logic-badge"><span></span> Tenant-scoped explanations</span>
+            </div>
+
+            <div class="trust-summary">
+              <div><span>Visible subjects</span><strong id="trust-subject-total">0</strong></div>
+              <div><span>Fresh trust states</span><strong id="trust-fresh-total">0</strong></div>
+              <div><span>Visible decisions</span><strong id="trust-decision-total">0</strong></div>
+              <div><span>Active policy bundle</span><strong id="trust-bundle-version">—</strong></div>
+            </div>
+
+            <div class="trust-subject-picker" id="trust-subject-picker" aria-label="Visible trust subjects"></div>
+
+            <div class="trust-explanation-grid">
+              <article class="card trust-score-card">
+                <div class="card-head">
+                  <div>
+                    <p class="eyebrow">Current policy input</p>
+                    <h3 id="trust-subject-name">Subject trust</h3>
+                  </div>
+                  <span class="status-pill success" id="trust-freshness"><span></span> Fresh</span>
+                </div>
+                <div class="trust-score-main">
+                  <div class="trust-score-ring" id="trust-score-ring"><strong id="trust-score">—</strong><span>/ 100</span></div>
+                  <div class="trust-score-copy">
+                    <span class="trust-band high" id="trust-band">High</span>
+                    <strong id="trust-score-status">Usable for policy</strong>
+                    <small id="trust-age">Observed —</small>
+                  </div>
+                </div>
+                <div class="trust-version-grid">
+                  <div><span>Model</span><strong id="trust-model-version">—</strong></div>
+                  <div><span>Configuration</span><strong id="trust-configuration-version">—</strong></div>
+                  <div><span>State update</span><strong id="trust-update-version">—</strong></div>
+                </div>
+              </article>
+
+              <article class="card trust-components-card">
+                <div class="card-head">
+                  <div>
+                    <p class="eyebrow">Weighted explanation</p>
+                    <h3>Score components</h3>
+                  </div>
+                  <span class="plain-meta">Higher is more trusted</span>
+                </div>
+                <div class="trust-components" id="trust-components"></div>
+              </article>
+            </div>
+
+            <div class="policy-provenance">
+              <div><span>Policy version</span><strong id="trust-policy-version">—</strong></div>
+              <div><span>Bundle version</span><strong id="trust-policy-bundle">—</strong></div>
+              <div><span>Policy profile</span><strong id="trust-policy-profile">—</strong></div>
+              <div><span>Calibration</span><strong id="trust-calibration">—</strong></div>
+            </div>
+
+            <div class="trust-history-grid">
+              <article class="card trust-history-card">
+                <div class="table-toolbar">
+                  <div><h3>Decision history</h3><span>Outcome, reason and exact policy version</span></div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Time</th><th>Action</th><th>Outcome</th><th>Reason</th><th>Score</th><th>Policy</th></tr></thead>
+                    <tbody id="trust-decision-rows"></tbody>
+                  </table>
+                </div>
+              </article>
+
+              <article class="card trust-transition-card">
+                <div class="table-toolbar">
+                  <div><h3>Trust transitions</h3><span>Newest durable state first</span></div>
+                </div>
+                <div class="transition-list" id="trust-transition-list"></div>
+              </article>
+            </div>
+
+            <div class="inline-callout trust-callout">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.4 8 11 4.6-1.6 8-5.9 8-11V5l-8-3Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
+              <div><strong>Scores explain decisions but never replace identity checks.</strong><span>Stale trust withholds the policy score and requires denial. Certificate, tenant, membership and resource checks remain independent prerequisites.</span></div>
             </div>
           </section>
 

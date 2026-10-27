@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CertificateDashboardError, createCertificateDashboard } from "./certificate-dashboard.mjs";
 import { getReviewState, runReviewScenario } from "./demo-domain.mjs";
+import { createTrustDashboard } from "./trust-dashboard.mjs";
 
 const host = process.env.REVIEW_DEMO_HOST ?? "127.0.0.1";
 const port = Number(process.env.REVIEW_DEMO_PORT ?? 4173);
@@ -12,6 +13,7 @@ const appDirectory = path.dirname(fileURLToPath(import.meta.url));
 const publicDirectory = path.join(appDirectory, "public");
 const auditEvents = [];
 const certificateDashboard = createCertificateDashboard();
+const trustDashboard = createTrustDashboard();
 const contentTypes = new Map([
   [".css", "text/css; charset=utf-8"],
   [".html", "text/html; charset=utf-8"],
@@ -75,9 +77,11 @@ const server = createServer(async (request, response) => {
       const personaKey = requestUrl.searchParams.get("persona") ?? undefined;
       const state = getReviewState(personaKey);
       const dashboard = certificateDashboard.getState(personaKey);
+      const trust = trustDashboard.getState(personaKey);
       sendJson(response, 200, {
         ...state,
         ...dashboard,
+        ...trust,
         certificate: dashboard.currentCertificate ?? state.certificate,
         auditEvents: auditEvents.slice(0, 12),
       });

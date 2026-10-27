@@ -13,11 +13,13 @@ const state = {
   data: null,
   auditEvents: [],
   lastResult: null,
+  trustSubjectId: null,
 };
 
 const pageTitles = {
   overview: "Security overview",
   certificates: "Certificates",
+  trust: "Trust decisions",
   records: "Tenant data",
   lab: "Access boundary lab",
   audit: "Audit trail",
@@ -77,7 +79,7 @@ function metricIcon(kind) {
 function renderMetrics(project, certificateSummary) {
   const metrics = [
     { value: `${project.completedPhases}/${project.totalPhases}`, label: "Phases complete", detail: `${project.completedTasks} verified tasks`, kind: "phases", color: "#2f7df4" },
-    { value: `${project.completedTasks}/${project.totalTasks}`, label: "Tasks complete", detail: `${project.currentTask} in progress`, kind: "tests", color: "#15856c" },
+    { value: `${project.completedTasks}/${project.totalTasks}`, label: "Tasks complete", detail: `${project.nextTask} ready`, kind: "tests", color: "#15856c" },
     { value: project.tenantCount, label: "Isolated tenants", detail: "Alpha + Beta", kind: "tenants", color: "#8b5cf6" },
     { value: certificateSummary.permittedOperations, label: "Permitted controls", detail: "Issue + renew + revoke", kind: "shield", color: "#d47d27" },
   ];
@@ -170,6 +172,91 @@ function renderCertificateDashboard(data) {
       <td>${operationButton({ operation: "revoke", subjectId: certificate.subjectId, certificateId: certificate.certificateId, decision: certificate.operations.revoke })}</td>
     </tr>
   `).join("") : '<tr class="empty-row"><td colspan="6">No certificates are visible in this tenant scope.</td></tr>';
+}
+
+function formatAge(seconds) {
+  if (seconds < 60) return `${Math.floor(seconds)} seconds`;
+  if (seconds < 3_600) return `${Math.floor(seconds / 60)} minutes`;
+  return `${(seconds / 3_600).toFixed(1)} hours`;
+}
+
+function renderTrustDashboard(data) {
+  const subjects = data.trustSubjects;
+  const summary = data.trustSummary;
+  document.querySelector("#trust-subject-total").textContent = summary.subjectCount;
+  document.querySelector("#trust-fresh-total").textContent = summary.freshCount;
+  document.querySelector("#trust-decision-total").textContent = summary.decisionCount;
+  document.querySelector("#trust-bundle-version").textContent = summary.bundleVersion === null ? "—" : `v${summary.bundleVersion}`;
+
+  if (!subjects.some(({ subjectId }) => subjectId === state.trustSubjectId)) {
+    state.trustSubjectId = summary.currentSubjectId ?? subjects[0]?.subjectId ?? null;
+  }
+  const subject = subjects.find(({ subjectId }) => subjectId === state.trustSubjectId) ?? subjects[0];
+  const picker = document.querySelector("#trust-subject-picker");
+  picker.innerHTML = subjects.map((candidate) => `
+    <button class="trust-subject-button ${candidate.subjectId === subject?.subjectId ? "active" : ""}" type="button" data-trust-subject="${escapeHtml(candidate.subjectId)}">
+      <span>${escapeHtml(candidate.initials)}</span>
+      <span><strong>${escapeHtml(candidate.displayName)}</strong><small>${escapeHtml(candidate.roleLabel)}</small></span>
+      <b class="${escapeHtml(candidate.freshness.state)}">${escapeHtml(candidate.freshness.state)}</b>
+    </button>
+  `).join("");
+  if (!subject) return;
+
+  const score = subject.current.lastKnownScore;
+  const freshness = subject.freshness;
+  document.querySelector("#trust-subject-name").textContent = subject.displayName;
+  document.querySelector("#trust-score").textContent = score.toFixed(2).replace(/\.00$/u, "");
+  document.querySelector("#trust-score-ring").style.setProperty("--trust-score", score);
+  const band = document.querySelector("#trust-band");
+  band.className = `trust-band ${subject.current.band}`;
+  band.textContent = `${subject.current.band} trust`;
+  document.querySelector("#trust-score-status").textContent = freshness.usableForPolicy
+    ? "Usable for policy"
+    : "Withheld from policy";
+  document.querySelector("#trust-age").textContent = `Observed ${formatAge(freshness.ageSeconds)} ago · stale after ${formatAge(freshness.staleAfterSeconds)}`;
+  const freshnessBadge = document.querySelector("#trust-freshness");
+  freshnessBadge.className = `status-pill ${freshness.state === "fresh" ? "success" : "danger"}`;
+  freshnessBadge.innerHTML = `<span></span> ${escapeHtml(freshness.state)}`;
+  document.querySelector("#trust-model-version").textContent = `v${subject.current.modelVersion}`;
+  document.querySelector("#trust-configuration-version").textContent = `v${subject.current.configurationVersion}`;
+  document.querySelector("#trust-update-version").textContent = `v${subject.current.updateVersion}`;
+
+  document.querySelector("#trust-components").innerHTML = subject.components.map((component) => `
+    <div class="trust-component" title="${escapeHtml(component.meaning)}">
+      <div class="trust-component-copy"><strong>${escapeHtml(component.label)}</strong><span>${component.value.toFixed(0)} · ${(component.weight * 100).toFixed(0)}% weight</span></div>
+      <div class="trust-component-track"><span style="width:${component.value}%"></span></div>
+      <b>${component.weightedContribution.toFixed(2)}</b>
+    </div>
+  `).join("");
+
+  document.querySelector("#trust-policy-version").textContent = subject.policy.policyVersionId;
+  document.querySelector("#trust-policy-bundle").textContent = `v${subject.policy.bundleVersion}`;
+  document.querySelector("#trust-policy-profile").textContent = subject.policy.profile;
+  document.querySelector("#trust-calibration").textContent = subject.policy.calibrationStatus.replaceAll("-", " ");
+
+  document.querySelector("#trust-decision-rows").innerHTML = subject.decisions.map((decision) => `
+    <tr>
+      <td>${dateFormatter.format(new Date(decision.evaluatedAt))}<small class="decision-time">${timeFormatter.format(new Date(decision.evaluatedAt))}</small></td>
+      <td><strong class="decision-action">${escapeHtml(formatAction(decision.action))}</strong></td>
+      <td><span class="decision-outcome ${decision.outcome.toLowerCase()}">${escapeHtml(decision.outcome)}</span></td>
+      <td><code class="decision-reason">${escapeHtml(decision.reasonCodes.join(", "))}</code></td>
+      <td>${decision.trustScore.toFixed(2).replace(/\.00$/u, "")} <small class="decision-band">${escapeHtml(decision.trustBand)}</small></td>
+      <td><span class="decision-policy">bundle v${decision.bundleVersion}</span></td>
+    </tr>
+  `).join("");
+
+  document.querySelector("#trust-transition-list").innerHTML = subject.transitions.map((transition) => {
+    const delta = transition.previousScore === null ? null : transition.newScore - transition.previousScore;
+    const deltaLabel = delta === null ? "Initial state" : `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}`;
+    return `
+      <div class="transition-row">
+        <span class="transition-dot ${escapeHtml(transition.newBand)}"></span>
+        <div><strong>${escapeHtml(transition.trigger)}</strong><small>${dateFormatter.format(new Date(transition.observedAt))} · ${timeFormatter.format(new Date(transition.observedAt))}</small></div>
+        <div class="transition-score"><strong>${transition.newScore.toFixed(2).replace(/\.00$/u, "")}</strong><span class="${delta !== null && delta < 0 ? "negative" : ""}">${deltaLabel}</span></div>
+        <code>${escapeHtml(transition.reasonCode)}</code>
+      </div>
+    `;
+  }).join("");
 }
 
 function renderPersonaPicker(data) {
@@ -288,6 +375,7 @@ async function loadState() {
   renderPersonaPicker(data);
   renderPersona(data);
   renderCertificateDashboard(data);
+  renderTrustDashboard(data);
   renderRecords(data.records, document.querySelector("#record-search").value);
   renderScenarios(data.scenarios);
   renderActivity();
@@ -360,10 +448,17 @@ document.addEventListener("click", (event) => {
 
   const certificateButton = event.target.closest("[data-certificate-operation]");
   if (certificateButton && !certificateButton.disabled) runCertificateOperation(certificateButton);
+
+  const trustSubjectButton = event.target.closest("[data-trust-subject]");
+  if (trustSubjectButton) {
+    state.trustSubjectId = trustSubjectButton.dataset.trustSubject;
+    renderTrustDashboard(state.data);
+  }
 });
 
 document.querySelector("#persona-picker").addEventListener("change", async (event) => {
   state.personaKey = event.target.value;
+  state.trustSubjectId = null;
   await loadState();
   showToast(`Switched to ${state.data.persona.displayName} in ${state.data.persona.tenant.name}`);
 });
