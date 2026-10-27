@@ -1,0 +1,15 @@
+# Evaluation baselines
+
+`@tenant-trust/evaluation` owns the fixed comparison scope and the evaluation-only JWT plus RBAC implementation used by Baseline A.
+
+All three comparison modes reference `tenant-trust-comparison-workload-v1`. The catalog contains the same two tenants, four subjects, resource identifiers, five canonical actions and Alpha/Beta isolation probes. Future protocol and workload-runner tasks must consume this catalog rather than creating mode-specific scenarios.
+
+Baseline A accepts only compact EdDSA JWTs with an exact `typ`, `alg` and `kid`. The signed claims bind issuer, audience, token ID, tenant, subject, roles and a maximum five-minute validity window. The verifier rejects noncanonical encoding, unknown fields, tampering, wrong keys, future tokens and expiry. After verification, it resolves a branded `trusted-session` tenant context against current tenant, subject and membership state, then applies the existing `role-action-matrix-v1` and explicit resource scope.
+
+This is deliberately a JWT plus RBAC comparator: an eligible tenant administrator can perform export or tenant administration based on the signed role and tenant scope alone. It does not use adaptive trust, certificates, OPA, step-up or Fabric audit. Signed roles remain valid until token expiry, although tenant, subject and membership suspension is checked for every evaluation call. No HTTP route or production API authentication path accepts these tokens.
+
+Run the focused gate with:
+
+```text
+npm run jwt-rbac-baseline:verify
+```

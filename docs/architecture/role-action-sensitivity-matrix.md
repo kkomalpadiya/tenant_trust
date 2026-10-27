@@ -4,6 +4,8 @@
 
 T4.4 defines the role eligibility contract consumed by the API and policy enforcement. T4.6 wraps it in the explicit `pki-rbac-baseline-v1` mode, which requires tenant-scoped certificate authentication and deliberately uses no adaptive trust input. Under `adaptive-trust-opa-v1`, T7.4 applies tenant-configured score thresholds and the same canonical sensitivities in OPA, T7.5 accepts bound step-up proofs and T7.6 enforces DENY/QUARANTINE outcomes. The baseline still does not consume trust.
 
+T10.4 reuses this exact matrix in the separate evaluation-only `jwt-rbac-baseline-v1` comparator. It verifies an EdDSA JWT, uses its signed role claims and enforces the same self, owner and tenant resource scopes. Pure JWT plus RBAC treats an eligible administrator's `requires-controls` row as role-authorized for comparison, while the production Baseline B and proposed framework retain their additional-control boundaries.
+
 The resolver accepts only an immutable tenant context produced from gateway-authenticated certificate identity and authoritative active tenant, subject, membership and role state. It never accepts a role, tenant, subject, resource type or sensitivity from request input. PostgreSQL forced row-level security remains the authoritative resource-scope check.
 
 ## Matrix

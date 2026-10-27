@@ -10,6 +10,8 @@ The repository contains the initial scope, repository design, selected technolog
 
 T10.3 adds a tenant-scoped audit-operations view for Fabric delivery, causal-chain verification and retryable quarantine/action failures. It exposes operational metadata only and excludes evidence content and credentials.
 
+T10.4 adds evaluation-only Baseline A: bounded EdDSA JWT authentication plus the existing RBAC matrix, with one immutable two-tenant workload catalog shared by Baseline A, Baseline B and the proposed framework. The production SaaS API remains mTLS-only.
+
 ## Planned capabilities
 
 - Issue, renew and revoke certificates through tenant-specific issuing authorities.
@@ -90,6 +92,7 @@ T10.3 adds a tenant-scoped audit-operations view for Fabric delivery, causal-cha
 - [Tenant certificate dashboard](docs/architecture/tenant-certificate-dashboard.md)
 - [Tenant trust and decision history dashboard](docs/architecture/tenant-trust-decision-dashboard.md)
 - [Tenant audit verification and operations dashboard](docs/architecture/tenant-audit-operations-dashboard.md)
+- [JWT plus RBAC evaluation baseline](docs/architecture/jwt-rbac-evaluation-baseline.md)
 - [Adaptive trust-engine verification and calibration fixtures](docs/architecture/trust-engine-verification.md)
 - [Phase 6 adaptive trust-engine implementation report](docs/reports/phase-6-adaptive-trust-engine-report.md)
 
