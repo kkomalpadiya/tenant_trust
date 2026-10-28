@@ -6,7 +6,7 @@ A valid certificate establishes identity. Access also depends on tenant membersh
 
 ## Current status
 
-The repository contains the initial scope, repository design, selected technology stack, shared event contracts, the tenant/subject/role data model, deterministic two-tenant identities, resources and security configuration, tested tenant-context, actor-aware PostgreSQL resource, membership, configuration and lifecycle authorization, audited tenant suspension and teardown, Redis key-scoping and NATS subject/consumer controls, a machine-checked tenant CA hierarchy, a versioned client-certificate identity profile, a certificate issuance boundary with real two-issuer cryptographic verification, a tenant-scoped certificate inventory with append-only lifecycle records, guarded fresh-key renewal with atomic supersession, fail-closed application certificate-status validation, authorized permanent revocation, a transactional outbox that publishes source-authenticated certificate lifecycle events with causal identities to JetStream, a completed mTLS-protected SaaS baseline, a versioned signed-evidence envelope, tenant-governed evidence-source keys, deterministic five-signal simulators, a size-bounded evidence endpoint with exact tenant/source/key/subject binding plus Ed25519 verification, atomic freshness/replay enforcement, tenant-scoped application-encrypted off-chain evidence storage, a completed adaptive trust-engine gate covering normalized scoring, smoothing, recovery, flood/replay safeguards, versioned state/configuration, explanations, current-score freshness and tenant isolation, and a completed context-aware authorization phase covering fail-closed OPA enforcement on every protected SaaS route, validated tenant-scoped bundle publication, executable trust-score/resource-sensitivity rules, bound single-use step-up proofs, durable DENY/QUARANTINE enforcement, bounded outage/freshness controls, canonical append-only decision provenance, and a deterministic certificate-to-risk-restriction scenario. Phase 8 is complete with a reproducible two-channel Fabric network, minimal commitment chaincode with duplicate protection, a live backend Gateway integration using separated writer/query identities, durable asynchronous delivery with commit reconciliation, a causal verifier that rebuilds off-chain commitments and validates the complete evidence-to-action graph against Fabric, adversarial coverage for tenant-ledger privacy plus simple and coordinated off-chain tampering, and a real peer-outage recovery gate proving authorization continuity and gap-free commitment recovery. Phase 9 is complete with an executable state machine, severity/corroboration/recovery rules, durable idempotent action execution with leased retries and exact revocation confirmation, authenticated certificate-lifecycle feedback that records one causal trust effect without recursive action eligibility, durable tenant-scoped session/cache invalidation with measured enforcement delay, governed two-stage recovery using current trust, a single-use administrator step-up proof and fresh replacement-certificate confirmation, immutable action/recovery audit projection with source-to-Fabric verification for missing or mismatched records, an integrated adversarial gate that suppresses repeated actions, one-source escalation and stale or competing recovery, an audit-aware operations view with idempotent restart recovery for stuck workers, and one fail-fast completion gate for the full evidence-to-trust-to-policy-to-action-to-audit-to-recovery loop. Phase 10 now includes tenant-scoped certificate controls and trust-decision explanations with weighted components, freshness, immutable versions, policy reasons and historical transitions. The initial weights and thresholds remain explicitly unvalidated prototype defaults.
+All ten phases and 100 tracked implementation tasks are complete. The repository contains the runnable two-tenant prototype, tenant-bound certificate lifecycle, signed evidence processing, explainable adaptive trust, context-aware OPA authorization, controlled certificate actions, asynchronous Fabric commitments, tenant-scoped review dashboards, reproducible evaluation workloads and measured comparison reports. The final release package adds a consolidated architecture overview, API reference, demo script, final report, updated presentation and an executable release-package check. The initial weights and thresholds remain explicitly unvalidated prototype defaults.
 
 T10.3 adds a tenant-scoped audit-operations view for Fabric delivery, causal-chain verification and retryable quarantine/action failures. It exposes operational metadata only and excludes evidence content and credentials.
 
@@ -22,7 +22,9 @@ T10.8 reports a live single-host performance run of 3,780 decisions across all m
 
 T10.9 compares both baselines with the proposed framework and adds executable ablations for smoothing, terminal certificate feedback and ledger placement. The conclusions report the measured security/performance tradeoffs, preserve the closed-catalog and single-host limitations, and describe the work as an evaluated integration of established mechanisms rather than claiming novel primitives or universally optimal parameters.
 
-## Planned capabilities
+T10.10 packages the final demonstration and release material, closes the review dashboard at 100/100 tasks and adds `npm run release:verify`. That release gate starts and removes a disposable clean environment, runs the complete regression suite through the foundation verifier, and checks the final documentation, slide deck and completion markers.
+
+## Implemented capabilities
 
 - Issue, renew and revoke certificates through tenant-specific issuing authorities.
 - Collect signed evidence about identity, device, behaviour, certificate state and compliance.
@@ -34,6 +36,11 @@ T10.9 compares both baselines with the proposed framework and adds executable ab
 ## Project documents
 
 - [Prototype scope and demonstration](docs/scope.md)
+- [System architecture overview](docs/architecture/system-overview.md)
+- [API reference](docs/api-reference.md)
+- [Final demonstration script](docs/demo-script.md)
+- [Final project report](docs/reports/final-project-report.md)
+- [Release checklist](docs/release-checklist.md)
 - [Repository layout and component boundaries](docs/architecture/repository-layout.md)
 - [Technology stack and resource budget](docs/architecture/technology-stack.md)
 - [Local development setup and environment checks](docs/local-development.md)
@@ -106,6 +113,8 @@ T10.9 compares both baselines with the proposed framework and adds executable ab
 - [Reproducible evaluation protocol and labels](docs/architecture/reproducible-evaluation-protocol.md)
 - [Benign and attack workload runner](docs/architecture/benign-attack-workload-runner.md)
 - [Effectiveness and isolation evaluation](docs/reports/effectiveness-and-isolation-evaluation.md)
+- [Latency, throughput and recovery evaluation](docs/reports/latency-throughput-and-recovery-evaluation.md)
+- [Ablation study and research conclusions](docs/reports/ablation-study-and-research-conclusions.md)
 - [Adaptive trust-engine verification and calibration fixtures](docs/architecture/trust-engine-verification.md)
 - [Phase 6 adaptive trust-engine implementation report](docs/reports/phase-6-adaptive-trust-engine-report.md)
 
@@ -117,7 +126,7 @@ Run `npm run demo:review` and open `http://127.0.0.1:4173` for the local securit
 
 The Audit operations view also shows tenant-scoped Fabric delivery, causal verification and security-action health without raw evidence or credentials. Run `npm run audit-operations-dashboard:verify` for T10.3.
 
-## Planned infrastructure
+## Infrastructure
 
 The application uses TypeScript on Node.js 24 LTS, Fastify for the API and React with Vite for the dashboard. PostgreSQL holds durable application state, Redis holds short-lived runtime state, NATS delivers events, step-ca provides certificate services, OPA makes policy decisions and Hyperledger Fabric records audit commitments. Docker Desktop with WSL2 runs Linux services locally. See the technology stack document for version targets and component bootstrap boundaries.
 

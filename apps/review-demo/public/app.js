@@ -79,7 +79,7 @@ function metricIcon(kind) {
 function renderMetrics(project, certificateSummary) {
   const metrics = [
     { value: `${project.completedPhases}/${project.totalPhases}`, label: "Phases complete", detail: `${project.completedTasks} verified tasks`, kind: "phases", color: "#2f7df4" },
-    { value: `${project.completedTasks}/${project.totalTasks}`, label: "Tasks complete", detail: `${project.nextTask} ready`, kind: "tests", color: "#15856c" },
+    { value: `${project.completedTasks}/${project.totalTasks}`, label: "Tasks complete", detail: project.nextTask ? `${project.nextTask} ready` : "All tasks verified", kind: "tests", color: "#15856c" },
     { value: project.tenantCount, label: "Isolated tenants", detail: "Alpha + Beta", kind: "tenants", color: "#8b5cf6" },
     { value: certificateSummary.permittedOperations, label: "Permitted controls", detail: "Issue + renew + revoke", kind: "shield", color: "#d47d27" },
   ];
