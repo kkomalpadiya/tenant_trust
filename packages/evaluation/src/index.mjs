@@ -47,3 +47,12 @@ export {
   EFFECTIVENESS_REPORT_ID,
   measureEffectivenessAndIsolation,
 } from "./effectiveness-metrics.mjs";
+
+export {
+  PERFORMANCE_REPORT_ID,
+  summarizeLatency,
+  summarizeRate,
+  summarizeRecovery,
+  summarizeResourceUse,
+  validatePerformanceCoverage,
+} from "./performance-metrics.mjs";

@@ -18,6 +18,8 @@ T10.6 adds the deterministic workload runner for all ten scenarios and all three
 
 T10.7 reports functional effectiveness and isolation outcomes from 36,900 measured trials with explicit denominators and 10,000-resample cluster-bootstrap uncertainty. It includes detection, false restriction, tenant isolation, replay rejection, audit modification, ledger verification and revocation enforcement. Unsupported baseline controls remain failures, and the report clearly separates deterministic functional results from T10.8 performance work.
 
+T10.8 reports a live single-host performance run of 3,780 decisions across all modes and registered load caps. Authentication, adaptive trust, authorization and end-to-end latency are separated from 30 real Fabric commit-delay observations. It also records throughput, Node.js CPU/RSS and three reversible peer-outage recovery measurements that preserve authorization continuity and reconcile to zero delivery gaps.
+
 ## Planned capabilities
 
 - Issue, renew and revoke certificates through tenant-specific issuing authorities.

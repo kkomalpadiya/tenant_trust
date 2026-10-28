@@ -20,6 +20,7 @@ const KEY_ID = /^[a-z0-9][a-z0-9._:-]{2,63}$/u;
 const ROLES = new Set(["tenant-admin", "tenant-member"]);
 const HEADER_FIELDS = Object.freeze(["alg", "kid", "typ"]);
 const CLAIM_FIELDS = Object.freeze(["aud", "exp", "iat", "iss", "jti", "nbf", "roles", "sub", "tid"]);
+const AUTHENTICATED_JWT_IDENTITIES = new WeakSet();
 
 export const JWT_RBAC_BASELINE_POLICY = Object.freeze({
   modeId: JWT_RBAC_BASELINE_MODE_ID,
@@ -245,8 +246,15 @@ export function createJwtRbacEvaluationBaseline({
     return normalizeClaims(decodeJson(encodedClaims, "JWT_CLAIMS_INVALID"), expected, nowSeconds(clock));
   }
 
-  function authorize({ token, authority, action, resource } = {}) {
-    const claims = verifyToken(token);
+  function authenticate(token) {
+    const authentication = Object.freeze({ claims: verifyToken(token) });
+    AUTHENTICATED_JWT_IDENTITIES.add(authentication);
+    return authentication;
+  }
+
+  function authorizeAuthenticated({ authentication, authority, action, resource } = {}) {
+    if (!authentication || !AUTHENTICATED_JWT_IDENTITIES.has(authentication)) fail("JWT_AUTHENTICATION_REQUIRED");
+    const { claims } = authentication;
     const context = resolveTenantContext({
       authentication: {
         source: "trusted-session",
@@ -276,7 +284,17 @@ export function createJwtRbacEvaluationBaseline({
     });
   }
 
-  return Object.freeze({ policy: JWT_RBAC_BASELINE_POLICY, verifyToken, authorize });
+  function authorize({ token, authority, action, resource } = {}) {
+    return authorizeAuthenticated({ authentication: authenticate(token), authority, action, resource });
+  }
+
+  return Object.freeze({
+    policy: JWT_RBAC_BASELINE_POLICY,
+    verifyToken,
+    authenticate,
+    authorizeAuthenticated,
+    authorize,
+  });
 }
 
 export function jwtRbacSafeDenial(error) {

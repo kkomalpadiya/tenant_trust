@@ -131,6 +131,8 @@ const outbox = createPostgresAuditOutboxWorkerRepository({ query: workerQuery })
 let outageGateway;
 let recoveryGateway;
 let peerStopped = false;
+let recoveryStartedAt;
+let recoveryTimeMilliseconds;
 
 try {
   assert.equal(peerHealth(), "healthy", "the tenant Alpha peer must be healthy before the outage exercise");
@@ -190,6 +192,7 @@ try {
 
   outageGateway.close();
   outageGateway = undefined;
+  recoveryStartedAt = process.hrtime.bigint();
   compose(["start", peerService], "tenant Alpha peer recovery");
   peerStopped = false;
   waitForHealthyPeer();
@@ -212,6 +215,7 @@ try {
   const delivered = await recoveryWorker.runOnce();
   assert.equal(delivered.status, "committed");
   assert.equal(delivered.eventId, identifiers.event);
+  recoveryTimeMilliseconds = Number(process.hrtime.bigint() - recoveryStartedAt) / 1_000_000;
 
   const stored = await pool.query(
     `SELECT status, attempt_count, validation_code, block_number::text, confirmation_source,
@@ -253,6 +257,7 @@ try {
   console.log("PASS the access-decision commitment stayed durable and visible as a failed outbox delivery");
   console.log("PASS peer recovery committed the same event and the ledger value matches PostgreSQL");
   console.log("PASS the delivery verifier reports no remaining audit gaps");
+  console.log(`MEASURE fabric-outage-recovery-time-ms ${recoveryTimeMilliseconds.toFixed(3)}`);
 } finally {
   outageGateway?.close();
   recoveryGateway?.close();

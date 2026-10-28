@@ -95,6 +95,30 @@ test("the complete shared workload produces the declared JWT plus RBAC outcomes"
   }
 });
 
+test("authentication and authorization stages can be measured without verifying a JWT twice", () => {
+  const actor = subject(EVALUATION_IDS.alice);
+  const token = issueFor(actor).token;
+  const authentication = baseline.authenticate(token);
+  const decision = baseline.authorizeAuthenticated({
+    authentication,
+    authority: authorityFor(actor),
+    action: "profile:read",
+    resource: EVALUATION_RESOURCES.aliceProfile,
+  });
+
+  assert.deepEqual(authentication.claims, baseline.verifyToken(token));
+  assert.equal(decision.outcome, "allow");
+  assert.throws(
+    () => baseline.authorizeAuthenticated({
+      authentication: { claims: authentication.claims },
+      authority: authorityFor(actor),
+      action: "profile:read",
+      resource: EVALUATION_RESOURCES.aliceProfile,
+    }),
+    (error) => error instanceof JwtRbacBaselineError && error.reasonCode === "JWT_AUTHENTICATION_REQUIRED",
+  );
+});
+
 test("JWT baseline permits administrator sensitive actions from signed role and tenant scope alone", () => {
   const actor = subject(EVALUATION_IDS.alphaAdmin);
   const token = issueFor(actor).token;

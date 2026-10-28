@@ -14,6 +14,8 @@ This is deliberately a JWT plus RBAC comparator: an eligible tenant administrato
 
 `tenant-trust-effectiveness-isolation-report-v1` accepts only complete full-protocol output. It reports attack detection, false restriction, tenant isolation, replay rejection, audit modification detection, ledger verification and revocation enforcement with explicit numerators, denominators, unsupported failures and deterministic 95% cluster-bootstrap intervals. Reference adapters model the verified functional capability boundary; performance and real-world prevalence claims remain out of scope.
 
+`tenant-trust-performance-recovery-report-v1` validates all nine registered mode/load blocks and summarizes authentication, trust, authorization and end-to-end latency without mixing in Fabric commit delay. The live runner uses the shared 14-case workload for 3,780 measured decisions, records Node.js CPU/RSS and throughput, submits 30 measured commitments, and exercises three real peer outage/recovery cycles. See [`docs/reports/latency-throughput-and-recovery-evaluation.md`](../../docs/reports/latency-throughput-and-recovery-evaluation.md).
+
 Run the focused gate with:
 
 ```text
@@ -21,4 +23,5 @@ npm run jwt-rbac-baseline:verify
 npm run evaluation-protocol:verify
 npm run workload-runner:verify
 npm run effectiveness-isolation:verify
+npm run performance-recovery:verify
 ```

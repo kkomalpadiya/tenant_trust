@@ -118,6 +118,7 @@
     "evaluation-protocol:verify": "npm run test:evaluation && node scripts/verify-evaluation-protocol.mjs",
     "workload-runner:verify": "npm run test:evaluation && node scripts/verify-benign-attack-workload-runner.mjs",
     "effectiveness-isolation:verify": "npm run test:evaluation && node scripts/verify-effectiveness-isolation-outcomes.mjs",
+    "performance-recovery:verify": "npm run test:evaluation && node scripts/measure-performance-recovery.mjs",
     "test:review-demo": "node --test apps/review-demo/test/*.test.mjs",
     "test:audit-chaincode": "npm test --workspace @tenant-trust/audit-chaincode",
     "test:audit": "npm test --workspace @tenant-trust/audit",
