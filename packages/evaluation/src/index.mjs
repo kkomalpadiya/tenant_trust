@@ -56,3 +56,9 @@ export {
   summarizeResourceUse,
   validatePerformanceCoverage,
 } from "./performance-metrics.mjs";
+
+export {
+  ABLATION_STUDY_ID,
+  EVALUATION_REFERENCE_RESULTS,
+  createAblationStudy,
+} from "./ablation-study.mjs";

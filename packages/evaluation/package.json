@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@tenant-trust/authorization": "0.1.0",
-    "@tenant-trust/tenant-context": "0.1.0"
+    "@tenant-trust/orchestrator": "0.1.0",
+    "@tenant-trust/tenant-context": "0.1.0",
+    "@tenant-trust/trust": "0.1.0"
   }
 }

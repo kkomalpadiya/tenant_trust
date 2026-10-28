@@ -16,6 +16,8 @@ This is deliberately a JWT plus RBAC comparator: an eligible tenant administrato
 
 `tenant-trust-performance-recovery-report-v1` validates all nine registered mode/load blocks and summarizes authentication, trust, authorization and end-to-end latency without mixing in Fabric commit delay. The live runner uses the shared 14-case workload for 3,780 measured decisions, records Node.js CPU/RSS and throughput, submits 30 measured commitments, and exercises three real peer outage/recovery cycles. See [`docs/reports/latency-throughput-and-recovery-evaluation.md`](../../docs/reports/latency-throughput-and-recovery-evaluation.md).
 
+`tenant-trust-ablation-study-v1` freezes the measured baseline/proposed comparison and executes three controlled variants. Real temporal scoring compares alpha 0.30 with no smoothing, the feedback counterfactual tests the consequence of making terminal lifecycle evidence action-eligible, and the ledger counterfactual places measured Fabric commit delay on the request path. The conclusion boundary describes the contribution as an evaluated integration and explicitly excludes unsupported novelty, generalization and production claims. See [`docs/reports/ablation-study-and-research-conclusions.md`](../../docs/reports/ablation-study-and-research-conclusions.md).
+
 Run the focused gate with:
 
 ```text
@@ -24,4 +26,5 @@ npm run evaluation-protocol:verify
 npm run workload-runner:verify
 npm run effectiveness-isolation:verify
 npm run performance-recovery:verify
+npm run ablation-conclusions:verify
 ```

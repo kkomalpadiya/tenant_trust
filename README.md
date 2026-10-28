@@ -20,6 +20,8 @@ T10.7 reports functional effectiveness and isolation outcomes from 36,900 measur
 
 T10.8 reports a live single-host performance run of 3,780 decisions across all modes and registered load caps. Authentication, adaptive trust, authorization and end-to-end latency are separated from 30 real Fabric commit-delay observations. It also records throughput, Node.js CPU/RSS and three reversible peer-outage recovery measurements that preserve authorization continuity and reconcile to zero delivery gaps.
 
+T10.9 compares both baselines with the proposed framework and adds executable ablations for smoothing, terminal certificate feedback and ledger placement. The conclusions report the measured security/performance tradeoffs, preserve the closed-catalog and single-host limitations, and describe the work as an evaluated integration of established mechanisms rather than claiming novel primitives or universally optimal parameters.
+
 ## Planned capabilities
 
 - Issue, renew and revoke certificates through tenant-specific issuing authorities.
