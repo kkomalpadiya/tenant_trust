@@ -12,10 +12,13 @@ This is deliberately a JWT plus RBAC comparator: an eligible tenant administrato
 
 `tenant-trust-workload-runner-v1` converts those scenarios into ordered benign, attack and resilience steps. The full plan derives all 3,150 warm-up plus measured scenario runs from the frozen protocol, launches the requested concurrent lanes and retains one labelled observation per step. A separate verification-only profile checks all scenarios and modes without producing benchmark data.
 
+`tenant-trust-effectiveness-isolation-report-v1` accepts only complete full-protocol output. It reports attack detection, false restriction, tenant isolation, replay rejection, audit modification detection, ledger verification and revocation enforcement with explicit numerators, denominators, unsupported failures and deterministic 95% cluster-bootstrap intervals. Reference adapters model the verified functional capability boundary; performance and real-world prevalence claims remain out of scope.
+
 Run the focused gate with:
 
 ```text
 npm run jwt-rbac-baseline:verify
 npm run evaluation-protocol:verify
 npm run workload-runner:verify
+npm run effectiveness-isolation:verify
 ```

@@ -11,6 +11,7 @@ export const WORKLOAD_RUNNER_ID = "tenant-trust-workload-runner-v1";
 const ADAPTER_STATUSES = new Set(["completed", "unsupported"]);
 const HASH_PATTERN = /^[a-f0-9]{64}$/u;
 const REASON_PATTERN = /^[A-Z][A-Z0-9_]{2,63}$/u;
+const MEASUREMENT_PATTERN = /^[a-z][a-zA-Z0-9]*Ms$/u;
 
 function deepFreeze(value) {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
@@ -173,6 +174,16 @@ function validateAdapterResult(result) {
   if (result.status === "unsupported" && result.observedOutcome !== "unsupported") {
     throw new TypeError("Unsupported adapter results must use the unsupported outcome.");
   }
+  if (result.measurements !== undefined) {
+    if (!result.measurements || typeof result.measurements !== "object" || Array.isArray(result.measurements)) {
+      throw new TypeError("Adapter result measurements must be an object.");
+    }
+    for (const [measurementId, value] of Object.entries(result.measurements)) {
+      if (!MEASUREMENT_PATTERN.test(measurementId) || !Number.isFinite(value) || value < 0) {
+        throw new TypeError("Adapter measurements must be non-negative millisecond values.");
+      }
+    }
+  }
   return result;
 }
 
@@ -257,6 +268,7 @@ async function executeLane({ run, scenario, steps, adapter, laneIndex, timeoutMs
       controlsExpected: workloadStep.expectedControls,
       controlsObserved,
       controlsMissing,
+      measurements: result.measurements ?? {},
       startedNs: startedNs.toString(),
       durationNs: (endedNs - startedNs).toString(),
     });

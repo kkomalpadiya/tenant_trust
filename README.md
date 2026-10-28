@@ -16,6 +16,8 @@ T10.5 pre-registers a reproducible comparison protocol with separate calibration
 
 T10.6 adds the deterministic workload runner for all ten scenarios and all three modes. It replays normal access, context and behaviour attacks, sensitive exports, cross-tenant attempts, forged and replayed evidence, audit tampering, ledger outage/recovery and corroborated revocation while retaining unsupported, timeout and error observations. Its focused profile verifies orchestration only; measurements remain deferred.
 
+T10.7 reports functional effectiveness and isolation outcomes from 36,900 measured trials with explicit denominators and 10,000-resample cluster-bootstrap uncertainty. It includes detection, false restriction, tenant isolation, replay rejection, audit modification, ledger verification and revocation enforcement. Unsupported baseline controls remain failures, and the report clearly separates deterministic functional results from T10.8 performance work.
+
 ## Planned capabilities
 
 - Issue, renew and revoke certificates through tenant-specific issuing authorities.
@@ -99,6 +101,7 @@ T10.6 adds the deterministic workload runner for all ten scenarios and all three
 - [JWT plus RBAC evaluation baseline](docs/architecture/jwt-rbac-evaluation-baseline.md)
 - [Reproducible evaluation protocol and labels](docs/architecture/reproducible-evaluation-protocol.md)
 - [Benign and attack workload runner](docs/architecture/benign-attack-workload-runner.md)
+- [Effectiveness and isolation evaluation](docs/reports/effectiveness-and-isolation-evaluation.md)
 - [Adaptive trust-engine verification and calibration fixtures](docs/architecture/trust-engine-verification.md)
 - [Phase 6 adaptive trust-engine implementation report](docs/reports/phase-6-adaptive-trust-engine-report.md)
 

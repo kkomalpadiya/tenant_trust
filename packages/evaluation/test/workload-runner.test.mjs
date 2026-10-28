@@ -20,6 +20,7 @@ function completedAdapter(overrides = {}) {
         observedOutcome: "deny",
         reasonCode: "TEST_DECISION",
         controlsObserved: step.expectedControls,
+        measurements: step.fixture === "revoked-certificate-reuse" ? { revocationEnforcementDelayMs: 275 } : undefined,
         ...overrides,
       };
     },
@@ -80,6 +81,7 @@ test("verification plan replays every scenario through all three comparison mode
   assert.equal(result.resultEligibility, "runner-verification-only");
   assert.deepEqual(new Set(result.observations.map(({ scenarioId }) => scenarioId)), new Set(EVALUATION_SCENARIOS.map(({ scenarioId }) => scenarioId)));
   assert.ok(result.observations.every(({ controlsMissing }) => controlsMissing.length === 0));
+  assert.ok(result.observations.some(({ measurements }) => measurements.revocationEnforcementDelayMs === 275));
 });
 
 test("runner executes each lane concurrently while preserving step order within a lane", async () => {

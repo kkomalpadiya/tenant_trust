@@ -37,3 +37,13 @@ export {
   createEvaluationWorkloadPlan,
   runEvaluationWorkload,
 } from "./workload-runner.mjs";
+
+export {
+  REFERENCE_EFFECTIVENESS_ADAPTER_ID,
+  createReferenceEffectivenessAdapters,
+} from "./reference-effectiveness-adapters.mjs";
+
+export {
+  EFFECTIVENESS_REPORT_ID,
+  measureEffectivenessAndIsolation,
+} from "./effectiveness-metrics.mjs";
