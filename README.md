@@ -14,6 +14,8 @@ T10.4 adds evaluation-only Baseline A: bounded EdDSA JWT authentication plus the
 
 T10.5 pre-registers a reproducible comparison protocol with separate calibration and evaluation partitions, closed ground-truth labels, fixed sample counts and repetitions, three concurrency levels, rotating mode order, exact reference hardware and failure-preserving metric denominators. The verified Review 2 slide map is bound to the source deck hash, and no benchmark result is claimed yet.
 
+T10.6 adds the deterministic workload runner for all ten scenarios and all three modes. It replays normal access, context and behaviour attacks, sensitive exports, cross-tenant attempts, forged and replayed evidence, audit tampering, ledger outage/recovery and corroborated revocation while retaining unsupported, timeout and error observations. Its focused profile verifies orchestration only; measurements remain deferred.
+
 ## Planned capabilities
 
 - Issue, renew and revoke certificates through tenant-specific issuing authorities.
@@ -96,6 +98,7 @@ T10.5 pre-registers a reproducible comparison protocol with separate calibration
 - [Tenant audit verification and operations dashboard](docs/architecture/tenant-audit-operations-dashboard.md)
 - [JWT plus RBAC evaluation baseline](docs/architecture/jwt-rbac-evaluation-baseline.md)
 - [Reproducible evaluation protocol and labels](docs/architecture/reproducible-evaluation-protocol.md)
+- [Benign and attack workload runner](docs/architecture/benign-attack-workload-runner.md)
 - [Adaptive trust-engine verification and calibration fixtures](docs/architecture/trust-engine-verification.md)
 - [Phase 6 adaptive trust-engine implementation report](docs/reports/phase-6-adaptive-trust-engine-report.md)
 

@@ -30,3 +30,10 @@ export {
   EVALUATION_SOURCE_CITATIONS,
   classifyAccessObservation,
 } from "./evaluation-protocol.mjs";
+
+export {
+  EVALUATION_SCENARIO_STEPS,
+  WORKLOAD_RUNNER_ID,
+  createEvaluationWorkloadPlan,
+  runEvaluationWorkload,
+} from "./workload-runner.mjs";
