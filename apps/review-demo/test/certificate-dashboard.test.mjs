@@ -17,7 +17,7 @@ function dashboard() {
   return createCertificateDashboard({ clock, idFactory: idFactory() });
 }
 
-test("members see only their own subject and certificate controls", () => {
+test("members see their own inventory but certificate controls are administrator-only", () => {
   const state = dashboard().getState("alpha-member");
 
   assert.equal(state.subjects.length, 1);
@@ -26,9 +26,9 @@ test("members see only their own subject and certificate controls", () => {
   assert.ok(state.certificates.every(({ tenantId, subjectId }) => (
     tenantId === reviewIds.alphaTenant && subjectId === reviewIds.alice
   )));
-  assert.equal(state.subjects[0].operations.issue.allowed, true);
-  assert.equal(state.certificates[0].operations.renew.allowed, true);
-  assert.equal(state.certificates[0].operations.revoke.allowed, true);
+  assert.equal(state.subjects[0].operations.issue.allowed, false);
+  assert.equal(state.certificates[0].operations.renew.allowed, false);
+  assert.equal(state.certificates[0].operations.revoke.allowed, false);
 });
 
 test("tenant administrators see only subjects and certificates from their tenant", () => {
@@ -53,7 +53,7 @@ test("issue, renew and revoke re-authorize and update only the scoped inventory"
   assert.equal(issued.certificate.subjectId, reviewIds.alice);
 
   const renewed = service.execute({
-    personaKey: "alpha-member",
+    personaKey: "alpha-admin",
     operation: "renew",
     subjectId: reviewIds.alice,
     certificateId: "crt_018f1234-5678-7abc-8def-0123456789c1",
@@ -74,11 +74,22 @@ test("issue, renew and revoke re-authorize and update only the scoped inventory"
   assert.equal(state.certificates.find(({ certificateId }) => certificateId === renewed.certificate.certificateId).state, "active");
   assert.equal(state.certificates.find(({ certificateId }) => certificateId === issued.certificate.certificateId).state, "revoked");
   assert.equal(state.certificates.find(({ certificateId }) => certificateId === "crt_018f1234-5678-7abc-8def-0123456789c1").state, "superseded");
+  const memberState = service.getState("alpha-member");
+  assert.equal(memberState.authenticationCertificate.state, "superseded");
+  assert.equal(memberState.authenticationCertificate.isAuthenticationCertificate, true);
+  assert.equal(memberState.authenticationCertificate.isCurrentCertificate, false);
+  assert.equal(memberState.currentCertificate, null);
 });
 
 test("server-side authorization denies foreign and elevated targets", () => {
   const service = dashboard();
 
+  assert.throws(
+    () => service.execute({ personaKey: "alpha-member", operation: "issue", subjectId: reviewIds.alice }),
+    (error) => error instanceof CertificateDashboardError
+      && error.statusCode === 403
+      && error.reasonCode === "ACCESS_DENIED",
+  );
   assert.throws(
     () => service.execute({ personaKey: "alpha-member", operation: "issue", subjectId: reviewIds.alphaAdmin }),
     (error) => error instanceof CertificateDashboardError

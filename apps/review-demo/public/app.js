@@ -81,7 +81,7 @@ function renderMetrics(project, certificateSummary) {
     { value: `${project.completedPhases}/${project.totalPhases}`, label: "Phases complete", detail: `${project.completedTasks} verified tasks`, kind: "phases", color: "#2f7df4" },
     { value: `${project.completedTasks}/${project.totalTasks}`, label: "Tasks complete", detail: project.nextTask ? `${project.nextTask} ready` : "All tasks verified", kind: "tests", color: "#15856c" },
     { value: project.tenantCount, label: "Isolated tenants", detail: "Alpha + Beta", kind: "tenants", color: "#8b5cf6" },
-    { value: certificateSummary.permittedOperations, label: "Permitted controls", detail: "Issue + renew + revoke", kind: "shield", color: "#d47d27" },
+    { value: certificateSummary.permittedOperations, label: "Permitted controls", detail: certificateSummary.permittedOperations ? "Administrator-managed PKI" : "Administrator only", kind: "shield", color: "#d47d27" },
   ];
   document.querySelector("#metric-grid").innerHTML = metrics.map((metric) => `
     <article class="metric-card" style="--metric-color:${metric.color}">
@@ -121,9 +121,7 @@ function renderPersona(data) {
 
 function operationReason(reasonCode) {
   const reasons = {
-    SELF_ENROLLMENT_ALLOWED: "Self enrollment allowed",
     TENANT_ADMIN_ENROLLMENT_ALLOWED: "Tenant administrator scope",
-    SELF_OPERATION_ALLOWED: "Own certificate",
     TENANT_ADMIN_OPERATION_ALLOWED: "Tenant administrator scope",
     RENEWAL_WINDOW_CLOSED: "Renewal window is closed",
     CERTIFICATE_NOT_ACTIVE: "Certificate is not active",
@@ -164,7 +162,11 @@ function renderCertificateDashboard(data) {
 
   document.querySelector("#certificate-rows").innerHTML = data.certificates.length ? data.certificates.map((certificate) => `
     <tr>
-      <td><strong class="certificate-owner">${escapeHtml(certificate.subjectName)}</strong>${certificate.isCurrentCertificate ? '<small class="current-label">Current login certificate</small>' : ""}</td>
+      <td><strong class="certificate-owner">${escapeHtml(certificate.subjectName)}</strong>${certificate.isCurrentCertificate
+        ? '<small class="current-label">Current login certificate</small>'
+        : certificate.isAuthenticationCertificate
+          ? `<small class="current-label invalid">Login certificate is ${escapeHtml(certificate.state)}</small>`
+          : ""}</td>
       <td><div class="certificate-id"><strong>${escapeHtml(certificate.serial)}</strong><small>${escapeHtml(certificate.certificateId)}</small></div></td>
       <td><span class="certificate-state ${escapeHtml(certificate.state)}">${escapeHtml(certificate.state)}</span></td>
       <td>${dateFormatter.format(new Date(certificate.expiresOn))}</td>
@@ -393,6 +395,10 @@ function renderResult(result) {
         <div><p class="eyebrow">${result.outcome === "allow" ? "Request accepted" : "Request stopped"}</p><h3>${escapeHtml(result.headline)}</h3><p>${escapeHtml(result.summary)}</p></div>
         <span class="http-code">HTTP ${result.statusCode}</span>
       </div>
+      ${result.trustImpact ? `<div class="trust-impact">
+        <span>${icons.shield ?? icons.check}</span>
+        <div><strong>Trust score updated</strong><small>${result.trustImpact.previousScore.toFixed(2)} → ${result.trustImpact.newScore.toFixed(2)} · ${escapeHtml(result.trustImpact.newBand)} · ${escapeHtml(result.trustImpact.reasonCode)}</small></div>
+      </div>` : ""}
       <div class="trace">
         <p class="trace-title">Decision trace</p>
         ${result.stages.map((stage) => `
@@ -463,11 +469,12 @@ async function runScenario(scenarioId) {
       body: JSON.stringify({ personaKey: state.personaKey, scenarioId }),
     });
     state.lastResult = result;
-    state.auditEvents.unshift(result.event);
+    await loadState();
     renderResult(result);
-    renderActivity();
-    renderAudit();
-    showToast(`${result.headline} · HTTP ${result.statusCode}`);
+    const trustMessage = result.trustImpact
+      ? ` · trust ${result.trustImpact.previousScore.toFixed(2)} → ${result.trustImpact.newScore.toFixed(2)}`
+      : "";
+    showToast(`${result.headline} · HTTP ${result.statusCode}${trustMessage}`);
   } catch {
     panel.innerHTML = `<div class="result-empty"><div class="empty-icon">${icons.close}</div><h3>Scenario unavailable</h3><p>The local review server did not return a result. Restart it with npm run demo:review.</p></div>`;
   } finally {

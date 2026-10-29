@@ -81,19 +81,32 @@ const server = createServer(async (request, response) => {
       const dashboard = certificateDashboard.getState(personaKey);
       const trust = trustDashboard.getState(personaKey);
       const auditOperations = auditOperationsDashboard.getState(personaKey);
+      const authenticationActive = dashboard.authenticationCertificate?.state === "active";
       sendJson(response, 200, {
         ...state,
         ...dashboard,
         ...trust,
         ...auditOperations,
-        certificate: dashboard.currentCertificate ?? state.certificate,
+        certificate: dashboard.authenticationCertificate ?? state.certificate,
+        records: authenticationActive ? state.records : [],
+        actionDecisions: authenticationActive
+          ? state.actionDecisions
+          : state.actionDecisions.map((decision) => ({ ...decision, outcome: "deny", scope: "none" })),
         auditEvents: auditEvents.slice(0, 12),
       });
       return;
     }
     if (request.method === "POST" && requestUrl.pathname === "/api/demo/scenarios") {
       const body = await readJson(request);
-      const result = runReviewScenario({ personaKey: body.personaKey, scenarioId: body.scenarioId });
+      const certificateState = certificateDashboard.getState(body.personaKey)
+        .authenticationCertificate?.state ?? "unknown";
+      const scenario = runReviewScenario({
+        personaKey: body.personaKey,
+        scenarioId: body.scenarioId,
+        certificateState,
+      });
+      const trustImpact = trustDashboard.recordScenario({ personaKey: body.personaKey, result: scenario });
+      const result = Object.freeze({ ...scenario, trustImpact });
       auditEvents.unshift(result.event);
       sendJson(response, 200, result);
       return;

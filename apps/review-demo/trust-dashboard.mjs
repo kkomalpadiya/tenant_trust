@@ -165,18 +165,59 @@ function evaluateDecision({ subject, transition, policy, freshnessState }) {
   return { outcome: "ALLOW", reasonCode: "POLICY_ALLOW", rule };
 }
 
-function buildSubject(subject, anchor, now, subjectIndex) {
+const runtimeAdjustments = Object.freeze({
+  "cross-tenant-record": Object.freeze({ identity: -12, device: -5, behaviour: -30, compliance: -15 }),
+  "forged-identity-header": Object.freeze({ identity: -18, device: -10, behaviour: -40, compliance: -20 }),
+  "sensitive-export": Object.freeze({ identity: -5, behaviour: -20, compliance: -12 }),
+  "revoked-certificate": Object.freeze({ identity: -10, behaviour: -10, certificate: -100 }),
+  "same-tenant-record": Object.freeze({ identity: -10, behaviour: -10, certificate: -100 }),
+});
+
+function runtimeTransitionDefinitions(subject, observations) {
+  let components = { ...subject.transitions.at(-1).components };
+  return observations.map((observation) => {
+    const certificateRejected = observation.reasonCode === "CERTIFICATE_NOT_ACCEPTED";
+    const adjustments = certificateRejected
+      ? runtimeAdjustments["revoked-certificate"]
+      : runtimeAdjustments[observation.scenarioId] ?? Object.freeze({ behaviour: -10 });
+    components = Object.fromEntries(Object.entries(components).map(([component, value]) => [
+      component,
+      Math.max(0, Math.min(100, value + (adjustments[component] ?? 0))),
+    ]));
+    return Object.freeze({
+      observedAt: observation.observedAt,
+      trigger: certificateRejected
+        ? "Invalid certificate use reduced trust"
+        : "Denied access attempt reduced trust",
+      reasonCode: certificateRejected
+        ? "CERTIFICATE_REJECTION_EVIDENCE"
+        : "SUSPICIOUS_ACCESS_EVIDENCE",
+      action: observation.action,
+      stepUpSatisfied: false,
+      components: Object.freeze({ ...components }),
+    });
+  });
+}
+
+function buildSubject(subject, anchor, now, subjectIndex, observations = []) {
   const policy = policyForTenant(subject.tenantId);
-  const transitions = subject.transitions.map((definition, transitionIndex) => {
+  const definitions = [
+    ...subject.transitions,
+    ...runtimeTransitionDefinitions(subject, observations),
+  ];
+  const transitions = definitions.map((definition, transitionIndex) => {
     const calculation = calculateWeightedTrustScore(definition.components);
     const controlState = initializeTrustControlState(calculation.score);
+    const observedAt = definition.observedAt
+      ? requireDate(definition.observedAt)
+      : new Date(anchor.getTime() - definition.ageSeconds * 1000);
     return {
       transitionId: id("trn", subjectIndex * 10 + transitionIndex + 1),
       updateVersion: transitionIndex + 1,
       modelVersion: calculation.modelVersion,
       configurationVersion: 1,
-      observedAt: new Date(anchor.getTime() - definition.ageSeconds * 1000).toISOString(),
-      evaluatedAt: new Date(anchor.getTime() - definition.ageSeconds * 1000 + 2_000).toISOString(),
+      observedAt: observedAt.toISOString(),
+      evaluatedAt: new Date(observedAt.getTime() + 2_000).toISOString(),
       score: calculation.score,
       band: controlState.band,
       trigger: definition.trigger,
@@ -277,6 +318,7 @@ function buildSubject(subject, anchor, now, subjectIndex) {
 export function createTrustDashboard({ clock = () => new Date() } = {}) {
   if (typeof clock !== "function") throw new TypeError("Trust dashboard clock must be a function.");
   const anchor = requireDate(clock());
+  const observationsBySubject = new Map();
 
   function getState(personaKey = "alpha-member") {
     const persona = getReviewPersona(personaKey);
@@ -291,6 +333,7 @@ export function createTrustDashboard({ clock = () => new Date() } = {}) {
       anchor,
       now,
       subjectDefinitions.indexOf(subject) + 1,
+      observationsBySubject.get(subject.subjectId) ?? [],
     ));
     const currentSubject = trustSubjects.find(({ subjectId }) => subjectId === persona.subjectId)
       ?? trustSubjects[0]
@@ -308,5 +351,32 @@ export function createTrustDashboard({ clock = () => new Date() } = {}) {
     });
   }
 
-  return Object.freeze({ getState });
+  function recordScenario({ personaKey = "alpha-member", result } = {}) {
+    if (!result || result.outcome !== "deny") return null;
+    const persona = getReviewPersona(personaKey);
+    const previous = getState(personaKey).trustSubjects
+      .find(({ subjectId }) => subjectId === persona.subjectId)?.current;
+    const observations = observationsBySubject.get(persona.subjectId) ?? [];
+    observations.push(Object.freeze({
+      observedAt: requireDate(clock()).toISOString(),
+      scenarioId: result.scenarioId,
+      action: result.event.action,
+      reasonCode: result.reasonCode,
+    }));
+    observationsBySubject.set(persona.subjectId, observations);
+    const current = getState(personaKey).trustSubjects
+      .find(({ subjectId }) => subjectId === persona.subjectId)?.current;
+    if (!previous || !current) return null;
+    return Object.freeze({
+      previousScore: previous.lastKnownScore,
+      newScore: current.lastKnownScore,
+      previousBand: previous.band,
+      newBand: current.band,
+      reasonCode: result.reasonCode === "CERTIFICATE_NOT_ACCEPTED"
+        ? "CERTIFICATE_REJECTION_EVIDENCE"
+        : "SUSPICIOUS_ACCESS_EVIDENCE",
+    });
+  }
+
+  return Object.freeze({ getState, recordScenario });
 }

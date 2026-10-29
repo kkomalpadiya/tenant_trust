@@ -280,7 +280,12 @@ export function getReviewState(personaKey = "alpha-member") {
   };
 }
 
-export function runReviewScenario({ personaKey = "alpha-member", scenarioId, clock = () => new Date() } = {}) {
+export function runReviewScenario({
+  personaKey = "alpha-member",
+  scenarioId,
+  certificateState = "active",
+  clock = () => new Date(),
+} = {}) {
   const persona = getReviewPersona(personaKey);
   const scenario = scenarioDefinitions.find((candidate) => candidate.id === scenarioId);
   if (!scenario) throw new RangeError("Unknown review scenario.");
@@ -296,15 +301,16 @@ export function runReviewScenario({ personaKey = "alpha-member", scenarioId, clo
   let summary;
   let stages;
 
-  if (scenario.id === "revoked-certificate") {
+  if (certificateState !== "active" || scenario.id === "revoked-certificate") {
+    const rejectedState = certificateState === "active" ? "revoked" : certificateState;
     statusCode = 401;
     outcome = "deny";
     reasonCode = "CERTIFICATE_NOT_ACCEPTED";
-    headline = "Revoked certificate rejected";
-    summary = "Authoritative inventory state is checked again on the request. No cached allow survives revocation.";
+    headline = "Authentication certificate rejected";
+    summary = `Authoritative inventory reports the login certificate as ${rejectedState}. No previous permission survives that lifecycle change.`;
     stages = [
-      commonAccepted[0],
-      { label: "Certificate state", detail: "Inventory reports revoked", state: "fail" },
+      { label: "mTLS edge", detail: "Certificate identity presented", state: "pass" },
+      { label: "Certificate state", detail: `Inventory reports ${rejectedState}`, state: "fail" },
       { label: "Protected API", detail: "Request stopped before data access", state: "blocked" },
     ];
   } else if (scenario.id === "cross-tenant-record") {

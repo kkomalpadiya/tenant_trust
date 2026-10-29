@@ -115,7 +115,7 @@ function requireDate(value, reasonCode) {
 function canManageSubject(context, subject) {
   return subject.tenantId === context.tenantId
     && subject.state === "active"
-    && (subject.subjectId === context.subjectId || context.roles.includes("tenant-admin"));
+    && context.roles.includes("tenant-admin");
 }
 
 function renewalWindowOpen(certificate, now) {
@@ -139,7 +139,7 @@ function permission(allowed, allowedReason, deniedReason) {
 function issuePermission(context, subject) {
   return permission(
     canManageSubject(context, subject),
-    subject.subjectId === context.subjectId ? "SELF_ENROLLMENT_ALLOWED" : "TENANT_ADMIN_ENROLLMENT_ALLOWED",
+    "TENANT_ADMIN_ENROLLMENT_ALLOWED",
     "SUBJECT_ENROLLMENT_UNAUTHORIZED",
   );
 }
@@ -156,7 +156,7 @@ function certificatePermission(context, subject, certificate, operation, now) {
   }
   return permission(
     true,
-    subject.subjectId === context.subjectId ? "SELF_OPERATION_ALLOWED" : "TENANT_ADMIN_OPERATION_ALLOWED",
+    "TENANT_ADMIN_OPERATION_ALLOWED",
     "CERTIFICATE_OPERATION_UNAUTHORIZED",
   );
 }
@@ -170,10 +170,12 @@ function compactSubject(subject, context) {
 }
 
 function compactCertificate(certificate, subject, context, currentCertificateId, now) {
+  const isAuthenticationCertificate = certificate.certificateId === currentCertificateId;
   return Object.freeze({
     ...certificate,
     subjectName: subject.displayName,
-    isCurrentCertificate: certificate.certificateId === currentCertificateId,
+    isAuthenticationCertificate,
+    isCurrentCertificate: isAuthenticationCertificate && certificate.state === "active",
     operations: Object.freeze({
       renew: certificatePermission(context, subject, certificate, "renew", now),
       revoke: certificatePermission(context, subject, certificate, "revoke", now),
@@ -247,6 +249,8 @@ export function createCertificateDashboard({ clock = () => new Date(), idFactory
       persona.certificateId,
       now,
     ));
+    const authenticationCertificate = compactCertificates
+      .find(({ isAuthenticationCertificate }) => isAuthenticationCertificate) ?? null;
     const permittedOperations = compactSubjects.filter(({ operations }) => operations.issue.allowed).length
       + compactCertificates.reduce((count, certificate) => count
         + Number(certificate.operations.renew.allowed)
@@ -260,7 +264,8 @@ export function createCertificateDashboard({ clock = () => new Date(), idFactory
         activeCertificateCount: compactCertificates.filter(({ state }) => state === "active").length,
         permittedOperations,
       }),
-      currentCertificate: compactCertificates.find(({ certificateId }) => certificateId === persona.certificateId) ?? null,
+      authenticationCertificate,
+      currentCertificate: authenticationCertificate?.state === "active" ? authenticationCertificate : null,
     });
   }
 
@@ -292,7 +297,10 @@ export function createCertificateDashboard({ clock = () => new Date(), idFactory
         && candidate.tenantId === context.tenantId);
       if (!target) throw new CertificateDashboardError("ACCESS_DENIED");
       const decision = certificatePermission(context, subject, target, operation, now);
-      if (!decision.allowed) throw new CertificateDashboardError(decision.reasonCode, 409);
+      if (!decision.allowed) {
+        const statusCode = decision.reasonCode === "CERTIFICATE_OPERATION_UNAUTHORIZED" ? 403 : 409;
+        throw new CertificateDashboardError(decision.reasonCode, statusCode);
+      }
       if (operation === "renew") {
         target.state = "superseded";
         target.updatedAt = now.toISOString();

@@ -106,6 +106,7 @@
     "security-action-audit:projector": "node scripts/run-security-action-audit-projector.mjs",
     "audit-outbox:worker": "node scripts/run-audit-outbox-worker.mjs",
     "audit-outbox:status": "node scripts/show-audit-outbox-status.mjs",
+    "fabric-audit:demo": "node scripts/demo-fabric-audit.mjs",
     "fabric:up": "node scripts/fabric-network.mjs up",
     "fabric:verify": "node scripts/fabric-network.mjs verify",
     "fabric:status": "node scripts/fabric-network.mjs status",

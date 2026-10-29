@@ -71,3 +71,35 @@ test("decision and transition histories carry reasons and tenant policy provenan
   assert.ok(bob.transitions.every((transition, index, items) => index === 0
     || Date.parse(items[index - 1].observedAt) >= Date.parse(transition.observedAt)));
 });
+
+test("denied and certificate-rejected access attempts immediately reduce trust", () => {
+  const service = createTrustDashboard({ clock: () => new Date(fixedTime) });
+  const before = service.getState("alpha-member").trustSubjects[0];
+  const denied = {
+    scenarioId: "forged-identity-header",
+    outcome: "deny",
+    reasonCode: "ACCESS_DENIED",
+    event: { action: "record:read" },
+  };
+  const firstImpact = service.recordScenario({ personaKey: "alpha-member", result: denied });
+  const afterDenied = service.getState("alpha-member").trustSubjects[0];
+
+  assert.equal(firstImpact.previousScore, before.current.lastKnownScore);
+  assert(firstImpact.newScore < firstImpact.previousScore);
+  assert.equal(afterDenied.transitions[0].reasonCode, "SUSPICIOUS_ACCESS_EVIDENCE");
+
+  const certificateImpact = service.recordScenario({
+    personaKey: "alpha-member",
+    result: {
+      scenarioId: "same-tenant-record",
+      outcome: "deny",
+      reasonCode: "CERTIFICATE_NOT_ACCEPTED",
+      event: { action: "record:read" },
+    },
+  });
+  const afterCertificate = service.getState("alpha-member").trustSubjects[0];
+
+  assert(certificateImpact.newScore < firstImpact.newScore);
+  assert.equal(afterCertificate.components.find(({ id }) => id === "certificate").value, 0);
+  assert.equal(afterCertificate.transitions[0].reasonCode, "CERTIFICATE_REJECTION_EVIDENCE");
+});

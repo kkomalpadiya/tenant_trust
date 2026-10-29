@@ -47,6 +47,20 @@ test("review scenarios show allow, cross-tenant denial and immediate revocation 
   assert.equal(revoked.reasonCode, "CERTIFICATE_NOT_ACCEPTED");
 });
 
+test("a non-active login certificate blocks every access-lab operation", () => {
+  const result = runReviewScenario({
+    personaKey: "alpha-member",
+    scenarioId: "same-tenant-record",
+    certificateState: "superseded",
+    clock,
+  });
+
+  assert.equal(result.statusCode, 401);
+  assert.equal(result.outcome, "deny");
+  assert.equal(result.reasonCode, "CERTIFICATE_NOT_ACCEPTED");
+  assert.match(result.summary, /superseded/u);
+});
+
 test("sensitive export stays role-bound even when additional controls exist", () => {
   const member = runReviewScenario({ personaKey: "alpha-member", scenarioId: "sensitive-export", clock });
   const admin = runReviewScenario({ personaKey: "alpha-admin", scenarioId: "sensitive-export", clock });

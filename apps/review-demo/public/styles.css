@@ -360,6 +360,12 @@ tbody tr:last-child td { border-bottom: 0; }
 .result-hero h3 { margin: 5px 0 7px; font-size: 20px; letter-spacing: -.03em; }
 .result-hero p { max-width: 570px; margin: 0; color: rgba(255,255,255,.8); font-size: 10px; line-height: 1.5; }
 .http-code { padding: 9px 11px; background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.trust-impact { display: flex; align-items: center; gap: 11px; margin: 18px 26px 0; padding: 13px 15px; color: #75491a; background: #fff5df; border: 1px solid #f1d69e; border-radius: 10px; }
+.trust-impact > span { display: grid; place-items: center; width: 30px; height: 30px; color: #b16a19; background: #ffe6b3; border-radius: 50%; }
+.trust-impact svg { width: 15px; height: 15px; }
+.trust-impact strong, .trust-impact small { display: block; }
+.trust-impact strong { font-size: 10px; }
+.trust-impact small { margin-top: 3px; color: #8a6339; font: 9px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .trace { padding: 24px 26px; }
 .trace-title { margin: 0 0 16px; color: var(--soft); font-size: 9px; letter-spacing: .09em; text-transform: uppercase; }
 .trace-step { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 11px; min-height: 62px; position: relative; }
@@ -476,6 +482,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .certificate-owner, .current-label { display: block; }
 .certificate-owner { color: var(--ink); font-size: 11px; }
 .current-label { margin-top: 3px; color: var(--blue); font-size: 8px; font-weight: 700; }
+.current-label.invalid { color: var(--red); }
 .certificate-id strong, .certificate-id small { display: block; }
 .certificate-id strong { color: #41566d; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; }
 .certificate-id small { margin-top: 3px; max-width: 205px; overflow: hidden; color: var(--soft); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
